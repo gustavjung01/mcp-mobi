@@ -92,8 +92,7 @@ class _SettingsPageState extends State<SettingsPage> {
         await _updates.openInstallPermissionSettings();
         if (!mounted) return;
         setState(() {
-          _message =
-              'Bật “Cho phép từ nguồn này”, quay lại MCP Field rồi bấm Cài bản cập nhật.';
+          _message = 'Bật “Cho phép từ nguồn này”, quay lại MCP Field rồi bấm Cài bản cập nhật.';
         });
         return;
       }
@@ -101,8 +100,7 @@ class _SettingsPageState extends State<SettingsPage> {
       await _updates.install(release);
       if (!mounted) return;
       setState(() {
-        _message =
-            'Đã tải và kiểm tra file. Android đang mở màn hình cài đặt.';
+        _message = 'Đã tải và kiểm tra file. Android đang mở màn hình cài đặt.';
       });
     } on AppUpdateFailure catch (failure) {
       if (!mounted) return;

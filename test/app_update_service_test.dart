@@ -53,11 +53,9 @@ void main() {
             'version': '1.0.1',
             'buildNumber': 1000001,
             'apk': 'MCP-Field-1.0.1.apk',
-            'url':
-                'https://updates.example.vn/mcp-filed/MCP-Field-1.0.1.apk',
+            'url': 'https://updates.example.vn/mcp-filed/MCP-Field-1.0.1.apk',
             'size': 123456,
-            'sha256':
-                'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+            'sha256': 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
             'releaseNotes': 'Bổ sung cập nhật trực tiếp.',
           }),
         ),
@@ -98,8 +96,7 @@ void main() {
             'version': '1.2.3',
             'apk': 'MCP-Field-1.2.3.apk',
             'size': 1,
-            'sha256':
-                'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+            'sha256': 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
           }),
         ),
         200,

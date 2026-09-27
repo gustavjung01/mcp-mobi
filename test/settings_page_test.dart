@@ -46,11 +46,9 @@ void main() {
             jsonEncode({
               'version': '1.0.1',
               'apk': 'MCP-Field-1.0.1.apk',
-              'url':
-                  'https://updates.example.vn/mcp-filed/MCP-Field-1.0.1.apk',
+              'url': 'https://updates.example.vn/mcp-filed/MCP-Field-1.0.1.apk',
               'size': 1024,
-              'sha256':
-                  'cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc',
+              'sha256': 'cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc',
               'releaseNotes': 'Bản thử cập nhật.',
             }),
           ),

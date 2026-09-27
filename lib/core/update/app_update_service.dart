@@ -158,9 +158,9 @@ class AppUpdateService {
     http.Client? client,
     AppUpdatePlatform? platform,
     this.timeout = const Duration(seconds: 12),
-  }) : baseUrl = (baseUrl ??
-            const String.fromEnvironment('MCP_UPDATE_BASE_URL'))
-        .trim(),
+  }) : baseUrl =
+           (baseUrl ?? const String.fromEnvironment('MCP_UPDATE_BASE_URL'))
+               .trim(),
        _client = client ?? http.Client(),
        platform = platform ?? const MethodChannelAppUpdatePlatform();
 
@@ -294,8 +294,7 @@ AppUpdateFailure _platformFailure(PlatformException error) {
     case 'INSTALL_PERMISSION_REQUIRED':
       return const AppUpdateFailure(
         code: 'INSTALL_PERMISSION_REQUIRED',
-        message:
-            'Cần cho phép MCP Field cài đặt ứng dụng từ nguồn này.',
+        message: 'Cần cho phép MCP Field cài đặt ứng dụng từ nguồn này.',
       );
     case 'DOWNLOAD_FAILED':
       return const AppUpdateFailure(
