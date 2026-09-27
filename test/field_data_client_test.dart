@@ -79,6 +79,7 @@ void main() {
               },
             }),
             200,
+            headers: {'content-type': 'application/json; charset=utf-8'},
           );
         }
         expect(request.url.path, '/api/mcp-day/data');
@@ -121,6 +122,7 @@ void main() {
             },
           }),
           200,
+          headers: {'content-type': 'application/json; charset=utf-8'},
         );
       }),
     );
