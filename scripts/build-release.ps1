@@ -19,15 +19,42 @@ if ($version -notmatch '^\d+\.\d+\.\d+$') {
 
 $ApiBaseUrl = $ApiBaseUrl.Trim().TrimEnd("/")
 $UpdateBaseUrl = $UpdateBaseUrl.Trim().TrimEnd("/")
+
 $apiUri = $null
-$updateUri = $null
-if (-not [Uri]::TryCreate($ApiBaseUrl, [UriKind]::Absolute, [ref]$apiUri) -or
-    $apiUri.Scheme -ne "https" -or
-    $apiUri.AbsolutePath -ne "/") {
-    throw "ApiBaseUrl must be the root public HTTPS origin of the MCP backend."
+try {
+    $apiUri = [System.Uri]::new($ApiBaseUrl, [System.UriKind]::Absolute)
 }
-if (-not [Uri]::TryCreate($UpdateBaseUrl, [UriKind]::Absolute, [ref]$updateUri) -or
-    $updateUri.Scheme -ne "https") {
+catch {
+    $apiUri = $null
+}
+
+$apiPath = if ($null -eq $apiUri -or [string]::IsNullOrEmpty($apiUri.AbsolutePath)) {
+    "/"
+}
+else {
+    $apiUri.AbsolutePath
+}
+
+if ($null -eq $apiUri -or
+    $apiUri.Scheme -ne "https" -or
+    [string]::IsNullOrWhiteSpace($apiUri.Host) -or
+    $apiPath -ne "/" -or
+    -not [string]::IsNullOrEmpty($apiUri.Query) -or
+    -not [string]::IsNullOrEmpty($apiUri.Fragment) -or
+    -not [string]::IsNullOrEmpty($apiUri.UserInfo)) {
+    throw "ApiBaseUrl must be the root public HTTPS origin of the MCP backend. Received: '$ApiBaseUrl'."
+}
+
+$updateUri = $null
+try {
+    $updateUri = [System.Uri]::new($UpdateBaseUrl, [System.UriKind]::Absolute)
+}
+catch {
+    $updateUri = $null
+}
+if ($null -eq $updateUri -or
+    $updateUri.Scheme -ne "https" -or
+    [string]::IsNullOrWhiteSpace($updateUri.Host)) {
     throw "UpdateBaseUrl must be a public HTTPS URL."
 }
 if ($updateUri.Host.EndsWith(".r2.cloudflarestorage.com", [StringComparison]::OrdinalIgnoreCase)) {
