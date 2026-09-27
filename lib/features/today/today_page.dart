@@ -1,97 +1,238 @@
 import 'package:flutter/material.dart';
 
 import '../../app/theme/app_theme.dart';
-import '../../shared/widgets/app_button.dart';
 import '../../shared/widgets/app_card.dart';
-import '../../shared/widgets/screen_header.dart';
 
 class TodayPage extends StatelessWidget {
   const TodayPage({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
+    return Scaffold(
       key: const Key('today-screen'),
-      child: ListView(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        children: [
-          const SizedBox(height: AppSpacing.xs),
-          const ScreenHeader(
-            title: 'Hôm nay',
-            subtitle: 'Tổng quan công việc cần xử lý',
-            trailing: StatusPill(
-              label: 'Sẵn sàng',
-              icon: Icons.check_circle_outline,
-            ),
-          ),
-          const SizedBox(height: AppSpacing.xl),
-          AppCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.all(AppSpacing.md),
+          children: [
+            Row(
               children: [
-                Row(
-                  children: [
-                    Text(
-                      'Tuyến hôm nay',
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                    const Spacer(),
-                    Text(
-                      '0 / 0 điểm',
-                      style: Theme.of(context).textTheme.bodyMedium,
-                    ),
-                  ],
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: const BoxDecoration(
+                    color: AppColors.primarySoft,
+                    shape: BoxShape.circle,
+                  ),
+                  alignment: Alignment.center,
+                  child: const Icon(
+                    Icons.person_rounded,
+                    color: AppColors.primary,
+                  ),
                 ),
-                const SizedBox(height: AppSpacing.md),
-                const LinearProgressIndicator(value: 0, minHeight: 8),
-                const SizedBox(height: AppSpacing.md),
-                Text(
-                  'Chưa có tuyến được đồng bộ.',
-                  style: Theme.of(context).textTheme.bodyMedium,
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Chào buổi sáng',
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                      Text(
+                        'Nhân viên thị trường',
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                    ],
+                  ),
                 ),
-                const SizedBox(height: AppSpacing.lg),
-                const AppPrimaryButton(
-                  label: 'Bắt đầu đi tuyến',
-                  icon: Icons.route_outlined,
+                IconButton(
                   onPressed: null,
+                  icon: const Icon(Icons.notifications_none_rounded),
                 ),
               ],
             ),
-          ),
-          const SizedBox(height: AppSpacing.xl),
-          Text(
-            'Cần theo dõi',
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          const Row(
-            children: [
-              Expanded(
-                child: _SummaryTile(
-                  icon: Icons.receipt_long_outlined,
-                  value: '0',
-                  label: 'Đơn hàng',
-                ),
+            const SizedBox(height: AppSpacing.lg),
+            AppCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Hôm nay',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Container(
+                          padding: const EdgeInsets.all(AppSpacing.md),
+                          decoration: BoxDecoration(
+                            color: AppColors.primarySoft,
+                            borderRadius: BorderRadius.circular(AppRadius.md),
+                          ),
+                          child: const Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Tuyến hôm nay',
+                                style: TextStyle(
+                                  color: AppColors.textSecondary,
+                                  fontSize: 12,
+                                ),
+                              ),
+                              SizedBox(height: 5),
+                              Text(
+                                'Chưa có tuyến',
+                                style: TextStyle(
+                                  color: AppColors.textPrimary,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.sm),
+                      Expanded(
+                        child: Container(
+                          padding: const EdgeInsets.all(AppSpacing.md),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF7FAFE),
+                            borderRadius: BorderRadius.circular(AppRadius.md),
+                            border: Border.all(color: AppColors.border),
+                          ),
+                          child: const Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Tiến độ ghé',
+                                style: TextStyle(
+                                  color: AppColors.textSecondary,
+                                  fontSize: 12,
+                                ),
+                              ),
+                              SizedBox(height: 5),
+                              Text(
+                                '0 / 0 điểm',
+                                style: TextStyle(
+                                  color: AppColors.textPrimary,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                              SizedBox(height: 8),
+                              LinearProgressIndicator(
+                                value: 0,
+                                minHeight: 6,
+                                borderRadius:
+                                    BorderRadius.all(Radius.circular(999)),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
-              SizedBox(width: AppSpacing.sm),
-              Expanded(
-                child: _SummaryTile(
-                  icon: Icons.assignment_outlined,
-                  value: '0',
-                  label: 'Báo cáo',
+            ),
+            const SizedBox(height: AppSpacing.md),
+            const Row(
+              children: [
+                Expanded(
+                  child: _SummaryTile(
+                    icon: Icons.receipt_long_outlined,
+                    value: '0',
+                    label: 'Đơn hàng',
+                  ),
                 ),
-              ),
-              SizedBox(width: AppSpacing.sm),
-              Expanded(
-                child: _SummaryTile(
-                  icon: Icons.task_alt_outlined,
-                  value: '0',
-                  label: 'Công việc',
+                SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: _SummaryTile(
+                    icon: Icons.assignment_outlined,
+                    value: '0',
+                    label: 'Báo cáo',
+                  ),
                 ),
+                SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: _SummaryTile(
+                    icon: Icons.task_alt_outlined,
+                    value: '0',
+                    label: 'Công việc',
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            Text(
+              'Điểm bán tiếp theo',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            AppCard(
+              child: Row(
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: AppColors.primarySoft,
+                      borderRadius: BorderRadius.circular(AppRadius.md),
+                    ),
+                    alignment: Alignment.center,
+                    child: const Icon(
+                      Icons.storefront_outlined,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: Text(
+                      'Chưa có điểm bán tiếp theo',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                  ),
+                  const Icon(
+                    Icons.chevron_right_rounded,
+                    color: AppColors.textSecondary,
+                  ),
+                ],
               ),
-            ],
-          ),
-        ],
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            Text(
+              'Việc cần làm hôm nay',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            const AppCard(
+              child: Column(
+                children: [
+                  _TaskRow(
+                    icon: Icons.route_outlined,
+                    label: 'Ghé các điểm còn lại',
+                    value: '0',
+                  ),
+                  Divider(height: 20),
+                  _TaskRow(
+                    icon: Icons.assignment_outlined,
+                    label: 'Hoàn thành báo cáo',
+                    value: '0',
+                  ),
+                  Divider(height: 20),
+                  _TaskRow(
+                    icon: Icons.receipt_long_outlined,
+                    label: 'Gửi đơn hàng',
+                    value: '0',
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -117,17 +258,65 @@ class _SummaryTile extends StatelessWidget {
       ),
       child: Column(
         children: [
-          Icon(icon, color: AppColors.primary),
-          const SizedBox(height: AppSpacing.sm),
-          Text(value, style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: 2),
+          Icon(icon, size: 20, color: AppColors.primary),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            value,
+            style: const TextStyle(
+              color: AppColors.textPrimary,
+              fontSize: 20,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
           Text(
             label,
             textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodyMedium,
+            style: const TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 11,
+            ),
           ),
         ],
       ),
+    );
+  }
+}
+
+class _TaskRow extends StatelessWidget {
+  const _TaskRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 18, color: AppColors.primary),
+        const SizedBox(width: AppSpacing.sm),
+        Expanded(
+          child: Text(
+            label,
+            style: const TextStyle(
+              color: AppColors.textPrimary,
+              fontSize: 14,
+            ),
+          ),
+        ),
+        Text(
+          value,
+          style: const TextStyle(
+            color: AppColors.textSecondary,
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ],
     );
   }
 }
