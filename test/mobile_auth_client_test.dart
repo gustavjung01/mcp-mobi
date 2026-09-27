@@ -21,8 +21,7 @@ void main() {
         return http.Response(
           jsonEncode({
             'data': {
-              'token':
-                  'nppusr.aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.tokenvalue',
+              'token': 'nppusr.aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.tokenvalue',
               'session': {
                 'expiresAt': '2026-09-28T00:00:00.000Z',
                 'sourceApp': 'mcp-field-mobile',
@@ -53,7 +52,10 @@ void main() {
       password: 'password-value',
     );
 
-    expect(captured.url.toString(), 'https://mcp.example.vn/api/mobile-auth/login');
+    expect(
+      captured.url.toString(),
+      'https://mcp.example.vn/api/mobile-auth/login',
+    );
     expect(captured.headers.containsKey('X-Backend-Token'), isFalse);
     expect(jsonDecode(captured.body)['loginName'], 'staff.test');
     expect(session.displayName, 'Nguyễn Văn A');
@@ -101,8 +103,7 @@ void main() {
 
   test('me sends only user bearer authorization', () async {
     late http.Request captured;
-    const token =
-        'nppusr.aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.tokenvalue';
+    const token = 'nppusr.aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.tokenvalue';
     final client = HttpMobileAuthClient(
       client: MockClient((request) async {
         captured = request;
@@ -132,7 +133,10 @@ void main() {
 
     await client.me(profile: profile, token: token);
 
-    expect(captured.url.toString(), 'https://mcp.example.vn/api/mobile-auth/me');
+    expect(
+      captured.url.toString(),
+      'https://mcp.example.vn/api/mobile-auth/me',
+    );
     expect(captured.headers['Authorization'], 'Bearer $token');
     expect(captured.headers.containsKey('X-Backend-Token'), isFalse);
   });
