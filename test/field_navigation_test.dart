@@ -190,19 +190,18 @@ Finder navLabel(String label) {
 
 Future<void> revealAddCustomerSubmit(WidgetTester tester) async {
   final screen = find.byKey(const Key('route-add-customer-screen'));
-  final verticalScrollable = find.descendant(
+  final list = find.descendant(
     of: screen,
-    matching: find.byWidgetPredicate(
-      (widget) =>
-          widget is Scrollable && widget.axisDirection == AxisDirection.down,
-    ),
+    matching: find.byType(ListView),
   );
-  await tester.scrollUntilVisible(
-    find.byKey(const Key('route-add-customer-submit')),
-    300,
-    scrollable: verticalScrollable,
-  );
-  await tester.pumpAndSettle();
+  final submit = find.byKey(const Key('route-add-customer-submit'));
+
+  for (var attempt = 0; attempt < 5 && submit.evaluate().isEmpty; attempt++) {
+    await tester.drag(list, const Offset(0, -300));
+    await tester.pumpAndSettle();
+  }
+
+  expect(submit, findsOneWidget);
 }
 
 void main() {
