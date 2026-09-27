@@ -4,7 +4,12 @@ import '../../app/theme/app_theme.dart';
 import '../../shared/widgets/app_card.dart';
 
 class TodayPage extends StatelessWidget {
-  const TodayPage({super.key});
+  const TodayPage({
+    super.key,
+    this.displayName,
+  });
+
+  final String? displayName;
 
   @override
   Widget build(BuildContext context) {
@@ -41,7 +46,9 @@ class TodayPage extends StatelessWidget {
                         style: textTheme.bodyMedium,
                       ),
                       Text(
-                        'Nhân viên thị trường',
+                        (displayName ?? '').trim().isEmpty
+                            ? 'Nhân viên thị trường'
+                            : displayName!.trim(),
                         style: textTheme.titleMedium,
                       ),
                     ],

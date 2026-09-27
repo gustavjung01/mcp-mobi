@@ -5,10 +5,18 @@ import '../../features/orders/orders_page.dart';
 import '../../features/outlets/outlets_page.dart';
 import '../../features/routes/routes_page.dart';
 import '../../features/today/today_page.dart';
+import '../../core/auth/mobile_auth_client.dart';
 import '../theme/app_theme.dart';
 
 class AppShell extends StatefulWidget {
-  const AppShell({super.key});
+  const AppShell({
+    super.key,
+    this.session,
+    this.onLogout,
+  });
+
+  final MobileSession? session;
+  final Future<void> Function()? onLogout;
 
   @override
   State<AppShell> createState() => _AppShellState();
@@ -17,20 +25,20 @@ class AppShell extends StatefulWidget {
 class _AppShellState extends State<AppShell> {
   int _selectedIndex = 0;
 
-  static const _pages = <Widget>[
-    TodayPage(),
-    RoutesPage(),
-    OutletsPage(),
-    OrdersPage(),
-    MorePage(),
-  ];
-
   @override
   Widget build(BuildContext context) {
+    final pages = <Widget>[
+      TodayPage(displayName: widget.session?.displayName),
+      const RoutesPage(),
+      const OutletsPage(),
+      const OrdersPage(),
+      MorePage(onLogout: widget.onLogout),
+    ];
+
     return Scaffold(
       body: IndexedStack(
         index: _selectedIndex,
-        children: _pages,
+        children: pages,
       ),
       bottomNavigationBar: DecoratedBox(
         decoration: const BoxDecoration(

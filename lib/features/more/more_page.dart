@@ -5,7 +5,12 @@ import '../../shared/widgets/app_card.dart';
 import '../../shared/widgets/screen_header.dart';
 
 class MorePage extends StatelessWidget {
-  const MorePage({super.key});
+  const MorePage({
+    super.key,
+    this.onLogout,
+  });
+
+  final Future<void> Function()? onLogout;
 
   static const _items = <_MoreItem>[
     _MoreItem(Icons.history, 'Lịch sử phiên'),
@@ -41,6 +46,17 @@ class MorePage extends StatelessWidget {
               ],
             ),
           ),
+          if (onLogout != null) ...[
+            const SizedBox(height: AppSpacing.lg),
+            OutlinedButton.icon(
+              key: const Key('logout-button'),
+              onPressed: () {
+                onLogout!();
+              },
+              icon: const Icon(Icons.logout_rounded),
+              label: const Text('Đăng xuất'),
+            ),
+          ],
         ],
       ),
     );
