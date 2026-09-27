@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 
 import '../../app/theme/app_theme.dart';
@@ -41,6 +43,7 @@ class _OutletDetailPageState extends State<OutletDetailPage> {
   late bool _checkedIn;
   String? _checkinAt;
   String? _heroPhotoUrl;
+  Uint8List? _heroPhotoBytes;
 
   @override
   void initState() {
@@ -131,7 +134,14 @@ class _OutletDetailPageState extends State<OutletDetailPage> {
             ),
             child: Stack(
               children: [
-                if ((_heroPhotoUrl ?? '').isNotEmpty)
+                if (_heroPhotoBytes != null)
+                  Positioned.fill(
+                    child: Image.memory(
+                      _heroPhotoBytes!,
+                      fit: BoxFit.cover,
+                    ),
+                  )
+                else if ((_heroPhotoUrl ?? '').isNotEmpty)
                   Positioned.fill(
                     child: Image.network(
                       _heroPhotoUrl!,
@@ -153,7 +163,7 @@ class _OutletDetailPageState extends State<OutletDetailPage> {
                     ),
                   ),
                 ),
-                if ((_heroPhotoUrl ?? '').isEmpty)
+                if (_heroPhotoBytes == null && (_heroPhotoUrl ?? '').isEmpty)
                   Positioned(
                     right: -22,
                     bottom: -36,
@@ -364,11 +374,17 @@ class _OutletDetailPageState extends State<OutletDetailPage> {
                             final hero = profile.media.isEmpty
                                 ? null
                                 : profile.media.first.viewUrl;
-                            if (mounted && hero != _heroPhotoUrl) {
-                              setState(() {
-                                _heroPhotoUrl = hero;
-                              });
-                            }
+                            if (!mounted) return;
+                            setState(() {
+                              _heroPhotoUrl = hero;
+                              _heroPhotoBytes = null;
+                            });
+                          },
+                          onDraftPreviewChanged: (bytes) {
+                            if (!mounted) return;
+                            setState(() {
+                              _heroPhotoBytes = bytes;
+                            });
                           },
                         ),
                       ],

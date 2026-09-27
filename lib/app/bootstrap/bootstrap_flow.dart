@@ -5,6 +5,7 @@ import '../../core/installation/installation_profile.dart';
 import '../../core/session/session_store.dart';
 import '../../features/auth/login_page.dart';
 import '../../features/bootstrap/system_setup_page.dart';
+import '../../features/settings/settings_page.dart';
 import '../navigation/app_shell.dart';
 import '../theme/app_theme.dart';
 
@@ -304,6 +305,19 @@ class _UnavailableScreen extends StatelessWidget {
                 onPressed: onRetry,
                 icon: const Icon(Icons.refresh_rounded),
                 label: const Text('Thử lại'),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              OutlinedButton.icon(
+                key: const Key('bootstrap-update-app'),
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const SettingsPage(),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.system_update_alt_rounded),
+                label: const Text('Cập nhật ứng dụng'),
               ),
               const SizedBox(height: AppSpacing.sm),
               TextButton(

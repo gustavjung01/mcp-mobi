@@ -14,6 +14,7 @@ class OutletPhotoSection extends StatefulWidget {
     required this.photoPicker,
     this.sessionId,
     this.onProfileChanged,
+    this.onDraftPreviewChanged,
   });
 
   final String routeCustomerId;
@@ -22,6 +23,7 @@ class OutletPhotoSection extends StatefulWidget {
   final OutletMediaClient mediaClient;
   final OutletPhotoPicker photoPicker;
   final ValueChanged<OutletMediaProfile>? onProfileChanged;
+  final ValueChanged<Uint8List?>? onDraftPreviewChanged;
 
   @override
   State<OutletPhotoSection> createState() => _OutletPhotoSectionState();
@@ -45,6 +47,12 @@ class _OutletPhotoSectionState extends State<OutletPhotoSection> {
 
   bool get _busy =>
       _loading || _picking || _saving || (_deletingId ?? '').isNotEmpty;
+
+  void _publishDraftPreview() {
+    widget.onDraftPreviewChanged?.call(
+      _drafts.isEmpty ? null : _drafts.first.bytes,
+    );
+  }
 
   @override
   void initState() {
@@ -104,6 +112,7 @@ class _OutletPhotoSectionState extends State<OutletPhotoSection> {
       setState(() {
         _drafts = [..._drafts, draft].take(_limit).toList(growable: false);
       });
+      _publishDraftPreview();
     } on OutletPhotoPickerFailure catch (failure) {
       if (!mounted) return;
       setState(() {
@@ -135,6 +144,7 @@ class _OutletPhotoSectionState extends State<OutletPhotoSection> {
           ...additions,
         ].take(_limit).toList(growable: false);
       });
+      _publishDraftPreview();
     } on OutletPhotoPickerFailure catch (failure) {
       if (!mounted) return;
       setState(() {
@@ -157,6 +167,7 @@ class _OutletPhotoSectionState extends State<OutletPhotoSection> {
           .toList(growable: false);
       _message = null;
     });
+    _publishDraftPreview();
   }
 
   Future<void> _saveDrafts() async {
@@ -168,6 +179,7 @@ class _OutletPhotoSectionState extends State<OutletPhotoSection> {
 
     final succeeded = <String>{};
     final failed = <String>{};
+    String? firstFailureMessage;
     try {
       for (final draft in List<OutletPhotoDraft>.from(_drafts)) {
         if (!mounted) return;
@@ -192,8 +204,9 @@ class _OutletPhotoSectionState extends State<OutletPhotoSection> {
             height: draft.height,
           );
           succeeded.add(draft.clientUploadId);
-        } on OutletMediaFailure {
+        } on OutletMediaFailure catch (failure) {
           failed.add(draft.clientUploadId);
+          firstFailureMessage ??= failure.message;
         }
       }
 
@@ -208,13 +221,17 @@ class _OutletPhotoSectionState extends State<OutletPhotoSection> {
             )
             .toList(growable: false);
       });
+      _publishDraftPreview();
 
       await _loadProfile();
       if (!mounted) return;
       setState(() {
         _message = failed.isEmpty
             ? 'Đã bổ sung ${succeeded.length} ảnh cho điểm bán.'
-            : 'Đã gửi ${succeeded.length} ảnh. Còn ${failed.length} ảnh lỗi, bấm Thử lại.';
+            : succeeded.isEmpty
+            ? (firstFailureMessage ??
+                  'Không gửi được ảnh điểm bán. Vui lòng thử lại.')
+            : 'Đã gửi ${succeeded.length} ảnh. ${firstFailureMessage ?? 'Còn ${failed.length} ảnh chưa gửi được.'}';
       });
     } finally {
       if (mounted) {

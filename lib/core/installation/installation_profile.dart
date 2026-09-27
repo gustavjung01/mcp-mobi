@@ -7,8 +7,8 @@ class InstallationProfile {
 
   static const _configuredBusinessBaseUrl = String.fromEnvironment(
     'MCP_BUSINESS_BASE_URL',
-    defaultValue: 'https://68.233.111.135',
   );
+  static const _legacyBusinessBaseUrl = 'https://68.233.111.135';
 
   final String name;
   final Uri baseUrl;
@@ -42,11 +42,15 @@ class InstallationProfile {
     final storedBusinessBaseUrl = parseBaseUrl(
       (value['businessBaseUrl'] ?? '').toString(),
     );
+    final configured = configuredBusinessBaseUrl();
+    final legacyStored =
+        storedBusinessBaseUrl?.toString() == _legacyBusinessBaseUrl;
     if (name.isEmpty || baseUrl == null) return null;
     return InstallationProfile(
       name: name,
       baseUrl: baseUrl,
-      businessBaseUrl: storedBusinessBaseUrl ?? configuredBusinessBaseUrl(),
+      businessBaseUrl:
+          configured ?? (legacyStored ? null : storedBusinessBaseUrl),
     );
   }
 
