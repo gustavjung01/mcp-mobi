@@ -67,8 +67,7 @@ class HttpSystemEndpointProbe implements SystemEndpointProbe {
     if (response.statusCode == 404) {
       throw const SystemEndpointFailure(
         code: 'SYSTEM_ENDPOINT_NOT_MCP',
-        message:
-            'Địa chỉ này không phải máy chủ MCP Field. Không nhập địa chỉ trang web quản lý.',
+        message: 'Địa chỉ này không phải máy chủ MCP Field. Không nhập địa chỉ trang web quản lý.',
       );
     }
     if (response.statusCode < 200 || response.statusCode >= 300) {
