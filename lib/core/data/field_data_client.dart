@@ -459,9 +459,7 @@ List<FieldRouteCustomer> _routeCustomersFromShellSnapshot(
 
   return _objects(snapshot['routeCustomers'])
       .where(
-        (row) =>
-            _text(row['route_id']) == routeId &&
-            _boolean(row['active']),
+        (row) => _text(row['route_id']) == routeId && _boolean(row['active']),
       )
       .map((row) {
         final lat = _optionalDouble(row['geo_lat']);
