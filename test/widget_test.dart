@@ -198,7 +198,7 @@ void main() {
     await tester.pump();
 
     expect(find.byKey(const Key('system-setup-screen')), findsOneWidget);
-    expect(find.text('Địa chỉ hệ thống chưa hợp lệ'), findsOneWidget);
+    expect(find.text('Địa chỉ máy chủ chưa hợp lệ'), findsOneWidget);
   });
 
   testWidgets('successful login stores the session and opens today', (
