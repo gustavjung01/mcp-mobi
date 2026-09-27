@@ -123,6 +123,76 @@ void main() {
   );
 
   test(
+    'failed R2 upload releases its reservation before retry',
+    () async {
+      final seen = <String>[];
+      final client = HttpOutletMediaClient(
+        profile: InstallationProfile(
+          name: 'Hưng Phát',
+          baseUrl: Uri.parse('https://mcp.example.vn'),
+        ),
+        token: 'mobile-token',
+        client: MockClient((request) async {
+          seen.add('${request.method} ${request.url}');
+
+          if (request.url.host == 'upload.example.vn') {
+            return http.Response('', 500);
+          }
+
+          if (request.url.path == '/api/outlet-media/upload-init') {
+            return http.Response(
+              jsonEncode({
+                'data': {
+                  'mediaId': 'media-failed',
+                  'putUrl': 'https://upload.example.vn/media-failed',
+                },
+              }),
+              200,
+            );
+          }
+
+          expect(request.url.path, '/api/outlet-media/delete');
+          final body = jsonDecode(request.body) as Map<String, dynamic>;
+          expect(body['mediaId'], 'media-failed');
+          return http.Response(
+            jsonEncode({
+              'data': {'mediaId': 'media-failed', 'deleted': true},
+            }),
+            200,
+          );
+        }),
+      );
+
+      await expectLater(
+        client.uploadPhoto(
+          routeCustomerId: 'rc-1',
+          clientUploadId: 'upload-failed',
+          bytes: Uint8List.fromList([1, 2, 3]),
+          mimeType: 'image/jpeg',
+          width: 10,
+          height: 10,
+        ),
+        throwsA(
+          isA<OutletMediaFailure>().having(
+            (failure) => failure.code,
+            'code',
+            'MEDIA_UPLOAD_REJECTED',
+          ),
+        ),
+      );
+
+      expect(
+        seen,
+        [
+          'POST https://mcp.example.vn/api/outlet-media/upload-init',
+          'PUT https://upload.example.vn/media-failed',
+          'POST https://mcp.example.vn/api/outlet-media/delete',
+        ],
+      );
+    },
+  );
+
+  test(
     'outlet media maps the MCP three-photo limit to office language',
     () async {
       final client = HttpOutletMediaClient(
@@ -134,9 +204,9 @@ void main() {
         client: MockClient((request) async {
           return http.Response(
             jsonEncode({
-              'error': {'code': 'outlet_media_limit_reached'},
+              'error': {'code': 'OUTLET_MEDIA_LIMIT_REACHED'},
             }),
-            409,
+            400,
           );
         }),
       );

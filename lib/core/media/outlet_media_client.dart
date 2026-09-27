@@ -193,29 +193,34 @@ class HttpOutletMediaClient implements OutletMediaClient {
           retryable: true,
         );
       }
+
+      await _jsonRequest(
+        'POST',
+        '/api/outlet-media/upload-finalize',
+        body: {
+          'mediaId': mediaId,
+          'width': width,
+          'height': height,
+        },
+      );
     } on TimeoutException {
+      await _discardUploadReservation(mediaId);
       throw const OutletMediaFailure(
         code: 'MEDIA_UPLOAD_TIMEOUT',
         message: 'Gửi ảnh quá thời gian. Vui lòng thử lại.',
         retryable: true,
       );
     } on http.ClientException {
+      await _discardUploadReservation(mediaId);
       throw const OutletMediaFailure(
         code: 'MEDIA_UPLOAD_NETWORK',
         message: 'Mạng bị gián đoạn khi gửi ảnh. Vui lòng thử lại.',
         retryable: true,
       );
+    } catch (_) {
+      await _discardUploadReservation(mediaId);
+      rethrow;
     }
-
-    await _jsonRequest(
-      'POST',
-      '/api/outlet-media/upload-finalize',
-      body: {
-        'mediaId': mediaId,
-        'width': width,
-        'height': height,
-      },
-    );
   }
 
   @override
@@ -227,6 +232,14 @@ class HttpOutletMediaClient implements OutletMediaClient {
       '/api/outlet-media/delete',
       body: {'mediaId': mediaId},
     );
+  }
+
+  Future<void> _discardUploadReservation(String mediaId) async {
+    try {
+      await deleteMedia(mediaId: mediaId);
+    } catch (_) {
+      // Giữ nguyên lỗi tải ảnh ban đầu; reservation cũ sẽ tự hết hạn ở backend.
+    }
   }
 
   Future<Map<String, dynamic>> _jsonRequest(
@@ -313,7 +326,7 @@ String _mediaErrorMessage(
   required String serverMessage,
   required int statusCode,
 }) {
-  switch (code) {
+  switch (code.trim().toLowerCase()) {
     case 'outlet_media_limit_reached':
       return 'Điểm bán chỉ lưu tối đa 3 ảnh.';
     case 'invalid_media_byte_size':
