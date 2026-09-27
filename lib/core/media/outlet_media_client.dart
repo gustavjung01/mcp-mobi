@@ -240,16 +240,15 @@ class HttpOutletMediaClient implements OutletMediaClient {
       final uri = _endpoint(path, query);
       final encoded = body == null ? null : jsonEncode(body);
       response = switch (method) {
-        'POST' => await _client
-            .post(
-              uri,
-              headers: _headers(hasBody: true),
-              body: encoded,
-            )
-            .timeout(timeout),
-        _ => await _client
-            .get(uri, headers: _headers())
-            .timeout(timeout),
+        'POST' =>
+          await _client
+              .post(
+                uri,
+                headers: _headers(hasBody: true),
+                body: encoded,
+              )
+              .timeout(timeout),
+        _ => await _client.get(uri, headers: _headers()).timeout(timeout),
       };
     } on TimeoutException {
       throw const OutletMediaFailure(

@@ -38,11 +38,10 @@ class _OutletPhotoSectionState extends State<OutletPhotoSection> {
 
   int get _limit => _profile?.mediaLimit ?? outletMediaMaxPhotos;
 
-  int get _remaining => (_limit -
-          (_profile?.media.length ?? 0) -
-          _drafts.length)
-      .clamp(0, _limit)
-      .toInt();
+  int get _remaining =>
+      (_limit - (_profile?.media.length ?? 0) - _drafts.length)
+          .clamp(0, _limit)
+          .toInt();
 
   bool get _busy =>
       _loading || _picking || _saving || (_deletingId ?? '').isNotEmpty;
@@ -131,9 +130,10 @@ class _OutletPhotoSectionState extends State<OutletPhotoSection> {
       );
       if (!mounted || additions.isEmpty) return;
       setState(() {
-        _drafts = [..._drafts, ...additions]
-            .take(_limit)
-            .toList(growable: false);
+        _drafts = [
+          ..._drafts,
+          ...additions,
+        ].take(_limit).toList(growable: false);
       });
     } on OutletPhotoPickerFailure catch (failure) {
       if (!mounted) return;

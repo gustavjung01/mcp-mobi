@@ -153,14 +153,14 @@ class _OutletDetailPageState extends State<OutletDetailPage> {
                 ),
                 if ((_heroPhotoUrl ?? '').isEmpty)
                   Positioned(
-                  right: -22,
-                  bottom: -36,
-                  child: Icon(
-                    Icons.storefront_rounded,
-                    size: 180,
-                    color: Colors.white.withValues(alpha: 0.08),
+                    right: -22,
+                    bottom: -36,
+                    child: Icon(
+                      Icons.storefront_rounded,
+                      size: 180,
+                      color: Colors.white.withValues(alpha: 0.08),
+                    ),
                   ),
-                ),
                 SafeArea(
                   bottom: false,
                   child: Padding(
