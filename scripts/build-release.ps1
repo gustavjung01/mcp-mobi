@@ -17,8 +17,25 @@ if ($version -notmatch '^\d+\.\d+\.\d+$') {
     throw "MCP Field release version must use major.minor.patch."
 }
 
-$ApiBaseUrl = $ApiBaseUrl.Trim().TrimEnd("/")
-$UpdateBaseUrl = $UpdateBaseUrl.Trim().TrimEnd("/")
+function Remove-OuterQuotes([string]$Value) {
+    $normalized = $Value.Trim()
+    while ($normalized.Length -ge 2) {
+        $first = $normalized[0]
+        $last = $normalized[$normalized.Length - 1]
+        $hasMatchingQuotes =
+            ($first -eq [char]34 -and $last -eq [char]34) -or
+            ($first -eq [char]39 -and $last -eq [char]39)
+        if (-not $hasMatchingQuotes) {
+            break
+        }
+        $normalized = $normalized.Substring(1, $normalized.Length - 2).Trim()
+    }
+    return $normalized
+}
+
+$Flutter = Remove-OuterQuotes $Flutter
+$ApiBaseUrl = (Remove-OuterQuotes $ApiBaseUrl).TrimEnd("/")
+$UpdateBaseUrl = (Remove-OuterQuotes $UpdateBaseUrl).TrimEnd("/")
 
 $apiUri = $null
 try {
