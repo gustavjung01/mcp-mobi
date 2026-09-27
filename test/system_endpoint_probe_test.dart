@@ -42,7 +42,9 @@ void main() {
     );
   });
 
-  test('probe rejects a health-only gateway that still freezes API routes', () async {
+  test(
+    'probe rejects a health-only gateway that still freezes API routes',
+    () async {
     final client = MockClient((request) async {
       if (request.url.path == '/health/live') {
         return http.Response(
@@ -74,7 +76,9 @@ void main() {
         ),
       ),
     );
-  });
+    },
+  );
+
   test('probe rejects a web frontend origin returning 404', () async {
     final client = MockClient((request) async => http.Response('<html/>', 404));
     final probe = HttpSystemEndpointProbe(client: client);
