@@ -1,4 +1,4 @@
-package com.hungphat.mcp_field
+package com.hungphat.mcpfield
 
 import io.flutter.embedding.android.FlutterActivity
 
