@@ -51,7 +51,7 @@ class TodayPage extends StatelessWidget {
                 ),
                 const SizedBox(height: AppSpacing.lg),
                 const AppPrimaryButton(
-                  label: 'Đi tuyến',
+                  label: 'Bắt đầu đi tuyến',
                   icon: Icons.route_outlined,
                   onPressed: null,
                 ),
