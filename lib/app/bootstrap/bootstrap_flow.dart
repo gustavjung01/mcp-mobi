@@ -207,9 +207,11 @@ class _BootstrapFlowState extends State<BootstrapFlow> {
           onChangeSystem: _changeSystem,
         );
       case _BootstrapState.ready:
+        final profile = _profile;
         final session = _session;
-        if (session == null) return const _LoadingScreen();
+        if (profile == null || session == null) return const _LoadingScreen();
         return AppShell(
+          profile: profile,
           session: session,
           onLogout: _logout,
         );
