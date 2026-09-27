@@ -104,6 +104,12 @@ void main() {
     expect(find.byKey(const Key('outlet-hero-photo-preview')), findsNothing);
 
     final camera = find.byKey(const Key('outlet-photo-camera'));
+    final detailList = find.byType(ListView);
+    for (var attempt = 0; attempt < 5 && camera.evaluate().isEmpty; attempt++) {
+      await tester.drag(detailList, const Offset(0, -320));
+      await tester.pumpAndSettle();
+    }
+    expect(camera, findsOneWidget);
     await tester.ensureVisible(camera);
     await tester.tap(camera);
     await tester.pumpAndSettle();
