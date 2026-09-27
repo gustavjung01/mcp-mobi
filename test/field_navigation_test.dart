@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mcp_field/app/navigation/app_shell.dart';
 import 'package:mcp_field/core/auth/mobile_auth_client.dart';
 import 'package:mcp_field/core/data/field_data_client.dart';
+import 'package:mcp_field/core/location/field_location.dart';
 
 const route = FieldRoute(
   id: 'route-1',
@@ -75,7 +76,9 @@ const session = MobileSession(
   expiresAt: null,
 );
 
-class FakeFieldDataClient implements FieldDataClient {
+class FakeFieldDataClient implements FieldDataClient, FieldActionClient {
+  bool checkInCalled = false;
+
   @override
   Future<List<FieldRoute>> loadRoutes() async => const [route];
 
@@ -85,6 +88,45 @@ class FakeFieldDataClient implements FieldDataClient {
     required DateTime date,
   }) async {
     return workspace;
+  }
+
+  @override
+  Future<void> openRouteSession({
+    required String routeId,
+    required DateTime date,
+    required String owner,
+    required String idempotencyKey,
+  }) async {}
+
+  @override
+  Future<void> finishRouteSession({
+    required String sessionId,
+    required String idempotencyKey,
+  }) async {}
+
+  @override
+  Future<void> setSessionCustomerCheckIn({
+    required String sessionCustomerId,
+    required double latitude,
+    required double longitude,
+    required double accuracy,
+    required String idempotencyKey,
+  }) async {
+    checkInCalled = true;
+    expect(sessionCustomerId, 'line-1');
+    expect(latitude, 10.75);
+    expect(longitude, 106.67);
+  }
+}
+
+class FakeLocationProvider implements FieldLocationProvider {
+  @override
+  Future<FieldLocation> current() async {
+    return const FieldLocation(
+      latitude: 10.75,
+      longitude: 106.67,
+      accuracy: 8,
+    );
   }
 }
 
@@ -122,4 +164,31 @@ void main() {
     expect(find.text('0903123456'), findsOneWidget);
     expect(find.text('123 Nguyễn Văn Cừ'), findsOneWidget);
   });
+  testWidgets('active outlet can check in with device location', (
+    WidgetTester tester,
+  ) async {
+    final client = FakeFieldDataClient();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AppShell(
+          session: session,
+          fieldDataClient: client,
+          fieldLocationProvider: FakeLocationProvider(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(navLabel('Điểm bán'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('outlet-row-customer-1')));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('outlet-checkin-button')));
+    await tester.pumpAndSettle();
+
+    expect(client.checkInCalled, isTrue);
+    expect(find.text('Đã check-in'), findsWidgets);
+  });
+
 }

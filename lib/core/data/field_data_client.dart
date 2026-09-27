@@ -267,7 +267,29 @@ abstract interface class FieldDataClient {
   });
 }
 
-class HttpFieldDataClient implements FieldDataClient {
+abstract interface class FieldActionClient {
+  Future<void> openRouteSession({
+    required String routeId,
+    required DateTime date,
+    required String owner,
+    required String idempotencyKey,
+  });
+
+  Future<void> finishRouteSession({
+    required String sessionId,
+    required String idempotencyKey,
+  });
+
+  Future<void> setSessionCustomerCheckIn({
+    required String sessionCustomerId,
+    required double latitude,
+    required double longitude,
+    required double accuracy,
+    required String idempotencyKey,
+  });
+}
+
+class HttpFieldDataClient implements FieldDataClient, FieldActionClient {
   HttpFieldDataClient({
     required this.profile,
     required this.token,
@@ -297,19 +319,38 @@ class HttpFieldDataClient implements FieldDataClient {
   Future<Map<String, dynamic>> _get(
     String path, [
     Map<String, String>? query,
-  ]) async {
+  ]) {
+    return _request('GET', path, query: query);
+  }
+
+  Future<Map<String, dynamic>> _request(
+    String method,
+    String path, {
+    Map<String, String>? query,
+    Map<String, Object?>? body,
+    String? idempotencyKey,
+  }) async {
+    final headers = <String, String>{
+      'Accept': 'application/json',
+      'Authorization': 'Bearer $token',
+      'X-Request-Id': _requestId(),
+      if (body != null) 'Content-Type': 'application/json',
+      if (idempotencyKey != null) 'Idempotency-Key': idempotencyKey,
+    };
+
     http.Response response;
     try {
-      response = await _client
-          .get(
-            _endpoint(path, query),
-            headers: {
-              'Accept': 'application/json',
-              'Authorization': 'Bearer $token',
-              'X-Request-Id': _requestId(),
-            },
-          )
-          .timeout(timeout);
+      final uri = _endpoint(path, query);
+      final encodedBody = body == null ? null : jsonEncode(body);
+      response = switch (method) {
+        'POST' => await _client
+            .post(uri, headers: headers, body: encodedBody)
+            .timeout(timeout),
+        'PATCH' => await _client
+            .patch(uri, headers: headers, body: encodedBody)
+            .timeout(timeout),
+        _ => await _client.get(uri, headers: headers).timeout(timeout),
+      };
     } on TimeoutException {
       throw const FieldDataFailure(
         code: 'NETWORK_TIMEOUT',
@@ -340,17 +381,25 @@ class HttpFieldDataClient implements FieldDataClient {
       final error = _object(payload['error']);
       final code = _text(error['code'], fallback: 'REQUEST_FAILED');
       final serverMessage = _text(error['message']);
-      if (response.statusCode == 401 || response.statusCode == 403) {
+      if (response.statusCode == 401) {
         throw FieldDataFailure(
           code: code,
           message: 'Phiên đăng nhập không còn hiệu lực.',
+        );
+      }
+      if (response.statusCode == 403) {
+        throw FieldDataFailure(
+          code: code,
+          message: serverMessage.isNotEmpty
+              ? serverMessage
+              : 'Tài khoản chưa được cấp quyền thực hiện thao tác này.',
         );
       }
       throw FieldDataFailure(
         code: code,
         message: serverMessage.isNotEmpty
             ? serverMessage
-            : 'Không tải được dữ liệu. Vui lòng thử lại.',
+            : 'Không xử lý được yêu cầu. Vui lòng thử lại.',
         retryable: response.statusCode >= 500 || error['retryable'] == true,
       );
     }
@@ -393,6 +442,61 @@ class HttpFieldDataClient implements FieldDataClient {
       route: route,
       customers: customers,
       day: FieldDayData.fromJson(results[1]),
+    );
+  }
+
+  @override
+  Future<void> openRouteSession({
+    required String routeId,
+    required DateTime date,
+    required String owner,
+    required String idempotencyKey,
+  }) async {
+    await _request(
+      'POST',
+      '/api/mcp-day/open-session',
+      body: {
+        'routeId': routeId,
+        'sessionDate': _dateOnly(date),
+        'owner': owner,
+      },
+      idempotencyKey: idempotencyKey,
+    );
+  }
+
+  @override
+  Future<void> finishRouteSession({
+    required String sessionId,
+    required String idempotencyKey,
+  }) async {
+    await _request(
+      'PATCH',
+      '/api/mcp-sessions/${Uri.encodeComponent(sessionId)}',
+      body: const {'status': 'done'},
+      idempotencyKey: idempotencyKey,
+    );
+  }
+
+  @override
+  Future<void> setSessionCustomerCheckIn({
+    required String sessionCustomerId,
+    required double latitude,
+    required double longitude,
+    required double accuracy,
+    required String idempotencyKey,
+  }) async {
+    await _request(
+      'POST',
+      '/api/mcp-day/session-customer/checkin',
+      body: {
+        'sessionCustomerId': sessionCustomerId,
+        'checkedIn': true,
+        'geoLat': latitude,
+        'geoLng': longitude,
+        'geoAccuracy': accuracy,
+        'geoSource': 'mobile_gps',
+      },
+      idempotencyKey: idempotencyKey,
     );
   }
 }

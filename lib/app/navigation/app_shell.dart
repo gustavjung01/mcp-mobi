@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../../core/auth/mobile_auth_client.dart';
 import '../../core/data/field_data_client.dart';
+import '../../core/idempotency/canonical_idempotency.dart';
 import '../../core/installation/installation_profile.dart';
+import '../../core/location/field_location.dart';
 import '../../features/more/more_page.dart';
 import '../../features/orders/orders_page.dart';
 import '../../features/outlets/outlet_detail_page.dart';
@@ -17,12 +19,14 @@ class AppShell extends StatefulWidget {
     this.profile,
     this.session,
     this.fieldDataClient,
+    this.fieldLocationProvider,
     this.onLogout,
   });
 
   final InstallationProfile? profile;
   final MobileSession? session;
   final FieldDataClient? fieldDataClient;
+  final FieldLocationProvider? fieldLocationProvider;
   final Future<void> Function()? onLogout;
 
   @override
@@ -32,18 +36,29 @@ class AppShell extends StatefulWidget {
 class _AppShellState extends State<AppShell> {
   int _selectedIndex = 0;
   FieldDataClient? _fieldDataClient;
+  late final FieldLocationProvider _locationProvider;
+  final Map<String, String> _mutationKeys = {};
+  final Map<String, _PendingCheckIn> _pendingCheckIns = {};
   List<FieldRoute> _routes = const [];
   FieldRoute? _selectedRoute;
   FieldRouteWorkspace? _workspace;
   bool _loadingRoutes = false;
   bool _loadingWorkspace = false;
+  bool _routeActionBusy = false;
   String? _fieldMessage;
   int _workspaceLoadGeneration = 0;
+
+  FieldActionClient? get _fieldActions {
+    final client = _fieldDataClient;
+    return client is FieldActionClient ? client : null;
+  }
 
   @override
   void initState() {
     super.initState();
     _fieldDataClient = widget.fieldDataClient ?? _defaultFieldDataClient();
+    _locationProvider =
+        widget.fieldLocationProvider ?? const DeviceFieldLocationProvider();
     if (_fieldDataClient != null) {
       _loadingRoutes = true;
       _loadRoutes();
@@ -57,6 +72,13 @@ class _AppShellState extends State<AppShell> {
     return HttpFieldDataClient(
       profile: profile,
       token: session.token,
+    );
+  }
+
+  String _mutationKey(String signature, String operation) {
+    return _mutationKeys.putIfAbsent(
+      signature,
+      () => CanonicalIdempotencyKey.create(operation),
     );
   }
 
@@ -152,6 +174,144 @@ class _AppShellState extends State<AppShell> {
     await _loadWorkspace(route);
   }
 
+  Future<void> _startRoute() async {
+    final route = _selectedRoute;
+    final actions = _fieldActions;
+    if (route == null || actions == null || _routeActionBusy) return;
+
+    final now = DateTime.now();
+    final signature = 'route-session.open:${route.id}:${_dateOnly(now)}';
+    final key = _mutationKey(signature, 'route-session.open');
+    final displayName = (widget.session?.displayName ?? '').trim();
+    final owner = displayName.isNotEmpty ? displayName : route.salesOwner;
+
+    setState(() {
+      _routeActionBusy = true;
+      _fieldMessage = null;
+    });
+    try {
+      await actions.openRouteSession(
+        routeId: route.id,
+        date: now,
+        owner: owner,
+        idempotencyKey: key,
+      );
+      _mutationKeys.remove(signature);
+      await _loadWorkspace(route);
+    } on FieldDataFailure catch (failure) {
+      if (!mounted) return;
+      setState(() {
+        _fieldMessage = failure.message;
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _routeActionBusy = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _finishRoute() async {
+    final route = _selectedRoute;
+    final day = _workspace?.day;
+    final actions = _fieldActions;
+    if (route == null ||
+        day?.sessionOpened != true ||
+        actions == null ||
+        _routeActionBusy) {
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Kết thúc tuyến hôm nay?'),
+        content: const Text(
+          'Sau khi kết thúc, phiên hôm nay sẽ chuyển sang chỉ xem.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Hủy'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Kết thúc'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    final signature = 'route-session.update:${day!.run.id}:done';
+    final key = _mutationKey(signature, 'route-session.update');
+    setState(() {
+      _routeActionBusy = true;
+      _fieldMessage = null;
+    });
+    try {
+      await actions.finishRouteSession(
+        sessionId: day.run.id,
+        idempotencyKey: key,
+      );
+      _mutationKeys.remove(signature);
+      await _loadWorkspace(route);
+    } on FieldDataFailure catch (failure) {
+      if (!mounted) return;
+      setState(() {
+        _fieldMessage = failure.message;
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _routeActionBusy = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _checkIn(FieldDayLine line) async {
+    final actions = _fieldActions;
+    final route = _selectedRoute;
+    final sessionCustomerId = line.sessionCustomerId;
+    if (actions == null || route == null || sessionCustomerId == null) {
+      throw const FieldDataFailure(
+        code: 'CHECKIN_UNAVAILABLE',
+        message: 'Bắt đầu tuyến trước khi check-in điểm bán.',
+      );
+    }
+
+    var pending = _pendingCheckIns[sessionCustomerId];
+    if (pending == null) {
+      try {
+        final location = await _locationProvider.current();
+        pending = _PendingCheckIn(
+          key: CanonicalIdempotencyKey.create(
+            'session-customer.checkin.set',
+          ),
+          location: location,
+        );
+        _pendingCheckIns[sessionCustomerId] = pending;
+      } on FieldLocationFailure catch (failure) {
+        throw FieldDataFailure(
+          code: 'LOCATION_UNAVAILABLE',
+          message: failure.message,
+        );
+      }
+    }
+
+    await actions.setSessionCustomerCheckIn(
+      sessionCustomerId: sessionCustomerId,
+      latitude: pending.location.latitude,
+      longitude: pending.location.longitude,
+      accuracy: pending.location.accuracy,
+      idempotencyKey: pending.key,
+    );
+    _pendingCheckIns.remove(sessionCustomerId);
+    await _loadWorkspace(route);
+  }
+
   void _openOutlet(
     FieldRouteCustomer? customer,
     FieldDayLine? line,
@@ -162,6 +322,7 @@ class _AppShellState extends State<AppShell> {
           routeName: _selectedRoute?.name ?? customer?.routeName ?? 'Điểm bán',
           customer: customer,
           line: line,
+          onCheckIn: _fieldActions == null ? null : _checkIn,
         ),
       ),
     );
@@ -197,9 +358,12 @@ class _AppShellState extends State<AppShell> {
         workspace: _workspace,
         loading: loading,
         message: _fieldMessage,
+        routeActionBusy: _routeActionBusy,
         onSelectRoute: _loadWorkspace,
         onRefresh: _fieldDataClient == null ? null : _refreshFieldData,
         onOpenOutlet: (line) => _openOutlet(_customerForLine(line), line),
+        onStartRoute: _fieldActions == null ? null : _startRoute,
+        onFinishRoute: _fieldActions == null ? null : _finishRoute,
       ),
       OutletsPage(
         selectedRoute: _selectedRoute,
@@ -258,4 +422,20 @@ class _AppShellState extends State<AppShell> {
       ),
     );
   }
+}
+
+class _PendingCheckIn {
+  const _PendingCheckIn({
+    required this.key,
+    required this.location,
+  });
+
+  final String key;
+  final FieldLocation location;
+}
+
+String _dateOnly(DateTime value) {
+  final month = value.month.toString().padLeft(2, '0');
+  final day = value.day.toString().padLeft(2, '0');
+  return '${value.year}-$month-$day';
 }
