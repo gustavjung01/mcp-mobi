@@ -553,11 +553,5 @@ String _formatVietnameseDate(DateTime value) {
   ];
   final day = value.day.toString().padLeft(2, '0');
   final month = value.month.toString().padLeft(2, '0');
-  return weekdays[value.weekday - 1] +
-      ', ' +
-      day +
-      '/' +
-      month +
-      '/' +
-      value.year.toString();
+  return '${weekdays[value.weekday - 1]}, $day/$month/${value.year}';
 }
