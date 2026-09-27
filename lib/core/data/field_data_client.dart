@@ -281,7 +281,10 @@ class HttpFieldDataClient implements FieldDataClient {
   final Duration timeout;
 
   Uri _endpoint(String path, [Map<String, String>? query]) {
-    final base = profile.baseUrl.toString().replaceFirst(RegExp(r'/+$'), '');
+    final base = profile.fieldBaseUrl.toString().replaceFirst(
+      RegExp(r'/+$'),
+      '',
+    );
     final uri = Uri.parse(base + path);
     if (query == null || query.isEmpty) return uri;
     return uri.replace(queryParameters: query);

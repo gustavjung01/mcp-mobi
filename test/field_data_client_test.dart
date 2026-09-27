@@ -9,14 +9,16 @@ import 'package:mcp_field/core/installation/installation_profile.dart';
 void main() {
   final profile = InstallationProfile(
     name: 'Hưng Phát',
-    baseUrl: Uri.parse('https://mcp.example.vn'),
+    baseUrl: Uri.parse('https://company.example.vn'),
+    businessBaseUrl: Uri.parse('https://mcp.example.vn'),
   );
 
-  test('field client loads routes with mobile bearer session', () async {
+  test('field client loads routes from MCP business endpoint', () async {
     final client = HttpFieldDataClient(
       profile: profile,
       token: 'nppusr.test-token',
       client: MockClient((request) async {
+        expect(request.url.host, 'mcp.example.vn');
         expect(request.url.path, '/api/routes/data');
         expect(
           request.headers['Authorization'],
@@ -57,6 +59,7 @@ void main() {
       profile: profile,
       token: 'nppusr.test-token',
       client: MockClient((request) async {
+        expect(request.url.host, 'mcp.example.vn');
         if (request.url.path == '/api/routes/customers/data') {
           expect(request.url.queryParameters['routeId'], 'route-1');
           return http.Response(

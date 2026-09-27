@@ -2,24 +2,56 @@ class InstallationProfile {
   const InstallationProfile({
     required this.name,
     required this.baseUrl,
+    this.businessBaseUrl,
   });
+
+  static const _configuredBusinessBaseUrl = String.fromEnvironment(
+    'MCP_BUSINESS_BASE_URL',
+    defaultValue: 'https://68.233.111.135',
+  );
 
   final String name;
   final Uri baseUrl;
+  final Uri? businessBaseUrl;
+
+  Uri get fieldBaseUrl => businessBaseUrl ?? baseUrl;
 
   String get installationKey => baseUrl.toString().toLowerCase();
+
+  factory InstallationProfile.selected({
+    required String name,
+    required Uri baseUrl,
+  }) {
+    return InstallationProfile(
+      name: name,
+      baseUrl: baseUrl,
+      businessBaseUrl: configuredBusinessBaseUrl(),
+    );
+  }
 
   Map<String, String> toJson() => {
     'name': name,
     'baseUrl': baseUrl.toString(),
+    if (businessBaseUrl != null) 'businessBaseUrl': businessBaseUrl.toString(),
   };
 
   static InstallationProfile? fromJson(Object? value) {
     if (value is! Map<String, dynamic>) return null;
     final name = (value['name'] ?? '').toString().trim();
     final baseUrl = parseBaseUrl((value['baseUrl'] ?? '').toString());
+    final storedBusinessBaseUrl = parseBaseUrl(
+      (value['businessBaseUrl'] ?? '').toString(),
+    );
     if (name.isEmpty || baseUrl == null) return null;
-    return InstallationProfile(name: name, baseUrl: baseUrl);
+    return InstallationProfile(
+      name: name,
+      baseUrl: baseUrl,
+      businessBaseUrl: storedBusinessBaseUrl ?? configuredBusinessBaseUrl(),
+    );
+  }
+
+  static Uri? configuredBusinessBaseUrl() {
+    return parseBaseUrl(_configuredBusinessBaseUrl);
   }
 
   static Uri? parseBaseUrl(String value) {
