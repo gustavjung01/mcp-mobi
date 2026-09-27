@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:image/image.dart' as image_lib;
 import 'package:mcp_field/core/media/outlet_media_client.dart';
 import 'package:mcp_field/core/media/outlet_photo_picker.dart';
 import 'package:mcp_field/features/outlets/outlet_photo_section.dart';
@@ -51,9 +52,10 @@ class FakeOutletMediaClient implements OutletMediaClient {
 class FakeOutletPhotoPicker implements OutletPhotoPicker {
   @override
   Future<OutletPhotoDraft?> pickCamera() async {
+    final image = image_lib.Image(width: 10, height: 10);
     return OutletPhotoDraft(
       clientUploadId: 'same-upload-id',
-      bytes: Uint8List.fromList([1, 2, 3]),
+      bytes: Uint8List.fromList(image_lib.encodeJpg(image)),
       width: 10,
       height: 10,
     );
