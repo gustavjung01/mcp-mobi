@@ -15,8 +15,7 @@ void main() {
       final client = HttpOutletMediaClient(
         profile: InstallationProfile(
           name: 'Hưng Phát',
-          baseUrl: Uri.parse('https://login.example.vn'),
-          businessBaseUrl: Uri.parse('https://mcp.example.vn'),
+          baseUrl: Uri.parse('https://mcp.example.vn'),
         ),
         token: 'mobile-token',
         client: MockClient((request) async {
