@@ -38,8 +38,11 @@ class _OutletPhotoSectionState extends State<OutletPhotoSection> {
 
   int get _limit => _profile?.mediaLimit ?? outletMediaMaxPhotos;
 
-  int get _remaining =>
-      (_limit - (_profile?.media.length ?? 0) - _drafts.length).clamp(0, _limit);
+  int get _remaining => (_limit -
+          (_profile?.media.length ?? 0) -
+          _drafts.length)
+      .clamp(0, _limit)
+      .toInt();
 
   bool get _busy =>
       _loading || _picking || _saving || (_deletingId ?? '').isNotEmpty;

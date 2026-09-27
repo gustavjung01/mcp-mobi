@@ -133,7 +133,6 @@ Future<OutletPhotoDraft> prepareOutletPhotoDraft({
       image,
       width: (image.width * scale).round(),
       height: (image.height * scale).round(),
-      interpolation: image_lib.Interpolation.average,
     );
   }
 

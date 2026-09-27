@@ -65,7 +65,7 @@ class OutletMediaProfile {
           .take(outletMediaMaxPhotos)
           .toList(growable: false),
       mediaLimit: requestedLimit > 0
-          ? requestedLimit.clamp(1, outletMediaMaxPhotos)
+          ? requestedLimit.clamp(1, outletMediaMaxPhotos).toInt()
           : outletMediaMaxPhotos,
     );
   }
