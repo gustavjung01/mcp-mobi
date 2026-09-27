@@ -277,7 +277,6 @@ class _LoginPageState extends State<LoginPage> {
   }
 }
 
-
 class _LoginHeroHeader extends StatelessWidget {
   const _LoginHeroHeader({
     required this.profileName,
