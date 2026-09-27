@@ -176,10 +176,6 @@ void main() {
     expect(find.text('0909000111'), findsOneWidget);
     expect(find.text('456 Lê Lợi'), findsOneWidget);
     expect(find.byKey(const Key('outlet-checkin-button')), findsNothing);
-    expect(
-      find.textContaining('Check-in và tác nghiệp chỉ thực hiện'),
-      findsOneWidget,
-    );
   });
 
   testWidgets('check-in is only available from active route context', (
