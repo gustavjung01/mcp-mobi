@@ -13,36 +13,59 @@ void main() {
     businessBaseUrl: Uri.parse('https://mcp.example.vn'),
   );
 
-  test('field client loads routes from MCP business endpoint', () async {
+  Map<String, dynamic> shellPayload() => {
+    'data': {
+      'cursor': 'cursor-1',
+      'unchanged': false,
+      'snapshot': {
+        'routes': [
+          {
+            'id': 'route-1',
+            'route_name': 'Tuyến Quận 1',
+            'area': 'Quận 1',
+            'active': true,
+            'sales': 'Nguyễn Văn A',
+          },
+        ],
+        'routeCustomers': [
+          {
+            'id': 'customer-1',
+            'route_id': 'route-1',
+            'customer_id': 'DP00123',
+            'customer_name': 'Cửa hàng Minh Phát',
+            'area': 'Quận 1',
+            'sort_order': 1,
+            'active': true,
+            'note': '',
+          },
+        ],
+        'latestSessions': [
+          {
+            'route_id': 'route-1',
+            'planned_customers': 1,
+            'visited_customers': 0,
+            'order_count': 0,
+          },
+        ],
+      },
+    },
+  };
+
+  test('field client loads routes from canonical local read API', () async {
     final client = HttpFieldDataClient(
       profile: profile,
       token: 'nppusr.test-token',
       client: MockClient((request) async {
         expect(request.url.host, 'mcp.example.vn');
-        expect(request.url.path, '/api/routes/data');
+        expect(request.url.path, '/api/local-read/mcp-shell');
         expect(
           request.headers['Authorization'],
           'Bearer nppusr.test-token',
         );
         return http.Response(
-          jsonEncode({
-            'data': {
-              'routes': [
-                {
-                  'id': 'route-1',
-                  'name': 'Tuyến Quận 1',
-                  'area': 'Quận 1',
-                  'salesOwner': 'Nguyễn Văn A',
-                  'plannedCustomers': 15,
-                  'visitedCustomers': 7,
-                  'orderCount': 3,
-                  'status': 'active',
-                },
-              ],
-            },
-          }),
+          jsonEncode(shellPayload()),
           200,
-          headers: {'content-type': 'application/json'},
+          headers: {'content-type': 'application/json; charset=utf-8'},
         );
       }),
     );
@@ -51,7 +74,7 @@ void main() {
 
     expect(routes, hasLength(1));
     expect(routes.single.name, 'Tuyến Quận 1');
-    expect(routes.single.plannedCustomers, 15);
+    expect(routes.single.plannedCustomers, 1);
   });
 
   test('field client loads route customers and current day data', () async {
@@ -60,27 +83,9 @@ void main() {
       token: 'nppusr.test-token',
       client: MockClient((request) async {
         expect(request.url.host, 'mcp.example.vn');
-        if (request.url.path == '/api/routes/customers/data') {
-          expect(request.url.queryParameters['routeId'], 'route-1');
+        if (request.url.path == '/api/local-read/mcp-shell') {
           return http.Response(
-            jsonEncode({
-              'data': {
-                'customers': [
-                  {
-                    'id': 'customer-1',
-                    'routeId': 'route-1',
-                    'routeName': 'Tuyến Quận 1',
-                    'accountId': 'DP00123',
-                    'accountName': 'Cửa hàng Minh Phát',
-                    'contactName': 'Anh Minh',
-                    'area': 'Quận 1',
-                    'sortOrder': 1,
-                    'status': 'active',
-                    'note': '',
-                  },
-                ],
-              },
-            }),
+            jsonEncode(shellPayload()),
             200,
             headers: {'content-type': 'application/json; charset=utf-8'},
           );
@@ -135,9 +140,9 @@ void main() {
       name: 'Tuyến Quận 1',
       area: 'Quận 1',
       salesOwner: 'Nguyễn Văn A',
-      plannedCustomers: 15,
-      visitedCustomers: 7,
-      orderCount: 3,
+      plannedCustomers: 1,
+      visitedCustomers: 0,
+      orderCount: 0,
       status: 'active',
     );
     final workspace = await client.loadRouteWorkspace(
@@ -146,6 +151,7 @@ void main() {
     );
 
     expect(workspace.customers.single.accountName, 'Cửa hàng Minh Phát');
+    expect(workspace.customers.single.accountId, 'DP00123');
     expect(workspace.day.sessionOpened, isTrue);
     expect(workspace.day.lines.single.phone, '0903123456');
   });

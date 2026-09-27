@@ -367,11 +367,9 @@ class HttpFieldDataClient implements FieldDataClient {
 
   @override
   Future<List<FieldRoute>> loadRoutes() async {
-    final data = await _get('/api/routes/data');
-    return _objects(data['routes'])
-        .map(FieldRoute.fromJson)
-        .where((route) => route.id.isNotEmpty)
-        .toList(growable: false);
+    final shell = await _get('/api/local-read/mcp-shell');
+    final snapshot = _object(shell['snapshot']);
+    return _routesFromShellSnapshot(snapshot);
   }
 
   @override
@@ -380,22 +378,119 @@ class HttpFieldDataClient implements FieldDataClient {
     required DateTime date,
   }) async {
     final results = await Future.wait([
-      _get('/api/routes/customers/data', {'routeId': route.id}),
+      _get('/api/local-read/mcp-shell'),
       _get('/api/mcp-day/data', {
         'routeId': route.id,
         'date': _dateOnly(date),
       }),
     ]);
-    final customers = _objects(results[0]['customers'])
-        .map(FieldRouteCustomer.fromJson)
-        .where((customer) => customer.id.isNotEmpty)
-        .toList(growable: false);
+    final snapshot = _object(results[0]['snapshot']);
+    final customers = _routeCustomersFromShellSnapshot(
+      snapshot,
+      routeId: route.id,
+    );
     return FieldRouteWorkspace(
       route: route,
       customers: customers,
       day: FieldDayData.fromJson(results[1]),
     );
   }
+}
+
+List<FieldRoute> _routesFromShellSnapshot(
+  Map<String, dynamic> snapshot,
+) {
+  final routeRows = _objects(snapshot['routes']);
+  final customerRows = _objects(snapshot['routeCustomers']);
+  final latestSessionRows = _objects(snapshot['latestSessions']);
+
+  final customerCountByRoute = <String, int>{};
+  for (final customer in customerRows) {
+    if (!_boolean(customer['active'])) continue;
+    final routeId = _text(customer['route_id']);
+    if (routeId.isEmpty) continue;
+    customerCountByRoute[routeId] = (customerCountByRoute[routeId] ?? 0) + 1;
+  }
+
+  final latestSessionByRoute = <String, Map<String, dynamic>>{};
+  for (final session in latestSessionRows) {
+    final routeId = _text(session['route_id']);
+    if (routeId.isNotEmpty) latestSessionByRoute[routeId] = session;
+  }
+
+  return routeRows
+      .where((row) => _boolean(row['active']))
+      .map((row) {
+        final routeId = _text(row['id']);
+        final session = latestSessionByRoute[routeId] ?? const {};
+        return FieldRoute(
+          id: routeId,
+          name: _text(
+            row['route_name'],
+            fallback: 'Tuyến chưa có tên',
+          ),
+          area: _text(row['area'], fallback: 'Chưa có khu vực'),
+          salesOwner: _text(row['sales']),
+          plannedCustomers: _integer(session['planned_customers']) > 0
+              ? _integer(session['planned_customers'])
+              : customerCountByRoute[routeId] ?? 0,
+          visitedCustomers: _integer(session['visited_customers']),
+          orderCount: _integer(session['order_count']),
+          status: 'active',
+        );
+      })
+      .where((route) => route.id.isNotEmpty)
+      .toList(growable: false);
+}
+
+List<FieldRouteCustomer> _routeCustomersFromShellSnapshot(
+  Map<String, dynamic> snapshot, {
+  required String routeId,
+}) {
+  final routeNames = <String, String>{};
+  for (final route in _objects(snapshot['routes'])) {
+    final id = _text(route['id']);
+    if (id.isEmpty) continue;
+    routeNames[id] = _text(
+      route['route_name'],
+      fallback: 'Tuyến làm việc',
+    );
+  }
+
+  return _objects(snapshot['routeCustomers'])
+      .where(
+        (row) => _text(row['route_id']) == routeId && _boolean(row['active']),
+      )
+      .map((row) {
+        final lat = _optionalDouble(row['geo_lat']);
+        final lng = _optionalDouble(row['geo_lng']);
+        final gps = lat == null || lng == null
+            ? null
+            : FieldGps(
+                lat: lat,
+                lng: lng,
+                accuracyMeters: _optionalDouble(row['geo_accuracy']),
+                updatedAt: _nullableText(row['geo_captured_at']),
+              );
+        return FieldRouteCustomer(
+          id: _text(row['id']),
+          routeId: _text(row['route_id']),
+          routeName: routeNames[_text(row['route_id'])] ?? 'Tuyến làm việc',
+          accountId: _text(row['customer_id']),
+          accountName: _text(
+            row['customer_name'],
+            fallback: 'Điểm bán',
+          ),
+          contactName: '',
+          area: _text(row['area'], fallback: 'Chưa có khu vực'),
+          sortOrder: _integer(row['sort_order']),
+          status: 'active',
+          note: _text(row['note']),
+          gps: gps,
+        );
+      })
+      .where((customer) => customer.id.isNotEmpty)
+      .toList(growable: false);
 }
 
 Map<String, dynamic> _object(Object? value) {
