@@ -32,8 +32,7 @@ class InstallationProfile {
   Map<String, String> toJson() => {
     'name': name,
     'baseUrl': baseUrl.toString(),
-    if (businessBaseUrl != null)
-      'businessBaseUrl': businessBaseUrl.toString(),
+    if (businessBaseUrl != null) 'businessBaseUrl': businessBaseUrl.toString(),
   };
 
   static InstallationProfile? fromJson(Object? value) {
@@ -47,8 +46,7 @@ class InstallationProfile {
     return InstallationProfile(
       name: name,
       baseUrl: baseUrl,
-      businessBaseUrl:
-          storedBusinessBaseUrl ?? configuredBusinessBaseUrl(),
+      businessBaseUrl: storedBusinessBaseUrl ?? configuredBusinessBaseUrl(),
     );
   }
 
