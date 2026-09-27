@@ -37,5 +37,11 @@ void main() {
     await tester.tap(find.text('Thêm'));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('more-screen')), findsOneWidget);
+    expect(find.text('Lịch sử phiên'), findsOneWidget);
+    expect(find.text('Báo cáo'), findsOneWidget);
+    expect(find.text('Kết quả thử sản phẩm'), findsOneWidget);
+    expect(find.text('Kế hoạch & Công việc'), findsOneWidget);
+    expect(find.text('Mở hoặc liên kết mã khách'), findsOneWidget);
+    expect(find.text('Thiết lập'), findsOneWidget);
   });
 }
