@@ -202,6 +202,8 @@ Future<void> revealAddCustomerSubmit(WidgetTester tester) async {
   }
 
   expect(submit, findsOneWidget);
+  await tester.ensureVisible(submit);
+  await tester.pumpAndSettle();
 }
 
 void main() {
