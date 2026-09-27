@@ -4,6 +4,7 @@ import '../../app/theme/app_theme.dart';
 import '../../core/auth/mobile_auth_client.dart';
 import '../../core/installation/installation_profile.dart';
 import '../../shared/widgets/app_card.dart';
+import '../settings/settings_page.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({
@@ -267,6 +268,21 @@ class _LoginPageState extends State<LoginPage> {
                       ),
                     ],
                   ),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                TextButton.icon(
+                  key: const Key('login-update-app'),
+                  onPressed: _busy
+                      ? null
+                      : () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) => const SettingsPage(),
+                            ),
+                          );
+                        },
+                  icon: const Icon(Icons.system_update_alt_rounded),
+                  label: const Text('Cập nhật ứng dụng'),
                 ),
               ],
             ),

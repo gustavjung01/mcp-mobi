@@ -74,6 +74,7 @@ void main() {
     WidgetTester tester,
   ) async {
     final media = FakeOutletMediaClient();
+    Uint8List? heroPreview;
 
     await tester.pumpWidget(
       MaterialApp(
@@ -87,6 +88,9 @@ void main() {
                 sessionId: 'session-1',
                 mediaClient: media,
                 photoPicker: FakeOutletPhotoPicker(),
+                onDraftPreviewChanged: (bytes) {
+                  heroPreview = bytes;
+                },
               ),
             ),
           ),
@@ -98,6 +102,8 @@ void main() {
     await tester.tap(find.byKey(const Key('outlet-photo-camera')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('outlet-photo-drafts')), findsOneWidget);
+    expect(heroPreview, isNotNull);
+    expect(heroPreview, isNotEmpty);
 
     await tester.tap(find.byKey(const Key('outlet-photo-save')));
     await tester.pumpAndSettle();
@@ -108,5 +114,6 @@ void main() {
 
     expect(media.uploadIds, ['same-upload-id', 'same-upload-id']);
     expect(find.byKey(const Key('outlet-photo-drafts')), findsNothing);
+    expect(heroPreview, isNull);
   });
 }

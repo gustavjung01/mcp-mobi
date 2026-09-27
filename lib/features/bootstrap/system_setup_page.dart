@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../app/theme/app_theme.dart';
 import '../../core/installation/installation_profile.dart';
 import '../../shared/widgets/app_card.dart';
+import '../settings/settings_page.dart';
 
 class SystemSetupPage extends StatefulWidget {
   const SystemSetupPage({
@@ -206,6 +207,19 @@ class _SystemSetupPageState extends State<SystemSetupPage> {
                   ],
                 ),
               ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            TextButton.icon(
+              key: const Key('system-update-app'),
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const SettingsPage(),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.system_update_alt_rounded),
+              label: const Text('Cập nhật ứng dụng'),
             ),
           ],
         ),
