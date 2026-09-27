@@ -233,7 +233,7 @@ class _OutletDetailPageState extends State<OutletDetailPage> {
                 : ListView(
                     padding: const EdgeInsets.all(AppSpacing.md),
                     children: [
-                      if (!_checkedIn) ...[
+                      if (line != null && !_checkedIn) ...[
                         SizedBox(
                           width: double.infinity,
                           child: FilledButton.icon(
