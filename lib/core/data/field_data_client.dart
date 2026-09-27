@@ -288,7 +288,7 @@ class HttpFieldDataClient implements FieldDataClient {
   }
 
   String _requestId() {
-    return 'mobile_data_' + DateTime.now().microsecondsSinceEpoch.toString();
+    return 'mobile_data_${DateTime.now().microsecondsSinceEpoch}';
   }
 
   Future<Map<String, dynamic>> _get(

@@ -195,7 +195,7 @@ class _OutletRow extends StatelessWidget {
     return AppCard(
       padding: EdgeInsets.zero,
       child: InkWell(
-        key: Key('outlet-row-' + customer.id),
+        key: Key('outlet-row-${customer.id}'),
         borderRadius: BorderRadius.circular(AppRadius.lg),
         onTap: onTap,
         child: Padding(

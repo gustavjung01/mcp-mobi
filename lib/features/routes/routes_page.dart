@@ -295,7 +295,7 @@ class _RouteSelectionCard extends StatelessWidget {
           const SizedBox(height: AppSpacing.sm),
           ...routes.map(
             (route) => InkWell(
-              key: Key('route-option-' + route.id),
+              key: Key('route-option-${route.id}'),
               borderRadius: BorderRadius.circular(AppRadius.md),
               onTap: onSelectRoute == null
                   ? null
@@ -374,7 +374,7 @@ class _VisitLineCard extends StatelessWidget {
     return AppCard(
       padding: EdgeInsets.zero,
       child: InkWell(
-        key: Key('route-line-' + line.id),
+        key: Key('route-line-${line.id}'),
         borderRadius: BorderRadius.circular(AppRadius.lg),
         onTap: onTap,
         child: Padding(
