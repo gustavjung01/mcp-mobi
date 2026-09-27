@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 
 import '../../core/auth/mobile_auth_client.dart';
 import '../../core/data/field_data_client.dart';
+import '../../core/data/order_data_client.dart';
 import '../../core/idempotency/canonical_idempotency.dart';
 import '../../core/installation/installation_profile.dart';
 import '../../core/location/field_location.dart';
 import '../../core/media/outlet_media_client.dart';
 import '../../core/media/outlet_photo_picker.dart';
 import '../../features/more/more_page.dart';
+import '../../features/orders/create_order_page.dart';
 import '../../features/orders/orders_page.dart';
 import '../../features/outlets/outlet_detail_page.dart';
 import '../../features/outlets/outlets_page.dart';
@@ -22,6 +24,7 @@ class AppShell extends StatefulWidget {
     this.profile,
     this.session,
     this.fieldDataClient,
+    this.orderDataClient,
     this.fieldLocationProvider,
     this.outletMediaClient,
     this.outletPhotoPicker,
@@ -31,6 +34,7 @@ class AppShell extends StatefulWidget {
   final InstallationProfile? profile;
   final MobileSession? session;
   final FieldDataClient? fieldDataClient;
+  final OrderDataClient? orderDataClient;
   final FieldLocationProvider? fieldLocationProvider;
   final OutletMediaClient? outletMediaClient;
   final OutletPhotoPicker? outletPhotoPicker;
@@ -43,6 +47,7 @@ class AppShell extends StatefulWidget {
 class _AppShellState extends State<AppShell> {
   int _selectedIndex = 0;
   FieldDataClient? _fieldDataClient;
+  OrderDataClient? _orderDataClient;
   OutletMediaClient? _outletMediaClient;
   late final FieldLocationProvider _locationProvider;
   late final OutletPhotoPicker _photoPicker;
@@ -59,6 +64,7 @@ class _AppShellState extends State<AppShell> {
   String? _fieldMessage;
   String? _outletMessage;
   int _workspaceLoadGeneration = 0;
+  int _orderRefreshToken = 0;
 
   FieldActionClient? get _fieldActions {
     final client = _fieldDataClient;
@@ -69,6 +75,7 @@ class _AppShellState extends State<AppShell> {
   void initState() {
     super.initState();
     _fieldDataClient = widget.fieldDataClient ?? _defaultFieldDataClient();
+    _orderDataClient = widget.orderDataClient ?? _defaultOrderDataClient();
     _outletMediaClient =
         widget.outletMediaClient ?? _defaultOutletMediaClient();
     _locationProvider =
@@ -87,6 +94,16 @@ class _AppShellState extends State<AppShell> {
     final session = widget.session;
     if (profile == null || session == null) return null;
     return HttpFieldDataClient(
+      profile: profile,
+      token: session.token,
+    );
+  }
+
+  OrderDataClient? _defaultOrderDataClient() {
+    final profile = widget.profile;
+    final session = widget.session;
+    if (profile == null || session == null) return null;
+    return HttpOrderDataClient(
       profile: profile,
       token: session.token,
     );
@@ -408,11 +425,13 @@ class _AppShellState extends State<AppShell> {
     FieldRouteCustomer? customer,
     FieldDayLine line,
   ) {
+    final outlet = _outletForRouteCustomerId(line.routeCustomerId);
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (context) => OutletDetailPage(
           routeName: _selectedRoute?.name ?? customer?.routeName ?? 'Đi tuyến',
           customer: customer,
+          outlet: outlet,
           line: line,
           sessionId: _workspace?.day.sessionOpened == true
               ? _workspace?.day.run.id
@@ -420,6 +439,9 @@ class _AppShellState extends State<AppShell> {
           mediaClient: _outletMediaClient,
           photoPicker: _photoPicker,
           onCheckIn: _fieldActions == null ? null : _checkIn,
+          onCreateOrder: _orderDataClient == null
+              ? null
+              : () => _openCreateOrder(line),
         ),
       ),
     );
@@ -435,6 +457,61 @@ class _AppShellState extends State<AppShell> {
           photoPicker: _photoPicker,
         ),
       ),
+    );
+  }
+
+  FieldOutlet? _outletForRouteCustomerId(String? routeCustomerId) {
+    if ((routeCustomerId ?? '').isEmpty) return null;
+    for (final outlet in _outlets) {
+      if (outlet.id == routeCustomerId) return outlet;
+    }
+    return null;
+  }
+
+  Future<void> _openCreateOrder(FieldDayLine line) async {
+    final client = _orderDataClient;
+    if (client == null) return;
+
+    var outlet = _outletForRouteCustomerId(line.routeCustomerId);
+    if (outlet == null && _fieldDataClient != null) {
+      await _loadOutlets();
+      outlet = _outletForRouteCustomerId(line.routeCustomerId);
+    }
+    if (!mounted) return;
+
+    if (outlet == null ||
+        (outlet.coreCustomerId ?? '').isEmpty ||
+        (outlet.coreCustomerAddressId ?? '').isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Điểm bán chưa liên kết đủ khách Công Ty và địa chỉ giao hàng để ra đơn.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    final created = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
+        builder: (context) => CreateOrderPage(
+          outlet: outlet!,
+          orderClient: client,
+        ),
+      ),
+    );
+    if (created != true || !mounted) return;
+
+    setState(() {
+      _orderRefreshToken += 1;
+    });
+    final route = _selectedRoute;
+    if (route != null) {
+      await _loadWorkspace(route);
+    }
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Đã tạo đơn hàng.')),
     );
   }
 
@@ -484,7 +561,10 @@ class _AppShellState extends State<AppShell> {
         onRefresh: _fieldDataClient == null ? null : _refreshOutlets,
         onOpenOutlet: _openDirectoryOutlet,
       ),
-      const OrdersPage(),
+      OrdersPage(
+        orderClient: _orderDataClient,
+        refreshToken: _orderRefreshToken,
+      ),
       MorePage(onLogout: widget.onLogout),
     ];
 
