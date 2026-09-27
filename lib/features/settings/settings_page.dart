@@ -312,20 +312,17 @@ class _SettingsPageState extends State<SettingsPage> {
                       const SizedBox(height: AppSpacing.sm),
                       const _InstallGuideStep(
                         number: '1',
-                        text:
-                            'Nếu Google Play Protect hiện cảnh báo, chọn “Tiếp tục cài đặt”.',
+                        text: 'Nếu Google Play Protect hiện cảnh báo, chọn “Tiếp tục cài đặt”.',
                       ),
                       const SizedBox(height: AppSpacing.sm),
                       const _InstallGuideStep(
                         number: '2',
-                        text:
-                            'Nếu máy yêu cầu quyền cài ứng dụng không xác định, bật “Cho phép từ nguồn này” cho MCP Field.',
+                        text: 'Nếu máy yêu cầu quyền cài ứng dụng không xác định, bật “Cho phép từ nguồn này” cho MCP Field.',
                       ),
                       const SizedBox(height: AppSpacing.sm),
                       const _InstallGuideStep(
                         number: '3',
-                        text:
-                            'Quay lại MCP Field và bấm cài bản cập nhật một lần nữa.',
+                        text: 'Quay lại MCP Field và bấm cài bản cập nhật một lần nữa.',
                       ),
                     ],
                   ),

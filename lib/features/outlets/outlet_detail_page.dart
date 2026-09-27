@@ -134,7 +134,8 @@ class _OutletDetailPageState extends State<OutletDetailPage> {
             ),
             child: Stack(
               children: [
-                if (_heroPhotoBytes == null && (_heroPhotoUrl ?? '').isEmpty) ...[
+                if (_heroPhotoBytes == null &&
+                    (_heroPhotoUrl ?? '').isEmpty) ...[
                   Positioned.fill(
                     key: const Key('outlet-hero-blue-overlay'),
                     child: DecoratedBox(
