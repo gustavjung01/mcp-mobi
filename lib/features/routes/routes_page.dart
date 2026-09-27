@@ -513,9 +513,7 @@ class _VisitLineCard extends StatelessWidget {
                 width: 36,
                 height: 36,
                 decoration: BoxDecoration(
-                  color: visited
-                      ? AppColors.successSoft
-                      : AppColors.primary,
+                  color: visited ? AppColors.successSoft : AppColors.primary,
                   borderRadius: BorderRadius.circular(AppRadius.sm),
                 ),
                 alignment: Alignment.center,

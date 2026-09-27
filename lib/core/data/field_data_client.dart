@@ -343,12 +343,14 @@ class HttpFieldDataClient implements FieldDataClient, FieldActionClient {
       final uri = _endpoint(path, query);
       final encodedBody = body == null ? null : jsonEncode(body);
       response = switch (method) {
-        'POST' => await _client
-            .post(uri, headers: headers, body: encodedBody)
-            .timeout(timeout),
-        'PATCH' => await _client
-            .patch(uri, headers: headers, body: encodedBody)
-            .timeout(timeout),
+        'POST' =>
+          await _client
+              .post(uri, headers: headers, body: encodedBody)
+              .timeout(timeout),
+        'PATCH' =>
+          await _client
+              .patch(uri, headers: headers, body: encodedBody)
+              .timeout(timeout),
         _ => await _client.get(uri, headers: headers).timeout(timeout),
       };
     } on TimeoutException {

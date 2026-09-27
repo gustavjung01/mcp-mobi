@@ -190,5 +190,4 @@ void main() {
     expect(client.checkInCalled, isTrue);
     expect(find.text('Đã check-in'), findsWidgets);
   });
-
 }

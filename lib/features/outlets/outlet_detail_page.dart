@@ -231,8 +231,9 @@ class _OutletDetailPageState extends State<OutletDetailPage> {
                           width: double.infinity,
                           child: FilledButton.icon(
                             key: const Key('outlet-checkin-button'),
-                            onPressed:
-                                canCheckIn && !_checkingIn ? _checkIn : null,
+                            onPressed: canCheckIn && !_checkingIn
+                                ? _checkIn
+                                : null,
                             style: FilledButton.styleFrom(
                               backgroundColor: AppColors.success,
                               minimumSize: const Size.fromHeight(48),
@@ -442,9 +443,7 @@ class _HistoryBody extends StatelessWidget {
               const Divider(height: 22),
               _InfoRow(
                 label: 'Check-in',
-                value: checkedIn
-                    ? _formatDateTime(checkinAt)
-                    : 'Chưa check-in',
+                value: checkedIn ? _formatDateTime(checkinAt) : 'Chưa check-in',
               ),
               const Divider(height: 22),
               _InfoRow(
