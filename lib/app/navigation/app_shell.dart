@@ -9,6 +9,7 @@ import '../../features/more/more_page.dart';
 import '../../features/orders/orders_page.dart';
 import '../../features/outlets/outlet_detail_page.dart';
 import '../../features/outlets/outlets_page.dart';
+import '../../features/routes/add_route_customer_page.dart';
 import '../../features/routes/routes_page.dart';
 import '../../features/today/today_page.dart';
 import '../theme/app_theme.dart';
@@ -345,6 +346,42 @@ class _AppShellState extends State<AppShell> {
     await _loadWorkspace(route);
   }
 
+  Future<void> _openAddRouteCustomer() async {
+    final route = _selectedRoute;
+    final day = _workspace?.day;
+    final actions = _fieldActions;
+    if (route == null || day?.sessionOpened != true || actions == null) return;
+
+    final status = day!.run.status.trim().toLowerCase();
+    if (const {'done', 'completed', 'cancelled', 'closed'}.contains(status)) {
+      setState(() {
+        _fieldMessage = 'Phiên hôm nay đã kết thúc nên không thể thêm điểm bán.';
+      });
+      return;
+    }
+
+    final added = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
+        builder: (context) => AddRouteCustomerPage(
+          routeName: route.name,
+          sessionId: day.run.id,
+          actionClient: actions,
+          locationProvider: _locationProvider,
+        ),
+      ),
+    );
+    if (added != true || !mounted) return;
+
+    setState(() {
+      _loadingWorkspace = true;
+      _loadingOutlets = true;
+    });
+    await Future.wait([
+      _loadWorkspace(route),
+      _loadOutlets(),
+    ]);
+  }
+
   void _openRouteOutlet(
     FieldRouteCustomer? customer,
     FieldDayLine line,
@@ -393,7 +430,8 @@ class _AppShellState extends State<AppShell> {
         loading: loading,
         message: _fieldMessage,
         onOpenRoutes: () => _openTab(1),
-        onOpenOutlets: () => _openTab(2),
+        onOpenRouteOutlet: (line) =>
+            _openRouteOutlet(_customerForLine(line), line),
         onRefresh: _fieldDataClient == null ? null : _refreshFieldData,
       ),
       RoutesPage(
@@ -408,6 +446,7 @@ class _AppShellState extends State<AppShell> {
         onOpenOutlet: (line) => _openRouteOutlet(_customerForLine(line), line),
         onStartRoute: _fieldActions == null ? null : _startRoute,
         onFinishRoute: _fieldActions == null ? null : _finishRoute,
+        onAddCustomer: _fieldActions == null ? null : _openAddRouteCustomer,
       ),
       OutletsPage(
         outlets: _outlets,

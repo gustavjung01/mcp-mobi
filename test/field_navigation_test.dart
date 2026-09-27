@@ -91,6 +91,8 @@ const session = MobileSession(
 
 class FakeFieldDataClient implements FieldDataClient, FieldActionClient {
   bool checkInCalled = false;
+  bool addCustomerCalled = false;
+  String? addCustomerKey;
 
   @override
   Future<List<FieldRoute>> loadRoutes() async => const [route];
@@ -119,6 +121,29 @@ class FakeFieldDataClient implements FieldDataClient, FieldActionClient {
     required String sessionId,
     required String idempotencyKey,
   }) async {}
+
+  @override
+  Future<FieldAddedCustomer> addSessionCustomer({
+    required String sessionId,
+    required String customerName,
+    required String phone,
+    required String area,
+    required String address,
+    required String note,
+    double? latitude,
+    double? longitude,
+    double? accuracy,
+    required String idempotencyKey,
+  }) async {
+    addCustomerCalled = true;
+    addCustomerKey = idempotencyKey;
+    expect(sessionId, 'session-1');
+    expect(customerName, 'Cửa hàng Mới');
+    return const FieldAddedCustomer(
+      routeCustomerId: 'customer-new',
+      sessionCustomerId: 'line-new',
+    );
+  }
 
   @override
   Future<void> setSessionCustomerCheckIn({
@@ -182,6 +207,65 @@ void main() {
     expect(find.text('Tuyến Quận 3'), findsWidgets);
     expect(find.text('Quận 3'), findsWidgets);
     expect(find.byKey(const Key('outlet-checkin-button')), findsNothing);
+  });
+
+  testWidgets('today next outlet keeps active route context', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AppShell(
+          session: session,
+          fieldDataClient: FakeFieldDataClient(),
+          fieldLocationProvider: FakeLocationProvider(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final nextOutlet = find.byKey(const Key('today-next-outlet-button'));
+    await tester.ensureVisible(nextOutlet);
+    await tester.tap(nextOutlet);
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('outlet-detail-screen')), findsOneWidget);
+    expect(find.byKey(const Key('outlet-checkin-button')), findsOneWidget);
+  });
+
+  testWidgets('field staff can add a customer to the active route session', (
+    WidgetTester tester,
+  ) async {
+    final client = FakeFieldDataClient();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AppShell(
+          session: session,
+          fieldDataClient: client,
+          fieldLocationProvider: FakeLocationProvider(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(navLabel('Đi tuyến'));
+    await tester.pumpAndSettle();
+
+    final addButton = find.byKey(const Key('route-add-customer-button'));
+    await tester.ensureVisible(addButton);
+    await tester.tap(addButton);
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('route-add-customer-screen')), findsOneWidget);
+    await tester.enterText(
+      find.byKey(const Key('route-add-customer-name')),
+      'Cửa hàng Mới',
+    );
+    await tester.tap(find.byKey(const Key('route-add-customer-submit')));
+    await tester.pumpAndSettle();
+
+    expect(client.addCustomerCalled, isTrue);
+    expect(client.addCustomerKey, startsWith('session-customer.add-'));
+    expect(find.byKey(const Key('routes-screen')), findsOneWidget);
   });
 
   testWidgets('check-in is only available from active route context', (

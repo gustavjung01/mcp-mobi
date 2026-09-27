@@ -351,7 +351,7 @@ void main() {
     expect(find.byKey(const Key('routes-screen')), findsOneWidget);
   });
 
-  testWidgets('today next outlet action opens outlet screen', (
+  testWidgets('today next outlet action stays in route context', (
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(
@@ -361,12 +361,12 @@ void main() {
     );
 
     final outletAction = find.byKey(
-      const Key('today-open-outlets-button'),
+      const Key('today-next-outlet-button'),
     );
     await tester.ensureVisible(outletAction);
     await tester.tap(outletAction);
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const Key('outlets-screen')), findsOneWidget);
+    expect(find.byKey(const Key('routes-screen')), findsOneWidget);
   });
 }
