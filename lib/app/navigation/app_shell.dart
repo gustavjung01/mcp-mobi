@@ -50,7 +50,7 @@ class _AppShellState extends State<AppShell> {
 
   FieldActionClient? get _fieldActions {
     final client = _fieldDataClient;
-    return client is FieldActionClient ? client : null;
+    return client is FieldActionClient ? client as FieldActionClient : null;
   }
 
   @override

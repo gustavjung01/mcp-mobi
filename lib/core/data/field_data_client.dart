@@ -334,9 +334,11 @@ class HttpFieldDataClient implements FieldDataClient, FieldActionClient {
       'Accept': 'application/json',
       'Authorization': 'Bearer $token',
       'X-Request-Id': _requestId(),
-      if (body != null) 'Content-Type': 'application/json',
-      if (idempotencyKey != null) 'Idempotency-Key': idempotencyKey,
     };
+    if (body != null) headers['Content-Type'] = 'application/json';
+    if (idempotencyKey != null) {
+      headers['Idempotency-Key'] = idempotencyKey;
+    }
 
     http.Response response;
     try {
