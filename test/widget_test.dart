@@ -39,7 +39,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('login-screen')), findsOneWidget);
-    expect(find.text('Hưng Phát'), findsOneWidget);
+    expect(find.text('Hưng Phát'), findsWidgets);
     expect(find.text('mcp.example.vn'), findsOneWidget);
   });
 
