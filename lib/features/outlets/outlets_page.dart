@@ -38,7 +38,9 @@ class _OutletsPageState extends State<OutletsPage> {
           return outlet.name.toLowerCase().contains(query) ||
               outlet.code.toLowerCase().contains(query) ||
               outlet.phone.toLowerCase().contains(query) ||
-              outlet.address.toLowerCase().contains(query);
+              outlet.address.toLowerCase().contains(query) ||
+              outlet.area.toLowerCase().contains(query) ||
+              outlet.routeName.toLowerCase().contains(query);
         })
         .toList(growable: false);
 
@@ -142,7 +144,11 @@ class _OutletRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final subtitle = [
+    final routeLine = [
+      if (outlet.routeName.isNotEmpty) outlet.routeName,
+      if (outlet.area.isNotEmpty) outlet.area,
+    ].join(' · ');
+    final contactLine = [
       if (outlet.code.isNotEmpty) outlet.code,
       if (outlet.phone.isNotEmpty) outlet.phone,
       if (outlet.address.isNotEmpty) outlet.address,
@@ -185,8 +191,23 @@ class _OutletRow extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 3),
+                    if (routeLine.isNotEmpty) ...[
+                      Text(
+                        routeLine,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: AppColors.primary,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                    ],
                     Text(
-                      subtitle.isEmpty ? 'Chưa có thông tin liên hệ' : subtitle,
+                      contactLine.isEmpty
+                          ? 'Chưa có thông tin liên hệ'
+                          : contactLine,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(

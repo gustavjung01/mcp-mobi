@@ -123,31 +123,57 @@ class FieldRouteCustomer {
 class FieldOutlet {
   const FieldOutlet({
     required this.id,
+    required this.routeId,
+    required this.routeName,
     required this.code,
     required this.name,
     required this.phone,
+    required this.area,
     required this.address,
     required this.status,
-    this.addressId,
+    required this.note,
+    this.coreCustomerId,
+    this.gps,
   });
 
   final String id;
+  final String routeId;
+  final String routeName;
   final String code;
   final String name;
   final String phone;
+  final String area;
   final String address;
   final String status;
-  final String? addressId;
+  final String note;
+  final String? coreCustomerId;
+  final FieldGps? gps;
 
   factory FieldOutlet.fromJson(Map<String, dynamic> json) {
+    final lat = _optionalDouble(json['geoLat']);
+    final lng = _optionalDouble(json['geoLng']);
+    final gps = lat == null || lng == null
+        ? null
+        : FieldGps(
+            lat: lat,
+            lng: lng,
+            accuracyMeters: _optionalDouble(json['geoAccuracy']),
+            updatedAt: _nullableText(json['geoCapturedAt']),
+          );
+
     return FieldOutlet(
-      id: _text(json['id']),
-      code: _text(json['customerCode']),
-      name: _text(json['name'], fallback: 'Điểm bán'),
+      id: _text(json['routeCustomerId']),
+      routeId: _text(json['routeId']),
+      routeName: _text(json['routeName']),
+      code: _text(json['customerId']),
+      name: _text(json['customerName'], fallback: 'Điểm bán'),
       phone: _text(json['phone']),
-      address: _text(json['defaultAddressLine1']),
-      status: _text(json['status'], fallback: 'active'),
-      addressId: _nullableText(json['defaultAddressId']),
+      area: _text(json['area'], fallback: 'Chưa có khu vực'),
+      address: _text(json['address']),
+      status: _text(json['status'], fallback: 'not_submitted'),
+      note: _text(json['note']),
+      coreCustomerId: _nullableText(json['coreCustomerId']),
+      gps: gps,
     );
   }
 }
@@ -461,8 +487,8 @@ class HttpFieldDataClient implements FieldDataClient, FieldActionClient {
 
   @override
   Future<List<FieldOutlet>> loadOutlets() async {
-    final data = await _get('/api/core-customers');
-    return _objects(data['customers'])
+    final data = await _get('/api/customer-verifications');
+    return _objects(data['items'])
         .map(FieldOutlet.fromJson)
         .where((outlet) => outlet.id.isNotEmpty)
         .toList(growable: false);
