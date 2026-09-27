@@ -45,37 +45,37 @@ void main() {
   test(
     'probe rejects a health-only gateway that still freezes API routes',
     () async {
-    final client = MockClient((request) async {
-      if (request.url.path == '/health/live') {
-        return http.Response(
-          jsonEncode({
-            'data': {'status': 'live'},
-          }),
-          200,
-        );
-      }
-      if (request.url.path == '/health/ready') {
-        return http.Response(
-          jsonEncode({
-            'data': {'status': 'ready'},
-          }),
-          200,
-        );
-      }
-      return http.Response('', 503);
-    });
-    final probe = HttpSystemEndpointProbe(client: client);
+      final client = MockClient((request) async {
+        if (request.url.path == '/health/live') {
+          return http.Response(
+            jsonEncode({
+              'data': {'status': 'live'},
+            }),
+            200,
+          );
+        }
+        if (request.url.path == '/health/ready') {
+          return http.Response(
+            jsonEncode({
+              'data': {'status': 'ready'},
+            }),
+            200,
+          );
+        }
+        return http.Response('', 503);
+      });
+      final probe = HttpSystemEndpointProbe(client: client);
 
-    await expectLater(
-      probe.verify(Uri.parse('https://mcp-api.example.vn')),
-      throwsA(
-        isA<SystemEndpointFailure>().having(
-          (failure) => failure.code,
-          'code',
-          'SYSTEM_ENDPOINT_API_UNAVAILABLE',
+      await expectLater(
+        probe.verify(Uri.parse('https://mcp-api.example.vn')),
+        throwsA(
+          isA<SystemEndpointFailure>().having(
+            (failure) => failure.code,
+            'code',
+            'SYSTEM_ENDPOINT_API_UNAVAILABLE',
+          ),
         ),
-      ),
-    );
+      );
     },
   );
 
