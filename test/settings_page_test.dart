@@ -65,6 +65,12 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('1.0.0'), findsOneWidget);
+    expect(find.byKey(const Key('update-install-guide')), findsOneWidget);
+    expect(find.textContaining('Google Play Protect'), findsOneWidget);
+    expect(find.textContaining('Cho phép từ nguồn này'), findsOneWidget);
+    expect(find.textContaining('Quay lại MCP Field'), findsOneWidget);
+    expect(find.textContaining('SHA-256'), findsNothing);
+
     await tester.tap(find.byKey(const Key('check-update-button')));
     await tester.pumpAndSettle();
 

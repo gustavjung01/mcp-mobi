@@ -134,36 +134,22 @@ class _OutletDetailPageState extends State<OutletDetailPage> {
             ),
             child: Stack(
               children: [
-                if (_heroPhotoBytes != null)
+                if (_heroPhotoBytes == null && (_heroPhotoUrl ?? '').isEmpty) ...[
                   Positioned.fill(
-                    child: Image.memory(
-                      _heroPhotoBytes!,
-                      fit: BoxFit.cover,
-                    ),
-                  )
-                else if ((_heroPhotoUrl ?? '').isNotEmpty)
-                  Positioned.fill(
-                    child: Image.network(
-                      _heroPhotoUrl!,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, _, _) => const SizedBox.shrink(),
-                    ),
-                  ),
-                Positioned.fill(
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          AppColors.primaryDeep.withValues(alpha: 0.46),
-                          AppColors.primaryDeep.withValues(alpha: 0.92),
-                        ],
+                    key: const Key('outlet-hero-blue-overlay'),
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            AppColors.primaryDeep.withValues(alpha: 0.46),
+                            AppColors.primaryDeep.withValues(alpha: 0.92),
+                          ],
+                        ),
                       ),
                     ),
                   ),
-                ),
-                if (_heroPhotoBytes == null && (_heroPhotoUrl ?? '').isEmpty)
                   Positioned(
                     right: -22,
                     bottom: -36,
@@ -171,6 +157,24 @@ class _OutletDetailPageState extends State<OutletDetailPage> {
                       Icons.storefront_rounded,
                       size: 180,
                       color: Colors.white.withValues(alpha: 0.08),
+                    ),
+                  ),
+                ],
+                if (_heroPhotoBytes != null)
+                  Positioned.fill(
+                    key: const Key('outlet-hero-photo-preview'),
+                    child: Image.memory(
+                      _heroPhotoBytes!,
+                      fit: BoxFit.cover,
+                    ),
+                  )
+                else if ((_heroPhotoUrl ?? '').isNotEmpty)
+                  Positioned.fill(
+                    key: const Key('outlet-hero-photo-preview'),
+                    child: Image.network(
+                      _heroPhotoUrl!,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, _, _) => const SizedBox.shrink(),
                     ),
                   ),
                 SafeArea(
