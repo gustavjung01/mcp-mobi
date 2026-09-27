@@ -1,18 +1,21 @@
 import 'package:flutter/material.dart';
 
 abstract final class AppColors {
-  static const primary = Color(0xFF0F766E);
-  static const primaryDark = Color(0xFF115E59);
-  static const primarySoft = Color(0xFFE6F4F2);
-  static const background = Color(0xFFF5F7F7);
+  static const primary = Color(0xFF1677FF);
+  static const primaryDark = Color(0xFF0B356D);
+  static const primaryDeep = Color(0xFF082B5A);
+  static const primarySoft = Color(0xFFEAF3FF);
+  static const background = Color(0xFFF3F6FA);
   static const surface = Color(0xFFFFFFFF);
-  static const border = Color(0xFFE2E8E7);
-  static const textPrimary = Color(0xFF17201F);
-  static const textSecondary = Color(0xFF687371);
-  static const success = Color(0xFF157F3D);
-  static const successSoft = Color(0xFFEAF7EE);
-  static const warning = Color(0xFF9A6700);
-  static const warningSoft = Color(0xFFFFF7DF);
+  static const border = Color(0xFFDDE5EF);
+  static const textPrimary = Color(0xFF10233F);
+  static const textSecondary = Color(0xFF66768A);
+  static const success = Color(0xFF21B66F);
+  static const successSoft = Color(0xFFE9F8F1);
+  static const warning = Color(0xFFE69424);
+  static const warningSoft = Color(0xFFFFF4E2);
+  static const danger = Color(0xFFED5A64);
+  static const dangerSoft = Color(0xFFFFECEE);
 }
 
 abstract final class AppSpacing {
@@ -25,9 +28,10 @@ abstract final class AppSpacing {
 }
 
 abstract final class AppRadius {
-  static const double sm = 12;
-  static const double md = 16;
-  static const double lg = 22;
+  static const double sm = 10;
+  static const double md = 14;
+  static const double lg = 18;
+  static const double xl = 24;
 }
 
 abstract final class AppTheme {
@@ -46,14 +50,14 @@ abstract final class AppTheme {
       textTheme: const TextTheme(
         headlineSmall: TextStyle(
           color: AppColors.textPrimary,
-          fontSize: 26,
-          fontWeight: FontWeight.w700,
-          height: 1.15,
+          fontSize: 25,
+          fontWeight: FontWeight.w800,
+          height: 1.12,
         ),
         titleLarge: TextStyle(
           color: AppColors.textPrimary,
           fontSize: 20,
-          fontWeight: FontWeight.w700,
+          fontWeight: FontWeight.w800,
         ),
         titleMedium: TextStyle(
           color: AppColors.textPrimary,
@@ -75,12 +79,31 @@ abstract final class AppTheme {
           fontWeight: FontWeight.w700,
         ),
       ),
-      navigationBarTheme: const NavigationBarThemeData(
-        height: 72,
+      navigationBarTheme: NavigationBarThemeData(
+        height: 68,
         elevation: 0,
         backgroundColor: AppColors.surface,
-        indicatorColor: AppColors.primarySoft,
+        indicatorColor: Colors.transparent,
         labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+        iconTheme: WidgetStateProperty.resolveWith((states) {
+          return IconThemeData(
+            size: 22,
+            color: states.contains(WidgetState.selected)
+                ? AppColors.primary
+                : AppColors.textSecondary,
+          );
+        }),
+        labelTextStyle: WidgetStateProperty.resolveWith((states) {
+          return TextStyle(
+            fontSize: 11,
+            fontWeight: states.contains(WidgetState.selected)
+                ? FontWeight.w800
+                : FontWeight.w600,
+            color: states.contains(WidgetState.selected)
+                ? AppColors.primary
+                : AppColors.textSecondary,
+          );
+        }),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
@@ -88,7 +111,7 @@ abstract final class AppTheme {
         hintStyle: const TextStyle(color: AppColors.textSecondary),
         contentPadding: const EdgeInsets.symmetric(
           horizontal: AppSpacing.md,
-          vertical: 14,
+          vertical: 15,
         ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppRadius.md),
@@ -103,6 +126,24 @@ abstract final class AppTheme {
           borderSide: const BorderSide(
             color: AppColors.primary,
             width: 1.5,
+          ),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          borderSide: const BorderSide(color: AppColors.danger),
+        ),
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          minimumSize: const Size.fromHeight(52),
+          backgroundColor: AppColors.primary,
+          foregroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadius.md),
+          ),
+          textStyle: const TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w800,
           ),
         ),
       ),

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'navigation/app_shell.dart';
+import 'bootstrap/bootstrap_flow.dart';
 import 'theme/app_theme.dart';
 
 class McpFieldApp extends StatelessWidget {
@@ -12,7 +12,7 @@ class McpFieldApp extends StatelessWidget {
       title: 'MCP Field',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(),
-      home: const AppShell(),
+      home: const BootstrapFlow(),
     );
   }
 }
