@@ -2,19 +2,16 @@ class InstallationProfile {
   const InstallationProfile({
     required this.name,
     required this.baseUrl,
-    this.businessBaseUrl,
   });
 
-  static const _configuredBusinessBaseUrl = String.fromEnvironment(
-    'MCP_BUSINESS_BASE_URL',
+  static const _configuredApiBaseUrl = String.fromEnvironment(
+    'MCP_API_BASE_URL',
   );
-  static const _legacyBusinessBaseUrl = 'https://68.233.111.135';
 
   final String name;
   final Uri baseUrl;
-  final Uri? businessBaseUrl;
 
-  Uri get fieldBaseUrl => businessBaseUrl ?? baseUrl;
+  Uri get fieldBaseUrl => baseUrl;
 
   String get installationKey => baseUrl.toString().toLowerCase();
 
@@ -25,37 +22,32 @@ class InstallationProfile {
     return InstallationProfile(
       name: name,
       baseUrl: baseUrl,
-      businessBaseUrl: configuredBusinessBaseUrl(),
     );
   }
 
   Map<String, String> toJson() => {
     'name': name,
     'baseUrl': baseUrl.toString(),
-    if (businessBaseUrl != null) 'businessBaseUrl': businessBaseUrl.toString(),
   };
 
   static InstallationProfile? fromJson(Object? value) {
     if (value is! Map<String, dynamic>) return null;
     final name = (value['name'] ?? '').toString().trim();
-    final baseUrl = parseBaseUrl((value['baseUrl'] ?? '').toString());
+    final storedBaseUrl = parseBaseUrl((value['baseUrl'] ?? '').toString());
     final storedBusinessBaseUrl = parseBaseUrl(
       (value['businessBaseUrl'] ?? '').toString(),
     );
-    final configured = configuredBusinessBaseUrl();
-    final legacyStored =
-        storedBusinessBaseUrl?.toString() == _legacyBusinessBaseUrl;
+    final baseUrl =
+        configuredApiBaseUrl() ?? storedBusinessBaseUrl ?? storedBaseUrl;
     if (name.isEmpty || baseUrl == null) return null;
     return InstallationProfile(
       name: name,
       baseUrl: baseUrl,
-      businessBaseUrl:
-          configured ?? (legacyStored ? null : storedBusinessBaseUrl),
     );
   }
 
-  static Uri? configuredBusinessBaseUrl() {
-    return parseBaseUrl(_configuredBusinessBaseUrl);
+  static Uri? configuredApiBaseUrl() {
+    return parseBaseUrl(_configuredApiBaseUrl);
   }
 
   static Uri? parseBaseUrl(String value) {
@@ -70,6 +62,9 @@ class InstallationProfile {
       return null;
     }
 
+    final path = uri.path.replaceAll(RegExp(r'/+$'), '');
+    if (path.isNotEmpty) return null;
+
     final loopbackHosts = {
       '127.0.0.1',
       'localhost',
@@ -80,8 +75,6 @@ class InstallationProfile {
         uri.scheme == 'http' && loopbackHosts.contains(uri.host.toLowerCase());
     if (uri.scheme != 'https' && !isDevelopmentHttp) return null;
 
-    return uri.replace(
-      path: uri.path.replaceAll(RegExp(r'/+$'), ''),
-    );
+    return uri.replace(path: '');
   }
 }

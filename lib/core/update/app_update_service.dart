@@ -184,10 +184,13 @@ class AppUpdateService {
     final base = Uri.tryParse(
       baseUrl.endsWith('/') ? baseUrl : '$baseUrl/',
     );
-    if (base == null || base.scheme != 'https' || base.host.isEmpty) {
+    if (base == null ||
+        base.scheme != 'https' ||
+        base.host.isEmpty ||
+        base.host.toLowerCase().endsWith('.r2.cloudflarestorage.com')) {
       throw const AppUpdateFailure(
         code: 'UPDATE_URL_INVALID',
-        message: 'Địa chỉ cập nhật chưa hợp lệ.',
+        message: 'Địa chỉ cập nhật công khai chưa hợp lệ.',
       );
     }
 

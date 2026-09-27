@@ -5,6 +5,7 @@ import 'package:mcp_field/app/app.dart';
 import 'package:mcp_field/app/navigation/app_shell.dart';
 import 'package:mcp_field/core/auth/mobile_auth_client.dart';
 import 'package:mcp_field/core/installation/installation_profile.dart';
+import 'package:mcp_field/core/installation/system_endpoint_probe.dart';
 import 'package:mcp_field/core/session/session_store.dart';
 
 final testProfile = InstallationProfile(
@@ -20,6 +21,11 @@ final testSession = MobileSession(
   expiresAt: DateTime.utc(2026, 9, 28),
   permissions: const ['mcp.session.write'],
 );
+
+class FakeSystemEndpointProbe implements SystemEndpointProbe {
+  @override
+  Future<void> verify(Uri baseUrl) async {}
+}
 
 class MemorySessionStore implements SessionStore {
   InstallationProfile? profile;
@@ -121,6 +127,7 @@ Future<void> openLogin(
     McpFieldApp(
       authClient: auth,
       sessionStore: store,
+      endpointProbe: FakeSystemEndpointProbe(),
     ),
   );
   await tester.pumpAndSettle();
@@ -191,7 +198,7 @@ void main() {
     await tester.pump();
 
     expect(find.byKey(const Key('system-setup-screen')), findsOneWidget);
-    expect(find.text('Địa chỉ hệ thống chưa hợp lệ'), findsOneWidget);
+    expect(find.text('Địa chỉ máy chủ chưa hợp lệ'), findsOneWidget);
   });
 
   testWidgets('successful login stores the session and opens today', (

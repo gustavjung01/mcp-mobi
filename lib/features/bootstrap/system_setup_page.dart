@@ -2,16 +2,19 @@ import 'package:flutter/material.dart';
 
 import '../../app/theme/app_theme.dart';
 import '../../core/installation/installation_profile.dart';
+import '../../core/installation/system_endpoint_probe.dart';
 import '../../shared/widgets/app_card.dart';
 import '../settings/settings_page.dart';
 
 class SystemSetupPage extends StatefulWidget {
   const SystemSetupPage({
     required this.onContinue,
+    required this.endpointProbe,
     super.key,
   });
 
   final ValueChanged<InstallationProfile> onContinue;
+  final SystemEndpointProbe endpointProbe;
 
   @override
   State<SystemSetupPage> createState() => _SystemSetupPageState();
@@ -20,7 +23,20 @@ class SystemSetupPage extends StatefulWidget {
 class _SystemSetupPageState extends State<SystemSetupPage> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
-  final _urlController = TextEditingController();
+  late final TextEditingController _urlController;
+  late final bool _usesConfiguredApiBaseUrl;
+  bool _checking = false;
+  String _endpointError = '';
+
+  @override
+  void initState() {
+    super.initState();
+    final configured = InstallationProfile.configuredApiBaseUrl();
+    _usesConfiguredApiBaseUrl = configured != null;
+    _urlController = TextEditingController(
+      text: configured?.toString() ?? '',
+    );
+  }
 
   @override
   void dispose() {
@@ -29,18 +45,38 @@ class _SystemSetupPageState extends State<SystemSetupPage> {
     super.dispose();
   }
 
-  void _continue() {
-    if (!_formKey.currentState!.validate()) return;
+  Future<void> _continue() async {
+    if (_checking || !_formKey.currentState!.validate()) return;
 
     final uri = InstallationProfile.parseBaseUrl(_urlController.text);
     if (uri == null) return;
 
-    widget.onContinue(
-      InstallationProfile.selected(
-        name: _nameController.text.trim(),
-        baseUrl: uri,
-      ),
-    );
+    setState(() {
+      _checking = true;
+      _endpointError = '';
+    });
+
+    try {
+      await widget.endpointProbe.verify(uri);
+      if (!mounted) return;
+      widget.onContinue(
+        InstallationProfile.selected(
+          name: _nameController.text.trim(),
+          baseUrl: uri,
+        ),
+      );
+    } on SystemEndpointFailure catch (failure) {
+      if (!mounted) return;
+      setState(() {
+        _endpointError = failure.message;
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _checking = false;
+        });
+      }
+    }
   }
 
   @override
@@ -121,7 +157,7 @@ class _SystemSetupPageState extends State<SystemSetupPage> {
             ),
             const SizedBox(height: AppSpacing.xs),
             Text(
-              'Mỗi bộ cài đặt sử dụng hệ thống riêng. Thiết lập đúng hệ thống trước khi đăng nhập.',
+              'Mỗi bộ cài đặt sử dụng hệ thống riêng. Ứng dụng sẽ kiểm tra máy chủ trước khi đăng nhập.',
               style: textTheme.bodyMedium,
             ),
             const SizedBox(height: AppSpacing.xl),
@@ -156,21 +192,25 @@ class _SystemSetupPageState extends State<SystemSetupPage> {
                     TextFormField(
                       key: const Key('system-url-field'),
                       controller: _urlController,
+                      readOnly: _usesConfiguredApiBaseUrl,
                       keyboardType: TextInputType.url,
                       autocorrect: false,
                       textInputAction: TextInputAction.done,
                       onFieldSubmitted: (_) => _continue(),
-                      decoration: const InputDecoration(
-                        labelText: 'Địa chỉ hệ thống',
-                        hintText: 'https://mcp.tencongty.vn',
-                        prefixIcon: Icon(Icons.language_rounded),
+                      decoration: InputDecoration(
+                        labelText: 'Địa chỉ máy chủ',
+                        hintText: 'https://dia-chi-may-chu',
+                        prefixIcon: const Icon(Icons.dns_outlined),
+                        suffixIcon: _usesConfiguredApiBaseUrl
+                            ? const Icon(Icons.lock_outline_rounded)
+                            : null,
                       ),
                       validator: (value) {
                         final uri = InstallationProfile.parseBaseUrl(
                           value ?? '',
                         );
                         if (uri == null) {
-                          return 'Địa chỉ hệ thống chưa hợp lệ';
+                          return 'Địa chỉ máy chủ chưa hợp lệ';
                         }
                         return null;
                       },
@@ -187,7 +227,7 @@ class _SystemSetupPageState extends State<SystemSetupPage> {
                         SizedBox(width: AppSpacing.sm),
                         Expanded(
                           child: Text(
-                            'Ứng dụng chỉ kết nối tới hệ thống đã chọn, không kết nối trực tiếp cơ sở dữ liệu.',
+                            'Chỉ dùng địa chỉ máy chủ MCP Field do Công Ty cấp. Không nhập địa chỉ trang web quản lý.',
                             style: TextStyle(
                               color: AppColors.textSecondary,
                               fontSize: 13,
@@ -197,12 +237,35 @@ class _SystemSetupPageState extends State<SystemSetupPage> {
                         ),
                       ],
                     ),
+                    if (_endpointError.isNotEmpty) ...[
+                      const SizedBox(height: AppSpacing.md),
+                      Text(
+                        _endpointError,
+                        key: const Key('system-endpoint-error'),
+                        style: const TextStyle(
+                          color: AppColors.danger,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: AppSpacing.xl),
                     FilledButton.icon(
                       key: const Key('system-continue-button'),
-                      onPressed: _continue,
-                      icon: const Icon(Icons.arrow_forward_rounded),
-                      label: const Text('Tiếp tục'),
+                      onPressed: _checking ? null : _continue,
+                      icon: _checking
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Icon(Icons.arrow_forward_rounded),
+                      label: Text(
+                        _checking ? 'Đang kiểm tra' : 'Tiếp tục',
+                      ),
                     ),
                   ],
                 ),

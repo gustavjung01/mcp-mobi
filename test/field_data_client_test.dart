@@ -9,8 +9,7 @@ import 'package:mcp_field/core/installation/installation_profile.dart';
 void main() {
   final profile = InstallationProfile(
     name: 'Hưng Phát',
-    baseUrl: Uri.parse('https://company.example.vn'),
-    businessBaseUrl: Uri.parse('https://mcp.example.vn'),
+    baseUrl: Uri.parse('https://mcp.example.vn'),
   );
 
   Map<String, dynamic> shellPayload() => {
