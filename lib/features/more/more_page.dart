@@ -86,17 +86,20 @@ class _MoreTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListTile(
-      onTap: onTap,
-      contentPadding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.md,
-        vertical: AppSpacing.xs,
-      ),
-      leading: Icon(item.icon, color: AppColors.primaryDark),
-      title: Text(item.label, style: Theme.of(context).textTheme.titleMedium),
-      trailing: const Icon(
-        Icons.chevron_right,
-        color: AppColors.textSecondary,
+    return Material(
+      color: Colors.transparent,
+      child: ListTile(
+        onTap: onTap,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: AppSpacing.xs,
+        ),
+        leading: Icon(item.icon, color: AppColors.primaryDark),
+        title: Text(item.label, style: Theme.of(context).textTheme.titleMedium),
+        trailing: const Icon(
+          Icons.chevron_right,
+          color: AppColors.textSecondary,
+        ),
       ),
     );
   }
