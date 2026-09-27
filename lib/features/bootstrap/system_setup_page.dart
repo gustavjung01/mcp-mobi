@@ -44,6 +44,8 @@ class _SystemSetupPageState extends State<SystemSetupPage> {
 
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
     return Scaffold(
       key: const Key('system-setup-screen'),
       body: SafeArea(
@@ -114,12 +116,12 @@ class _SystemSetupPageState extends State<SystemSetupPage> {
             const SizedBox(height: 40),
             Text(
               'Chọn hệ thống',
-              style: Theme.of(context).textTheme.headlineSmall,
+              style: textTheme.headlineSmall,
             ),
             const SizedBox(height: AppSpacing.xs),
             Text(
               'Mỗi bộ cài đặt sử dụng hệ thống riêng. Thiết lập đúng hệ thống trước khi đăng nhập.',
-              style: Theme.of(context).textTheme.bodyMedium,
+              style: textTheme.bodyMedium,
             ),
             const SizedBox(height: AppSpacing.xl),
             AppCard(
@@ -130,7 +132,7 @@ class _SystemSetupPageState extends State<SystemSetupPage> {
                   children: [
                     Text(
                       'Thông tin hệ thống',
-                      style: Theme.of(context).textTheme.titleMedium,
+                      style: textTheme.titleMedium,
                     ),
                     const SizedBox(height: AppSpacing.lg),
                     TextFormField(
@@ -163,7 +165,10 @@ class _SystemSetupPageState extends State<SystemSetupPage> {
                         prefixIcon: Icon(Icons.language_rounded),
                       ),
                       validator: (value) {
-                        if (InstallationProfile.parseBaseUrl(value ?? '') == null) {
+                        final uri = InstallationProfile.parseBaseUrl(
+                          value ?? '',
+                        );
+                        if (uri == null) {
                           return 'Địa chỉ hệ thống chưa hợp lệ';
                         }
                         return null;

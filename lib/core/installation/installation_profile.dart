@@ -19,7 +19,9 @@ class InstallationProfile {
       return null;
     }
 
-    if (uri.userInfo.isNotEmpty || uri.query.isNotEmpty || uri.fragment.isNotEmpty) {
+    if (uri.userInfo.isNotEmpty ||
+        uri.query.isNotEmpty ||
+        uri.fragment.isNotEmpty) {
       return null;
     }
 

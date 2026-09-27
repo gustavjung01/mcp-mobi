@@ -45,6 +45,8 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
     return Scaffold(
       key: const Key('login-screen'),
       body: Column(
@@ -124,7 +126,9 @@ class _LoginPageState extends State<LoginPage> {
                             height: 44,
                             decoration: BoxDecoration(
                               color: AppColors.primarySoft,
-                              borderRadius: BorderRadius.circular(AppRadius.md),
+                              borderRadius: BorderRadius.circular(
+                                AppRadius.md,
+                              ),
                             ),
                             alignment: Alignment.center,
                             child: const Icon(
@@ -139,12 +143,12 @@ class _LoginPageState extends State<LoginPage> {
                               children: [
                                 Text(
                                   widget.profile.name,
-                                  style: Theme.of(context).textTheme.titleMedium,
+                                  style: textTheme.titleMedium,
                                 ),
                                 const SizedBox(height: 2),
                                 Text(
                                   widget.profile.baseUrl.host,
-                                  style: Theme.of(context).textTheme.bodyMedium,
+                                  style: textTheme.bodyMedium,
                                 ),
                               ],
                             ),
@@ -174,7 +178,9 @@ class _LoginPageState extends State<LoginPage> {
                         onSubmitted: (_) => _login(),
                         decoration: InputDecoration(
                           labelText: 'Mật khẩu',
-                          prefixIcon: const Icon(Icons.lock_outline_rounded),
+                          prefixIcon: const Icon(
+                            Icons.lock_outline_rounded,
+                          ),
                           suffixIcon: IconButton(
                             onPressed: () {
                               setState(() {

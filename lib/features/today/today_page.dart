@@ -8,6 +8,8 @@ class TodayPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
     return Scaffold(
       key: const Key('today-screen'),
       body: SafeArea(
@@ -36,11 +38,11 @@ class TodayPage extends StatelessWidget {
                     children: [
                       Text(
                         'Chào buổi sáng',
-                        style: Theme.of(context).textTheme.bodyMedium,
+                        style: textTheme.bodyMedium,
                       ),
                       Text(
                         'Nhân viên thị trường',
-                        style: Theme.of(context).textTheme.titleMedium,
+                        style: textTheme.titleMedium,
                       ),
                     ],
                   ),
@@ -58,7 +60,7 @@ class TodayPage extends StatelessWidget {
                 children: [
                   Text(
                     'Hôm nay',
-                    style: Theme.of(context).textTheme.titleMedium,
+                    style: textTheme.titleMedium,
                   ),
                   const SizedBox(height: AppSpacing.md),
                   Row(
@@ -126,8 +128,9 @@ class TodayPage extends StatelessWidget {
                               LinearProgressIndicator(
                                 value: 0,
                                 minHeight: 6,
-                                borderRadius:
-                                    BorderRadius.all(Radius.circular(999)),
+                                borderRadius: BorderRadius.all(
+                                  Radius.circular(999),
+                                ),
                               ),
                             ],
                           ),
@@ -169,7 +172,7 @@ class TodayPage extends StatelessWidget {
             const SizedBox(height: AppSpacing.lg),
             Text(
               'Điểm bán tiếp theo',
-              style: Theme.of(context).textTheme.titleMedium,
+              style: textTheme.titleMedium,
             ),
             const SizedBox(height: AppSpacing.sm),
             AppCard(
@@ -192,7 +195,7 @@ class TodayPage extends StatelessWidget {
                   Expanded(
                     child: Text(
                       'Chưa có điểm bán tiếp theo',
-                      style: Theme.of(context).textTheme.bodyMedium,
+                      style: textTheme.bodyMedium,
                     ),
                   ),
                   const Icon(
@@ -205,7 +208,7 @@ class TodayPage extends StatelessWidget {
             const SizedBox(height: AppSpacing.lg),
             Text(
               'Việc cần làm hôm nay',
-              style: Theme.of(context).textTheme.titleMedium,
+              style: textTheme.titleMedium,
             ),
             const SizedBox(height: AppSpacing.sm),
             const AppCard(
