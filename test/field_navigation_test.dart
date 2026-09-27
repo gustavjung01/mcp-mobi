@@ -188,6 +188,23 @@ Finder navLabel(String label) {
   );
 }
 
+Future<void> revealAddCustomerSubmit(WidgetTester tester) async {
+  final screen = find.byKey(const Key('route-add-customer-screen'));
+  final verticalScrollable = find.descendant(
+    of: screen,
+    matching: find.byWidgetPredicate(
+      (widget) =>
+          widget is Scrollable && widget.axisDirection == AxisDirection.down,
+    ),
+  );
+  await tester.scrollUntilVisible(
+    find.byKey(const Key('route-add-customer-submit')),
+    300,
+    scrollable: verticalScrollable,
+  );
+  await tester.pumpAndSettle();
+}
+
 void main() {
   testWidgets('outlet directory is independent from route today', (
     WidgetTester tester,
@@ -270,9 +287,8 @@ void main() {
       find.byKey(const Key('route-add-customer-name')),
       'Cửa hàng Mới',
     );
+    await revealAddCustomerSubmit(tester);
     final submit = find.byKey(const Key('route-add-customer-submit'));
-    await tester.ensureVisible(submit);
-    await tester.pumpAndSettle();
     await tester.tap(submit);
     await tester.pumpAndSettle();
 
@@ -308,9 +324,8 @@ void main() {
       find.byKey(const Key('route-add-customer-name')),
       'Cửa hàng Mới',
     );
+    await revealAddCustomerSubmit(tester);
     final submit = find.byKey(const Key('route-add-customer-submit'));
-    await tester.ensureVisible(submit);
-    await tester.pumpAndSettle();
     await tester.tap(submit);
     await tester.pumpAndSettle();
 
@@ -318,7 +333,7 @@ void main() {
       find.text('Mạng tạm thời gián đoạn. Vui lòng thử lại.'),
       findsOneWidget,
     );
-    await tester.ensureVisible(submit);
+    await revealAddCustomerSubmit(tester);
     await tester.tap(submit);
     await tester.pumpAndSettle();
 
