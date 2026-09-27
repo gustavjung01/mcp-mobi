@@ -35,7 +35,7 @@ class _SystemSetupPageState extends State<SystemSetupPage> {
     if (uri == null) return;
 
     widget.onContinue(
-      InstallationProfile(
+      InstallationProfile.selected(
         name: _nameController.text.trim(),
         baseUrl: uri,
       ),

@@ -9,11 +9,12 @@ import 'package:mcp_field/core/installation/installation_profile.dart';
 
 final profile = InstallationProfile(
   name: 'Hưng Phát',
-  baseUrl: Uri.parse('https://mcp.example.vn'),
+  baseUrl: Uri.parse('https://company.example.vn'),
+  businessBaseUrl: Uri.parse('https://mcp.example.vn'),
 );
 
 void main() {
-  test('login calls the selected MCP backend and parses the session', () async {
+  test('login keeps using the selected authentication endpoint', () async {
     late http.Request captured;
     final client = HttpMobileAuthClient(
       client: MockClient((request) async {
@@ -54,7 +55,7 @@ void main() {
 
     expect(
       captured.url.toString(),
-      'https://mcp.example.vn/api/mobile-auth/login',
+      'https://company.example.vn/api/mobile-auth/login',
     );
     expect(captured.headers.containsKey('X-Backend-Token'), isFalse);
     expect(jsonDecode(captured.body)['loginName'], 'staff.test');
@@ -135,7 +136,7 @@ void main() {
 
     expect(
       captured.url.toString(),
-      'https://mcp.example.vn/api/mobile-auth/me',
+      'https://company.example.vn/api/mobile-auth/me',
     );
     expect(captured.headers['Authorization'], 'Bearer $token');
     expect(captured.headers.containsKey('X-Backend-Token'), isFalse);
