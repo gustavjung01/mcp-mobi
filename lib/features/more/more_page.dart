@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../app/theme/app_theme.dart';
 import '../../shared/widgets/app_card.dart';
 import '../../shared/widgets/screen_header.dart';
+import '../settings/settings_page.dart';
 
 class MorePage extends StatelessWidget {
   const MorePage({
@@ -39,7 +40,18 @@ class MorePage extends StatelessWidget {
             child: Column(
               children: [
                 for (var index = 0; index < _items.length; index++) ...[
-                  _MoreTile(item: _items[index]),
+                  _MoreTile(
+                    item: _items[index],
+                    onTap: _items[index].label == 'Thiết lập'
+                        ? () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute<void>(
+                                builder: (_) => const SettingsPage(),
+                              ),
+                            );
+                          }
+                        : null,
+                  ),
                   if (index < _items.length - 1)
                     const Divider(height: 1, indent: 64),
                 ],
@@ -64,13 +76,18 @@ class MorePage extends StatelessWidget {
 }
 
 class _MoreTile extends StatelessWidget {
-  const _MoreTile({required this.item});
+  const _MoreTile({
+    required this.item,
+    this.onTap,
+  });
 
   final _MoreItem item;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     return ListTile(
+      onTap: onTap,
       contentPadding: const EdgeInsets.symmetric(
         horizontal: AppSpacing.md,
         vertical: AppSpacing.xs,
