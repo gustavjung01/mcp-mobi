@@ -6,6 +6,14 @@ import 'package:http/testing.dart';
 import 'package:mcp_field/core/data/order_data_client.dart';
 import 'package:mcp_field/core/installation/installation_profile.dart';
 
+http.Response jsonResponse(Object body, int statusCode) {
+  return http.Response.bytes(
+    utf8.encode(jsonEncode(body)),
+    statusCode,
+    headers: const {'content-type': 'application/json; charset=utf-8'},
+  );
+}
+
 void main() {
   test(
     'order client uses MCP core-sales contract without commercial fields',
@@ -24,8 +32,8 @@ void main() {
 
           if (request.url.path == '/api/core-sales/products/search') {
             expect(request.url.queryParameters['includePrice'], 'true');
-            return http.Response(
-              jsonEncode({
+            return jsonResponse(
+              {
                 'data': [
                   {
                     'productId': 'product-1',
@@ -36,14 +44,14 @@ void main() {
                     'price': 125000,
                   },
                 ],
-              }),
+              },
               200,
             );
           }
 
           if (request.method == 'GET') {
-            return http.Response(
-              jsonEncode({
+            return jsonResponse(
+              {
                 'data': [
                   {
                     'id': 'order-1',
@@ -52,7 +60,7 @@ void main() {
                     'customerName': 'Cửa hàng Minh Phát',
                   },
                 ],
-              }),
+              },
               200,
             );
           }
@@ -74,15 +82,15 @@ void main() {
           expect(line['quantity'], '2');
           expect(line.containsKey('price'), isFalse);
 
-          return http.Response(
-            jsonEncode({
+          return jsonResponse(
+            {
               'data': {
                 'id': 'order-2',
                 'number': 'SO-002',
                 'status': 'draft',
                 'customerName': 'Cửa hàng Minh Phát',
               },
-            }),
+            },
             201,
           );
         }),

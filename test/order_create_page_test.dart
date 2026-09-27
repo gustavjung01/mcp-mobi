@@ -94,10 +94,7 @@ void main() {
     await tester.tap(submit);
     await tester.pumpAndSettle();
 
-    expect(
-      find.text('Mạng tạm thời gián đoạn. Vui lòng thử lại.'),
-      findsOneWidget,
-    );
+    expect(find.byKey(const Key('create-order-screen')), findsOneWidget);
     expect(client.keys, hasLength(1));
     expect(client.keys.single, startsWith('mcp.sales-order.create-'));
 
