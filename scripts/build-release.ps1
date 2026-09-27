@@ -148,7 +148,9 @@ $manifest = [ordered]@{
     publishedAt = (Get-Date).ToUniversalTime().ToString("o")
 }
 
-$manifest | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $manifestPath -Encoding UTF8
+$manifestJson = ($manifest | ConvertTo-Json -Depth 4) + [Environment]::NewLine
+$utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+[System.IO.File]::WriteAllText($manifestPath, $manifestJson, $utf8NoBom)
 
 Write-Host "MCP Field release ready"
 Write-Host "Version: $version"
