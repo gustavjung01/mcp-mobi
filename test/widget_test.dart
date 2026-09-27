@@ -3,6 +3,13 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:mcp_field/app/app.dart';
 
+Finder navLabel(String label) {
+  return find.descendant(
+    of: find.byType(NavigationBar),
+    matching: find.text(label),
+  );
+}
+
 void main() {
   testWidgets('MCP Field shell renders five primary destinations', (
     WidgetTester tester,
@@ -11,10 +18,10 @@ void main() {
 
     expect(find.byKey(const Key('today-screen')), findsOneWidget);
     expect(find.text('Hôm nay'), findsWidgets);
-    expect(find.text('Đi tuyến'), findsOneWidget);
-    expect(find.text('Điểm bán'), findsOneWidget);
-    expect(find.text('Đơn hàng'), findsOneWidget);
-    expect(find.text('Thêm'), findsOneWidget);
+    expect(navLabel('Đi tuyến'), findsOneWidget);
+    expect(navLabel('Điểm bán'), findsOneWidget);
+    expect(navLabel('Đơn hàng'), findsOneWidget);
+    expect(navLabel('Thêm'), findsOneWidget);
   });
 
   testWidgets('bottom navigation switches business sections', (
@@ -22,19 +29,19 @@ void main() {
   ) async {
     await tester.pumpWidget(const McpFieldApp());
 
-    await tester.tap(find.text('Đi tuyến'));
+    await tester.tap(navLabel('Đi tuyến'));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('routes-screen')), findsOneWidget);
 
-    await tester.tap(find.text('Điểm bán'));
+    await tester.tap(navLabel('Điểm bán'));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('outlets-screen')), findsOneWidget);
 
-    await tester.tap(find.text('Đơn hàng'));
+    await tester.tap(navLabel('Đơn hàng'));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('orders-screen')), findsOneWidget);
 
-    await tester.tap(find.text('Thêm'));
+    await tester.tap(navLabel('Thêm'));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('more-screen')), findsOneWidget);
     expect(find.text('Lịch sử phiên'), findsOneWidget);
