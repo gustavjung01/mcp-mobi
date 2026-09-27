@@ -335,4 +335,38 @@ void main() {
     expect(navLabel('Đơn hàng'), findsOneWidget);
     expect(navLabel('Thêm'), findsOneWidget);
   });
+
+  testWidgets('today primary action opens route screen', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AppShell(session: testSession),
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('today-open-routes-button')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('routes-screen')), findsOneWidget);
+  });
+
+  testWidgets('today next outlet action opens outlet screen', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AppShell(session: testSession),
+      ),
+    );
+
+    final outletAction = find.byKey(
+      const Key('today-open-outlets-button'),
+    );
+    await tester.ensureVisible(outletAction);
+    await tester.tap(outletAction);
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('outlets-screen')), findsOneWidget);
+  });
 }
