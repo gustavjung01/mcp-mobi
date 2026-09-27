@@ -9,12 +9,14 @@ class OutletDetailPage extends StatefulWidget {
     required this.routeName,
     super.key,
     this.customer,
+    this.outlet,
     this.line,
     this.onCheckIn,
   });
 
   final String routeName;
   final FieldRouteCustomer? customer;
+  final FieldOutlet? outlet;
   final FieldDayLine? line;
   final Future<void> Function(FieldDayLine line)? onCheckIn;
 
@@ -78,13 +80,18 @@ class _OutletDetailPageState extends State<OutletDetailPage> {
   Widget build(BuildContext context) {
     final line = widget.line;
     final customer = widget.customer;
-    final name = line?.accountName ?? customer?.accountName ?? 'Điểm bán';
+    final outlet = widget.outlet;
+    final name =
+        line?.accountName ??
+        customer?.accountName ??
+        outlet?.name ??
+        'Điểm bán';
     final area = line?.area ?? customer?.area ?? 'Chưa có khu vực';
-    final phone = (line?.phone ?? '').trim();
-    final address = (line?.address ?? '').trim();
+    final phone = (line?.phone ?? outlet?.phone ?? '').trim();
+    final address = (line?.address ?? outlet?.address ?? '').trim();
     final contact = (customer?.contactName ?? '').trim();
     final note = _firstNonEmpty([line?.note, customer?.note]);
-    final accountId = (customer?.accountId ?? '').trim();
+    final accountId = (customer?.accountId ?? outlet?.code ?? '').trim();
     final visited = line?.status == 'visited';
     final gps = customer?.gps;
     final canCheckIn =
@@ -226,7 +233,7 @@ class _OutletDetailPageState extends State<OutletDetailPage> {
                 : ListView(
                     padding: const EdgeInsets.all(AppSpacing.md),
                     children: [
-                      if (!_checkedIn) ...[
+                      if (line != null && !_checkedIn) ...[
                         SizedBox(
                           width: double.infinity,
                           child: FilledButton.icon(
@@ -299,59 +306,79 @@ class _OutletDetailPageState extends State<OutletDetailPage> {
                         ),
                       ),
                       const SizedBox(height: AppSpacing.md),
-                      const Text(
-                        'Tác nghiệp tại điểm bán',
-                        style: TextStyle(
-                          color: AppColors.textPrimary,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w900,
+                      if (line != null) ...[
+                        const Text(
+                          'Tác nghiệp tại điểm bán',
+                          style: TextStyle(
+                            color: AppColors.textPrimary,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w900,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: AppSpacing.sm),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _ActivityCard(
-                              icon: Icons.receipt_long_outlined,
-                              label: 'Đơn hàng',
-                              active: line?.hasOrder == true,
-                              accent: AppColors.primary,
+                        const SizedBox(height: AppSpacing.sm),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _ActivityCard(
+                                icon: Icons.receipt_long_outlined,
+                                label: 'Đơn hàng',
+                                active: line.hasOrder,
+                                accent: AppColors.primary,
+                              ),
                             ),
-                          ),
-                          const SizedBox(width: AppSpacing.sm),
-                          Expanded(
-                            child: _ActivityCard(
-                              icon: Icons.assignment_outlined,
-                              label: 'Báo cáo',
-                              active: line?.hasReport == true,
-                              accent: AppColors.warning,
+                            const SizedBox(width: AppSpacing.sm),
+                            Expanded(
+                              child: _ActivityCard(
+                                icon: Icons.assignment_outlined,
+                                label: 'Báo cáo',
+                                active: line.hasReport,
+                                accent: AppColors.warning,
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: AppSpacing.sm),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _ActivityCard(
-                              icon: Icons.science_outlined,
-                              label: 'Thử sản phẩm',
-                              active: line?.hasTest == true,
-                              accent: const Color(0xFF805AD5),
+                          ],
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _ActivityCard(
+                                icon: Icons.science_outlined,
+                                label: 'Thử sản phẩm',
+                                active: line.hasTest,
+                                accent: const Color(0xFF805AD5),
+                              ),
                             ),
-                          ),
-                          const SizedBox(width: AppSpacing.sm),
-                          Expanded(
-                            child: _ActivityCard(
-                              icon: Icons.task_alt_outlined,
-                              label: 'Theo dõi',
-                              active: (line?.followupCount ?? 0) > 0,
-                              value: (line?.followupCount ?? 0).toString(),
-                              accent: AppColors.danger,
+                            const SizedBox(width: AppSpacing.sm),
+                            Expanded(
+                              child: _ActivityCard(
+                                icon: Icons.task_alt_outlined,
+                                label: 'Theo dõi',
+                                active: line.followupCount > 0,
+                                value: line.followupCount.toString(),
+                                accent: AppColors.danger,
+                              ),
                             ),
+                          ],
+                        ),
+                      ] else
+                        AppCard(
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Icon(
+                                Icons.route_outlined,
+                                color: AppColors.primary,
+                              ),
+                              const SizedBox(width: AppSpacing.sm),
+                              Expanded(
+                                child: Text(
+                                  'Đây là hồ sơ tra cứu. Check-in và tác nghiệp chỉ thực hiện khi mở điểm bán từ Đi tuyến.',
+                                  style: Theme.of(context).textTheme.bodyMedium,
+                                ),
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
+                        ),
                       const SizedBox(height: AppSpacing.md),
                       AppCard(
                         child: _InfoRow(
@@ -420,6 +447,32 @@ class _HistoryBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (line == null) {
+      return ListView(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        children: [
+          AppCard(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(
+                  Icons.history_rounded,
+                  color: AppColors.textSecondary,
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: Text(
+                    'Lịch sử tác nghiệp sẽ hiển thị khi điểm bán có dữ liệu phiên đi tuyến.',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      );
+    }
+
     return ListView(
       padding: const EdgeInsets.all(AppSpacing.md),
       children: [

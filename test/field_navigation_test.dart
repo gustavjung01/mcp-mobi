@@ -29,6 +29,15 @@ const customer = FieldRouteCustomer(
   note: '',
 );
 
+const outlet = FieldOutlet(
+  id: 'outlet-1',
+  code: 'KH001',
+  name: 'Đại lý An Phát',
+  phone: '0909000111',
+  address: '456 Lê Lợi',
+  status: 'active',
+);
+
 const line = FieldDayLine(
   id: 'line-1',
   sessionCustomerId: 'line-1',
@@ -81,6 +90,9 @@ class FakeFieldDataClient implements FieldDataClient, FieldActionClient {
 
   @override
   Future<List<FieldRoute>> loadRoutes() async => const [route];
+
+  @override
+  Future<List<FieldOutlet>> loadOutlets() async => const [outlet];
 
   @override
   Future<FieldRouteWorkspace> loadRouteWorkspace({
@@ -138,7 +150,7 @@ Finder navLabel(String label) {
 }
 
 void main() {
-  testWidgets('single route loads today and outlet detail', (
+  testWidgets('outlet directory is independent from route today', (
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(
@@ -151,20 +163,22 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Tuyến Quận 1'), findsWidgets);
-
     await tester.tap(navLabel('Điểm bán'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Cửa hàng Minh Phát'), findsOneWidget);
-    await tester.tap(find.byKey(const Key('outlet-row-customer-1')));
+    expect(find.text('Đại lý An Phát'), findsOneWidget);
+    expect(find.text('Cửa hàng Minh Phát'), findsNothing);
+
+    await tester.tap(find.byKey(const Key('outlet-row-outlet-1')));
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('outlet-detail-screen')), findsOneWidget);
-    expect(find.text('0903123456'), findsOneWidget);
-    expect(find.text('123 Nguyễn Văn Cừ'), findsOneWidget);
+    expect(find.text('0909000111'), findsOneWidget);
+    expect(find.text('456 Lê Lợi'), findsOneWidget);
+    expect(find.byKey(const Key('outlet-checkin-button')), findsNothing);
   });
-  testWidgets('active outlet can check in with device location', (
+
+  testWidgets('check-in is only available from active route context', (
     WidgetTester tester,
   ) async {
     final client = FakeFieldDataClient();
@@ -179,11 +193,12 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(navLabel('Điểm bán'));
+    await tester.tap(navLabel('Đi tuyến'));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('outlet-row-customer-1')));
+    await tester.tap(find.byKey(const Key('route-line-line-1')));
     await tester.pumpAndSettle();
 
+    expect(find.byKey(const Key('outlet-checkin-button')), findsOneWidget);
     await tester.tap(find.byKey(const Key('outlet-checkin-button')));
     await tester.pumpAndSettle();
 

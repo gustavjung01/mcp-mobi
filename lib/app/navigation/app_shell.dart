@@ -40,12 +40,15 @@ class _AppShellState extends State<AppShell> {
   final Map<String, String> _mutationKeys = {};
   final Map<String, _PendingCheckIn> _pendingCheckIns = {};
   List<FieldRoute> _routes = const [];
+  List<FieldOutlet> _outlets = const [];
   FieldRoute? _selectedRoute;
   FieldRouteWorkspace? _workspace;
   bool _loadingRoutes = false;
+  bool _loadingOutlets = false;
   bool _loadingWorkspace = false;
   bool _routeActionBusy = false;
   String? _fieldMessage;
+  String? _outletMessage;
   int _workspaceLoadGeneration = 0;
 
   FieldActionClient? get _fieldActions {
@@ -61,7 +64,9 @@ class _AppShellState extends State<AppShell> {
         widget.fieldLocationProvider ?? const DeviceFieldLocationProvider();
     if (_fieldDataClient != null) {
       _loadingRoutes = true;
+      _loadingOutlets = true;
       _loadRoutes();
+      _loadOutlets();
     }
   }
 
@@ -131,6 +136,27 @@ class _AppShellState extends State<AppShell> {
     }
   }
 
+  Future<void> _loadOutlets() async {
+    final client = _fieldDataClient;
+    if (client == null) return;
+
+    try {
+      final outlets = await client.loadOutlets();
+      if (!mounted) return;
+      setState(() {
+        _outlets = outlets;
+        _loadingOutlets = false;
+        _outletMessage = null;
+      });
+    } on FieldDataFailure catch (failure) {
+      if (!mounted) return;
+      setState(() {
+        _loadingOutlets = false;
+        _outletMessage = failure.message;
+      });
+    }
+  }
+
   Future<void> _loadWorkspace(FieldRoute route) async {
     final client = _fieldDataClient;
     if (client == null) return;
@@ -172,6 +198,13 @@ class _AppShellState extends State<AppShell> {
       return;
     }
     await _loadWorkspace(route);
+  }
+
+  Future<void> _refreshOutlets() async {
+    setState(() {
+      _loadingOutlets = true;
+    });
+    await _loadOutlets();
   }
 
   Future<void> _startRoute() async {
@@ -312,17 +345,28 @@ class _AppShellState extends State<AppShell> {
     await _loadWorkspace(route);
   }
 
-  void _openOutlet(
+  void _openRouteOutlet(
     FieldRouteCustomer? customer,
-    FieldDayLine? line,
+    FieldDayLine line,
   ) {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (context) => OutletDetailPage(
-          routeName: _selectedRoute?.name ?? customer?.routeName ?? 'Điểm bán',
+          routeName: _selectedRoute?.name ?? customer?.routeName ?? 'Đi tuyến',
           customer: customer,
           line: line,
           onCheckIn: _fieldActions == null ? null : _checkIn,
+        ),
+      ),
+    );
+  }
+
+  void _openDirectoryOutlet(FieldOutlet outlet) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (context) => OutletDetailPage(
+          routeName: 'Danh bạ điểm bán',
+          outlet: outlet,
         ),
       ),
     );
@@ -361,18 +405,16 @@ class _AppShellState extends State<AppShell> {
         routeActionBusy: _routeActionBusy,
         onSelectRoute: _loadWorkspace,
         onRefresh: _fieldDataClient == null ? null : _refreshFieldData,
-        onOpenOutlet: (line) => _openOutlet(_customerForLine(line), line),
+        onOpenOutlet: (line) => _openRouteOutlet(_customerForLine(line), line),
         onStartRoute: _fieldActions == null ? null : _startRoute,
         onFinishRoute: _fieldActions == null ? null : _finishRoute,
       ),
       OutletsPage(
-        selectedRoute: _selectedRoute,
-        workspace: _workspace,
-        loading: loading,
-        message: _fieldMessage,
-        onOpenRoutes: () => _openTab(1),
-        onRefresh: _fieldDataClient == null ? null : _refreshFieldData,
-        onOpenOutlet: _openOutlet,
+        outlets: _outlets,
+        loading: _loadingOutlets,
+        message: _outletMessage,
+        onRefresh: _fieldDataClient == null ? null : _refreshOutlets,
+        onOpenOutlet: _openDirectoryOutlet,
       ),
       const OrdersPage(),
       MorePage(onLogout: widget.onLogout),
