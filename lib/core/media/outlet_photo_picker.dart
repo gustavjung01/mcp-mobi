@@ -1,5 +1,3 @@
-import 'dart:typed_data';
-
 import 'package:flutter/services.dart';
 import 'package:image/image.dart' as image_lib;
 import 'package:image_picker/image_picker.dart';
@@ -78,7 +76,7 @@ class DeviceOutletPhotoPicker implements OutletPhotoPicker {
         preferredCameraDevice: CameraDevice.rear,
       );
       if (file == null) return null;
-      return prepareOutletPhotoDraft(
+      return await prepareOutletPhotoDraft(
         sourceBytes: await file.readAsBytes(),
         clientUploadId: _uuid.v4(),
       );
