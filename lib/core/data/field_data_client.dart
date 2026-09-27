@@ -629,8 +629,7 @@ class HttpFieldDataClient implements FieldDataClient, FieldActionClient {
         if (latitude != null) 'geoLat': latitude,
         if (longitude != null) 'geoLng': longitude,
         if (accuracy != null) 'geoAccuracy': accuracy,
-        if (latitude != null && longitude != null)
-          'geoSource': 'mobile_gps',
+        if (latitude != null && longitude != null) 'geoSource': 'mobile_gps',
       },
       idempotencyKey: idempotencyKey,
     );

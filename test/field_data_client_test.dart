@@ -213,8 +213,7 @@ void main() {
           expect(body['sessionCustomerId'], 'line-1');
           expect(body['checkedIn'], isTrue);
           expect(body['geoSource'], 'mobile_gps');
-        } else if (request.url.path ==
-            '/api/mcp-day/session-customer/add') {
+        } else if (request.url.path == '/api/mcp-day/session-customer/add') {
           expect(body['sessionId'], 'session-1');
           expect(body['customerName'], 'Cửa hàng Mới');
           expect(body['phone'], '0909555666');

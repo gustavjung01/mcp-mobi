@@ -355,7 +355,8 @@ class _AppShellState extends State<AppShell> {
     final status = day!.run.status.trim().toLowerCase();
     if (const {'done', 'completed', 'cancelled', 'closed'}.contains(status)) {
       setState(() {
-        _fieldMessage = 'Phiên hôm nay đã kết thúc nên không thể thêm điểm bán.';
+        _fieldMessage =
+            'Phiên hôm nay đã kết thúc nên không thể thêm điểm bán.';
       });
       return;
     }

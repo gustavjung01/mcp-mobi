@@ -94,10 +94,9 @@ class _AddRouteCustomerPageState extends State<AddRouteCustomerPage> {
       return;
     }
 
-    final idempotencyKey =
-        _idempotencyKey ??= CanonicalIdempotencyKey.create(
-          'session-customer.add',
-        );
+    final idempotencyKey = _idempotencyKey ??= CanonicalIdempotencyKey.create(
+      'session-customer.add',
+    );
     setState(() {
       _saving = true;
       _message = null;
@@ -294,8 +293,9 @@ class _AddRouteCustomerPageState extends State<AddRouteCustomerPage> {
                                 key: const Key(
                                   'route-add-customer-location',
                                 ),
-                                onPressed:
-                                    _locating || _saving ? null : _captureLocation,
+                                onPressed: _locating || _saving
+                                    ? null
+                                    : _captureLocation,
                                 icon: _locating
                                     ? const SizedBox(
                                         width: 16,
