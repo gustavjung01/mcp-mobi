@@ -82,7 +82,10 @@ class _OutletDetailPageState extends State<OutletDetailPage> {
     final customer = widget.customer;
     final outlet = widget.outlet;
     final name =
-        line?.accountName ?? customer?.accountName ?? outlet?.name ?? 'Điểm bán';
+        line?.accountName ??
+        customer?.accountName ??
+        outlet?.name ??
+        'Điểm bán';
     final area = line?.area ?? customer?.area ?? 'Chưa có khu vực';
     final phone = (line?.phone ?? outlet?.phone ?? '').trim();
     final address = (line?.address ?? outlet?.address ?? '').trim();

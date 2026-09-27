@@ -405,8 +405,7 @@ class _AppShellState extends State<AppShell> {
         routeActionBusy: _routeActionBusy,
         onSelectRoute: _loadWorkspace,
         onRefresh: _fieldDataClient == null ? null : _refreshFieldData,
-        onOpenOutlet: (line) =>
-            _openRouteOutlet(_customerForLine(line), line),
+        onOpenOutlet: (line) => _openRouteOutlet(_customerForLine(line), line),
         onStartRoute: _fieldActions == null ? null : _startRoute,
         onFinishRoute: _fieldActions == null ? null : _finishRoute,
       ),

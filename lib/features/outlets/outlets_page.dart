@@ -31,14 +31,16 @@ class _OutletsPageState extends State<OutletsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final visible = widget.outlets.where((outlet) {
-      final query = _query.trim().toLowerCase();
-      if (query.isEmpty) return true;
-      return outlet.name.toLowerCase().contains(query) ||
-          outlet.code.toLowerCase().contains(query) ||
-          outlet.phone.toLowerCase().contains(query) ||
-          outlet.address.toLowerCase().contains(query);
-    }).toList(growable: false);
+    final visible = widget.outlets
+        .where((outlet) {
+          final query = _query.trim().toLowerCase();
+          if (query.isEmpty) return true;
+          return outlet.name.toLowerCase().contains(query) ||
+              outlet.code.toLowerCase().contains(query) ||
+              outlet.phone.toLowerCase().contains(query) ||
+              outlet.address.toLowerCase().contains(query);
+        })
+        .toList(growable: false);
 
     final list = ListView(
       padding: const EdgeInsets.fromLTRB(
@@ -89,8 +91,7 @@ class _OutletsPageState extends State<OutletsPage> {
             child: EmptyState(
               icon: Icons.storefront_outlined,
               title: 'Chưa có điểm bán',
-              message:
-                  'Các điểm bán được phân công cho tài khoản sẽ hiển thị tại đây.',
+              message: 'Các điểm bán được phân công cho tài khoản sẽ hiển thị tại đây.',
             ),
           )
         else
