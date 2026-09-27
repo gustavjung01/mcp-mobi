@@ -13,7 +13,7 @@ class TodayPage extends StatelessWidget {
     this.loading = false,
     this.message,
     this.onOpenRoutes,
-    this.onOpenOutlets,
+    this.onOpenRouteOutlet,
     this.onRefresh,
   });
 
@@ -23,7 +23,7 @@ class TodayPage extends StatelessWidget {
   final bool loading;
   final String? message;
   final VoidCallback? onOpenRoutes;
-  final VoidCallback? onOpenOutlets;
+  final void Function(FieldDayLine line)? onOpenRouteOutlet;
   final Future<void> Function()? onRefresh;
 
   @override
@@ -112,13 +112,19 @@ class TodayPage extends StatelessWidget {
         const SizedBox(height: AppSpacing.lg),
         _SectionTitle(
           title: 'Điểm bán tiếp theo',
-          actionLabel: 'Xem tất cả',
-          onPressed: onOpenOutlets,
+          actionLabel: 'Xem tuyến',
+          onPressed: onOpenRoutes,
         ),
         const SizedBox(height: AppSpacing.sm),
         GestureDetector(
-          key: const Key('today-open-outlets-button'),
-          onTap: onOpenOutlets,
+          key: const Key('today-next-outlet-button'),
+          onTap: () {
+            if (nextLine != null && onOpenRouteOutlet != null) {
+              onOpenRouteOutlet!(nextLine);
+              return;
+            }
+            onOpenRoutes?.call();
+          },
           behavior: HitTestBehavior.opaque,
           child: AppCard(
             child: Row(

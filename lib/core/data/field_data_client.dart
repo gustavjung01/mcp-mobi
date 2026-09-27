@@ -316,6 +316,16 @@ class FieldRouteWorkspace {
   final FieldDayData day;
 }
 
+class FieldAddedCustomer {
+  const FieldAddedCustomer({
+    required this.routeCustomerId,
+    required this.sessionCustomerId,
+  });
+
+  final String routeCustomerId;
+  final String sessionCustomerId;
+}
+
 abstract interface class FieldDataClient {
   Future<List<FieldRoute>> loadRoutes();
 
@@ -345,6 +355,19 @@ abstract interface class FieldActionClient {
     required double latitude,
     required double longitude,
     required double accuracy,
+    required String idempotencyKey,
+  });
+
+  Future<FieldAddedCustomer> addSessionCustomer({
+    required String sessionId,
+    required String customerName,
+    required String phone,
+    required String area,
+    required String address,
+    required String note,
+    double? latitude,
+    double? longitude,
+    double? accuracy,
     required String idempotencyKey,
   });
 }
@@ -570,6 +593,68 @@ class HttpFieldDataClient implements FieldDataClient, FieldActionClient {
         'geoSource': 'mobile_gps',
       },
       idempotencyKey: idempotencyKey,
+    );
+  }
+
+  @override
+  Future<FieldAddedCustomer> addSessionCustomer({
+    required String sessionId,
+    required String customerName,
+    required String phone,
+    required String area,
+    required String address,
+    required String note,
+    double? latitude,
+    double? longitude,
+    double? accuracy,
+    required String idempotencyKey,
+  }) async {
+    if ((latitude == null) != (longitude == null)) {
+      throw const FieldDataFailure(
+        code: 'LOCATION_INCOMPLETE',
+        message: 'Vị trí điểm bán chưa đầy đủ. Vui lòng lấy lại vị trí.',
+      );
+    }
+
+    final result = await _request(
+      'POST',
+      '/api/mcp-day/session-customer/add',
+      body: {
+        'sessionId': sessionId,
+        'customerName': customerName.trim(),
+        if (phone.trim().isNotEmpty) 'phone': phone.trim(),
+        if (area.trim().isNotEmpty) 'area': area.trim(),
+        if (address.trim().isNotEmpty) 'address': address.trim(),
+        if (note.trim().isNotEmpty) 'note': note.trim(),
+        'geoLat': ?latitude,
+        'geoLng': ?longitude,
+        'geoAccuracy': ?accuracy,
+        if (latitude != null && longitude != null) 'geoSource': 'mobile_gps',
+      },
+      idempotencyKey: idempotencyKey,
+    );
+
+    final routeCustomer = _object(result['routeCustomer']);
+    final sessionCustomer = _object(result['sessionCustomer']);
+    final routeCustomerId = _text(
+      result['routeCustomerId'],
+      fallback: _text(routeCustomer['id']),
+    );
+    final sessionCustomerId = _text(
+      result['sessionCustomerId'],
+      fallback: _text(sessionCustomer['id']),
+    );
+    if (routeCustomerId.isEmpty || sessionCustomerId.isEmpty) {
+      throw const FieldDataFailure(
+        code: 'RESPONSE_INVALID',
+        message: 'Hệ thống chưa trả đủ thông tin điểm bán vừa thêm.',
+        retryable: true,
+      );
+    }
+
+    return FieldAddedCustomer(
+      routeCustomerId: routeCustomerId,
+      sessionCustomerId: sessionCustomerId,
     );
   }
 }

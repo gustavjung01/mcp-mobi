@@ -213,6 +213,23 @@ void main() {
           expect(body['sessionCustomerId'], 'line-1');
           expect(body['checkedIn'], isTrue);
           expect(body['geoSource'], 'mobile_gps');
+        } else if (request.url.path == '/api/mcp-day/session-customer/add') {
+          expect(body['sessionId'], 'session-1');
+          expect(body['customerName'], 'Cửa hàng Mới');
+          expect(body['phone'], '0909555666');
+          expect(body['geoLat'], 10.76);
+          expect(body['geoLng'], 106.68);
+          expect(body['geoSource'], 'mobile_gps');
+          return http.Response(
+            jsonEncode({
+              'data': {
+                'routeCustomerId': 'customer-new',
+                'sessionCustomerId': 'line-new',
+              },
+            }),
+            200,
+            headers: {'content-type': 'application/json; charset=utf-8'},
+          );
         } else {
           expect(request.url.path, '/api/mcp-sessions/session-1');
           expect(body['status'], 'done');
@@ -241,16 +258,31 @@ void main() {
       accuracy: 8,
       idempotencyKey: 'test-key-checkin-12345678',
     );
+    final added = await client.addSessionCustomer(
+      sessionId: 'session-1',
+      customerName: 'Cửa hàng Mới',
+      phone: '0909555666',
+      area: 'Quận 1',
+      address: '12 Nguyễn Trãi',
+      note: 'Khách mới ngoài tuyến',
+      latitude: 10.76,
+      longitude: 106.68,
+      accuracy: 9,
+      idempotencyKey: 'test-key-add-12345678',
+    );
     await client.finishRouteSession(
       sessionId: 'session-1',
       idempotencyKey: 'test-key-finish-12345678',
     );
 
+    expect(added.routeCustomerId, 'customer-new');
+    expect(added.sessionCustomerId, 'line-new');
     expect(
       seen,
       [
         '/api/mcp-day/open-session',
         '/api/mcp-day/session-customer/checkin',
+        '/api/mcp-day/session-customer/add',
         '/api/mcp-sessions/session-1',
       ],
     );

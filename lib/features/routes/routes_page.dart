@@ -20,6 +20,7 @@ class RoutesPage extends StatefulWidget {
     this.onOpenOutlet,
     this.onStartRoute,
     this.onFinishRoute,
+    this.onAddCustomer,
   });
 
   final List<FieldRoute> routes;
@@ -33,6 +34,7 @@ class RoutesPage extends StatefulWidget {
   final void Function(FieldDayLine line)? onOpenOutlet;
   final Future<void> Function()? onStartRoute;
   final Future<void> Function()? onFinishRoute;
+  final Future<void> Function()? onAddCustomer;
 
   @override
   State<RoutesPage> createState() => _RoutesPageState();
@@ -228,24 +230,39 @@ class _RoutesPageState extends State<RoutesPage> {
           else ...[
             Row(
               children: [
-                const Expanded(
-                  child: Text(
-                    'Danh sách điểm bán',
-                    style: TextStyle(
-                      color: AppColors.primary,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w900,
-                    ),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Danh sách điểm bán',
+                        style: TextStyle(
+                          color: AppColors.primary,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${visibleLines.length} điểm trong phiên hôm nay',
+                        style: const TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                Text(
-                  '${visibleLines.length} điểm',
-                  style: const TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
+                if (_canAddCustomer(day) && widget.onAddCustomer != null)
+                  OutlinedButton.icon(
+                    key: const Key('route-add-customer-button'),
+                    onPressed: widget.routeActionBusy
+                        ? null
+                        : () => widget.onAddCustomer!(),
+                    icon: const Icon(Icons.person_add_alt_1_rounded, size: 18),
+                    label: const Text('Thêm khách'),
                   ),
-                ),
               ],
             ),
             const SizedBox(height: AppSpacing.sm),
@@ -559,6 +576,12 @@ class _Notice extends StatelessWidget {
       ),
     );
   }
+}
+
+bool _canAddCustomer(FieldDayData? day) {
+  if (day?.sessionOpened != true) return false;
+  final status = day!.run.status.trim().toLowerCase();
+  return !const {'done', 'completed', 'cancelled', 'closed'}.contains(status);
 }
 
 String _statusLabel(FieldDayData? day) {

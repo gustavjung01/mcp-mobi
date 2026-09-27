@@ -91,6 +91,10 @@ const session = MobileSession(
 
 class FakeFieldDataClient implements FieldDataClient, FieldActionClient {
   bool checkInCalled = false;
+  bool addCustomerCalled = false;
+  bool failFirstAddCustomer = false;
+  String? addCustomerKey;
+  final List<String> addCustomerKeys = [];
 
   @override
   Future<List<FieldRoute>> loadRoutes() async => const [route];
@@ -119,6 +123,37 @@ class FakeFieldDataClient implements FieldDataClient, FieldActionClient {
     required String sessionId,
     required String idempotencyKey,
   }) async {}
+
+  @override
+  Future<FieldAddedCustomer> addSessionCustomer({
+    required String sessionId,
+    required String customerName,
+    required String phone,
+    required String area,
+    required String address,
+    required String note,
+    double? latitude,
+    double? longitude,
+    double? accuracy,
+    required String idempotencyKey,
+  }) async {
+    addCustomerCalled = true;
+    addCustomerKey = idempotencyKey;
+    addCustomerKeys.add(idempotencyKey);
+    expect(sessionId, 'session-1');
+    expect(customerName, 'Cửa hàng Mới');
+    if (failFirstAddCustomer && addCustomerKeys.length == 1) {
+      throw const FieldDataFailure(
+        code: 'NETWORK_UNAVAILABLE',
+        message: 'Mạng tạm thời gián đoạn. Vui lòng thử lại.',
+        retryable: true,
+      );
+    }
+    return const FieldAddedCustomer(
+      routeCustomerId: 'customer-new',
+      sessionCustomerId: 'line-new',
+    );
+  }
 
   @override
   Future<void> setSessionCustomerCheckIn({
@@ -153,6 +188,24 @@ Finder navLabel(String label) {
   );
 }
 
+Future<void> revealAddCustomerSubmit(WidgetTester tester) async {
+  final screen = find.byKey(const Key('route-add-customer-screen'));
+  final list = find.descendant(
+    of: screen,
+    matching: find.byType(ListView),
+  );
+  final submit = find.byKey(const Key('route-add-customer-submit'));
+
+  for (var attempt = 0; attempt < 5 && submit.evaluate().isEmpty; attempt++) {
+    await tester.drag(list, const Offset(0, -300));
+    await tester.pumpAndSettle();
+  }
+
+  expect(submit, findsOneWidget);
+  await tester.ensureVisible(submit);
+  await tester.pumpAndSettle();
+}
+
 void main() {
   testWidgets('outlet directory is independent from route today', (
     WidgetTester tester,
@@ -182,6 +235,112 @@ void main() {
     expect(find.text('Tuyến Quận 3'), findsWidgets);
     expect(find.text('Quận 3'), findsWidgets);
     expect(find.byKey(const Key('outlet-checkin-button')), findsNothing);
+  });
+
+  testWidgets('today next outlet keeps active route context', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AppShell(
+          session: session,
+          fieldDataClient: FakeFieldDataClient(),
+          fieldLocationProvider: FakeLocationProvider(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final nextOutlet = find.byKey(const Key('today-next-outlet-button'));
+    await tester.ensureVisible(nextOutlet);
+    await tester.tap(nextOutlet);
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('outlet-detail-screen')), findsOneWidget);
+    expect(find.byKey(const Key('outlet-checkin-button')), findsOneWidget);
+  });
+
+  testWidgets('field staff can add a customer to the active route session', (
+    WidgetTester tester,
+  ) async {
+    final client = FakeFieldDataClient();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AppShell(
+          session: session,
+          fieldDataClient: client,
+          fieldLocationProvider: FakeLocationProvider(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(navLabel('Đi tuyến'));
+    await tester.pumpAndSettle();
+
+    final addButton = find.byKey(const Key('route-add-customer-button'));
+    await tester.ensureVisible(addButton);
+    await tester.tap(addButton);
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('route-add-customer-screen')), findsOneWidget);
+    await tester.enterText(
+      find.byKey(const Key('route-add-customer-name')),
+      'Cửa hàng Mới',
+    );
+    await revealAddCustomerSubmit(tester);
+    final submit = find.byKey(const Key('route-add-customer-submit'));
+    await tester.tap(submit);
+    await tester.pumpAndSettle();
+
+    expect(client.addCustomerCalled, isTrue);
+    expect(client.addCustomerKey, startsWith('session-customer.add-'));
+    expect(find.byKey(const Key('routes-screen')), findsOneWidget);
+  });
+
+  testWidgets('retrying the same add-customer intent reuses its key', (
+    WidgetTester tester,
+  ) async {
+    final client = FakeFieldDataClient()..failFirstAddCustomer = true;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AppShell(
+          session: session,
+          fieldDataClient: client,
+          fieldLocationProvider: FakeLocationProvider(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(navLabel('Đi tuyến'));
+    await tester.pumpAndSettle();
+
+    final addButton = find.byKey(const Key('route-add-customer-button'));
+    await tester.ensureVisible(addButton);
+    await tester.tap(addButton);
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const Key('route-add-customer-name')),
+      'Cửa hàng Mới',
+    );
+    await revealAddCustomerSubmit(tester);
+    final submit = find.byKey(const Key('route-add-customer-submit'));
+    await tester.tap(submit);
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('Mạng tạm thời gián đoạn. Vui lòng thử lại.'),
+      findsOneWidget,
+    );
+    await revealAddCustomerSubmit(tester);
+    await tester.tap(submit);
+    await tester.pumpAndSettle();
+
+    expect(client.addCustomerKeys, hasLength(2));
+    expect(client.addCustomerKeys[1], client.addCustomerKeys[0]);
+    expect(find.byKey(const Key('routes-screen')), findsOneWidget);
   });
 
   testWidgets('check-in is only available from active route context', (
