@@ -18,6 +18,7 @@ class OutletDetailPage extends StatefulWidget {
     this.mediaClient,
     this.photoPicker,
     this.onCheckIn,
+    this.onCreateOrder,
   });
 
   final String routeName;
@@ -28,6 +29,7 @@ class OutletDetailPage extends StatefulWidget {
   final OutletMediaClient? mediaClient;
   final OutletPhotoPicker? photoPicker;
   final Future<void> Function(FieldDayLine line)? onCheckIn;
+  final Future<void> Function()? onCreateOrder;
 
   @override
   State<OutletDetailPage> createState() => _OutletDetailPageState();
@@ -385,10 +387,12 @@ class _OutletDetailPageState extends State<OutletDetailPage> {
                           children: [
                             Expanded(
                               child: _ActivityCard(
+                                key: const Key('outlet-create-order'),
                                 icon: Icons.receipt_long_outlined,
                                 label: 'Đơn hàng',
                                 active: line.hasOrder,
                                 accent: AppColors.primary,
+                                onTap: widget.onCreateOrder,
                               ),
                             ),
                             const SizedBox(width: AppSpacing.sm),
@@ -623,11 +627,13 @@ class _InfoRow extends StatelessWidget {
 
 class _ActivityCard extends StatelessWidget {
   const _ActivityCard({
+    super.key,
     required this.icon,
     required this.label,
     required this.active,
     required this.accent,
     this.value,
+    this.onTap,
   });
 
   final IconData icon;
@@ -635,43 +641,57 @@ class _ActivityCard extends StatelessWidget {
   final bool active;
   final Color accent;
   final String? value;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    return AppCard(
-      padding: const EdgeInsets.all(AppSpacing.sm),
-      child: Column(
-        children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: accent.withValues(alpha: 0.10),
-              borderRadius: BorderRadius.circular(AppRadius.sm),
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(AppRadius.lg),
+      child: AppCard(
+        padding: const EdgeInsets.all(AppSpacing.sm),
+        child: Column(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: accent.withValues(alpha: 0.10),
+                borderRadius: BorderRadius.circular(AppRadius.sm),
+              ),
+              alignment: Alignment.center,
+              child: Icon(icon, size: 20, color: accent),
             ),
-            alignment: Alignment.center,
-            child: Icon(icon, size: 20, color: accent),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            label,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: AppColors.textPrimary,
-              fontSize: 12,
-              fontWeight: FontWeight.w800,
+            const SizedBox(height: 8),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+              ),
             ),
-          ),
-          const SizedBox(height: 3),
-          Text(
-            value ?? (active ? 'Đã có' : 'Chưa có'),
-            style: TextStyle(
-              color: active ? AppColors.success : AppColors.textSecondary,
-              fontSize: 10,
-              fontWeight: FontWeight.w700,
+            const SizedBox(height: 3),
+            Text(
+              value ??
+                  (active
+                      ? 'Đã có'
+                      : onTap == null
+                      ? 'Chưa có'
+                      : 'Mở'),
+              style: TextStyle(
+                color: active
+                    ? AppColors.success
+                    : onTap == null
+                    ? AppColors.textSecondary
+                    : accent,
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

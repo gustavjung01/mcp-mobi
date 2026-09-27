@@ -133,6 +133,8 @@ class FieldOutlet {
     required this.status,
     required this.note,
     this.coreCustomerId,
+    this.coreCustomerAddressId,
+    this.coreCustomerCode,
     this.gps,
   });
 
@@ -147,6 +149,8 @@ class FieldOutlet {
   final String status;
   final String note;
   final String? coreCustomerId;
+  final String? coreCustomerAddressId;
+  final String? coreCustomerCode;
   final FieldGps? gps;
 
   factory FieldOutlet.fromJson(Map<String, dynamic> json) {
@@ -173,6 +177,8 @@ class FieldOutlet {
       status: _text(json['status'], fallback: 'not_submitted'),
       note: _text(json['note']),
       coreCustomerId: _nullableText(json['coreCustomerId']),
+      coreCustomerAddressId: _nullableText(json['coreCustomerAddressId']),
+      coreCustomerCode: _nullableText(json['coreCustomerCode']),
       gps: gps,
     );
   }
