@@ -1,15 +1,41 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:mcp_field/main.dart';
+import 'package:mcp_field/app/app.dart';
 
 void main() {
-  testWidgets('MCP Field foundation renders without demo controls', (
+  testWidgets('MCP Field shell renders five primary destinations', (
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(const McpFieldApp());
 
-    expect(find.text('MCP Field'), findsOneWidget);
-    expect(find.byType(FloatingActionButton), findsNothing);
+    expect(find.byKey(const Key('today-screen')), findsOneWidget);
+    expect(find.text('Hôm nay'), findsWidgets);
+    expect(find.text('Đi tuyến'), findsOneWidget);
+    expect(find.text('Điểm bán'), findsOneWidget);
+    expect(find.text('Đơn hàng'), findsOneWidget);
+    expect(find.text('Thêm'), findsOneWidget);
+  });
+
+  testWidgets('bottom navigation switches business sections', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(const McpFieldApp());
+
+    await tester.tap(find.text('Đi tuyến'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('routes-screen')), findsOneWidget);
+
+    await tester.tap(find.text('Điểm bán'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('outlets-screen')), findsOneWidget);
+
+    await tester.tap(find.text('Đơn hàng'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('orders-screen')), findsOneWidget);
+
+    await tester.tap(find.text('Thêm'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('more-screen')), findsOneWidget);
   });
 }
