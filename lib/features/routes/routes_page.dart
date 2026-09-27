@@ -141,8 +141,7 @@ class RoutesPage extends StatelessWidget {
                   child: EmptyState(
                     icon: Icons.route_outlined,
                     title: 'Chưa có điểm bán trong tuyến',
-                    message:
-                        'Khi tuyến được giao, danh sách điểm bán sẽ hiển thị tại đây.',
+                    message: 'Khi tuyến được giao, danh sách điểm bán sẽ hiển thị tại đây.',
                   ),
                 ),
               ],

@@ -69,8 +69,7 @@ class OutletsPage extends StatelessWidget {
                   child: EmptyState(
                     icon: Icons.storefront_outlined,
                     title: 'Chưa có dữ liệu điểm bán',
-                    message:
-                        'Danh sách điểm bán sẽ hiển thị sau khi dữ liệu được đồng bộ.',
+                    message: 'Danh sách điểm bán sẽ hiển thị sau khi dữ liệu được đồng bộ.',
                   ),
                 ),
                 const SizedBox(height: AppSpacing.md),
