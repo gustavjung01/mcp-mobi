@@ -79,6 +79,7 @@ class RoutesPage extends StatelessWidget {
                           ),
                           const Spacer(),
                           SizedBox(
+                            width: 112,
                             height: 40,
                             child: FilledButton.icon(
                               onPressed: null,
@@ -87,6 +88,12 @@ class RoutesPage extends StatelessWidget {
                                 size: 18,
                               ),
                               label: const Text('Bắt đầu'),
+                              style: FilledButton.styleFrom(
+                                minimumSize: Size.zero,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: AppSpacing.sm,
+                                ),
+                              ),
                             ),
                           ),
                         ],
