@@ -31,11 +31,15 @@ const customer = FieldRouteCustomer(
 
 const outlet = FieldOutlet(
   id: 'outlet-1',
-  code: 'KH001',
+  routeId: 'route-2',
+  routeName: 'Tuyến Quận 3',
+  code: 'MCP001',
   name: 'Đại lý An Phát',
   phone: '0909000111',
+  area: 'Quận 3',
   address: '456 Lê Lợi',
-  status: 'active',
+  status: 'linked_existing',
+  note: 'Khách MCP',
 );
 
 const line = FieldDayLine(
@@ -175,6 +179,8 @@ void main() {
     expect(find.byKey(const Key('outlet-detail-screen')), findsOneWidget);
     expect(find.text('0909000111'), findsOneWidget);
     expect(find.text('456 Lê Lợi'), findsOneWidget);
+    expect(find.text('Tuyến Quận 3'), findsWidgets);
+    expect(find.text('Quận 3'), findsWidgets);
     expect(find.byKey(const Key('outlet-checkin-button')), findsNothing);
   });
 

@@ -365,7 +365,7 @@ class _AppShellState extends State<AppShell> {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (context) => OutletDetailPage(
-          routeName: 'Danh bạ điểm bán',
+          routeName: outlet.routeName.isEmpty ? 'Điểm bán' : outlet.routeName,
           outlet: outlet,
         ),
       ),

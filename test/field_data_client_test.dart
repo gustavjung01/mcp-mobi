@@ -73,24 +73,32 @@ void main() {
     expect(routes.single.plannedCustomers, 1);
   });
 
-  test('field client loads independent outlet directory', () async {
+  test('field client loads MCP outlet directory by employee scope', () async {
     final client = HttpFieldDataClient(
       profile: profile,
       token: 'nppusr.test-token',
       client: MockClient((request) async {
-        expect(request.url.path, '/api/core-customers');
+        expect(request.url.path, '/api/customer-verifications');
         return http.Response(
           jsonEncode({
             'data': {
-              'customers': [
+              'items': [
                 {
-                  'id': 'outlet-1',
-                  'customerCode': 'KH001',
-                  'name': 'Đại lý An Phát',
+                  'routeCustomerId': 'outlet-1',
+                  'routeId': 'route-2',
+                  'routeName': 'Tuyến Quận 3',
+                  'customerId': 'MCP001',
+                  'customerName': 'Đại lý An Phát',
                   'phone': '0909000111',
-                  'status': 'active',
-                  'defaultAddressId': 'address-1',
-                  'defaultAddressLine1': '456 Lê Lợi',
+                  'area': 'Quận 3',
+                  'address': '456 Lê Lợi',
+                  'note': 'Khách MCP',
+                  'active': true,
+                  'geoLat': 10.78,
+                  'geoLng': 106.68,
+                  'geoAccuracy': 7.5,
+                  'status': 'linked_existing',
+                  'coreCustomerId': 'core-customer-1',
                 },
               ],
             },
@@ -104,8 +112,14 @@ void main() {
     final outlets = await client.loadOutlets();
 
     expect(outlets, hasLength(1));
+    expect(outlets.single.id, 'outlet-1');
+    expect(outlets.single.routeId, 'route-2');
+    expect(outlets.single.routeName, 'Tuyến Quận 3');
+    expect(outlets.single.code, 'MCP001');
     expect(outlets.single.name, 'Đại lý An Phát');
+    expect(outlets.single.area, 'Quận 3');
     expect(outlets.single.address, '456 Lê Lợi');
+    expect(outlets.single.gps?.lat, 10.78);
   });
 
   test('field client loads route customers and current day data', () async {

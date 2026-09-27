@@ -86,14 +86,15 @@ class _OutletDetailPageState extends State<OutletDetailPage> {
         customer?.accountName ??
         outlet?.name ??
         'Điểm bán';
-    final area = line?.area ?? customer?.area ?? 'Chưa có khu vực';
+    final area =
+        line?.area ?? customer?.area ?? outlet?.area ?? 'Chưa có khu vực';
     final phone = (line?.phone ?? outlet?.phone ?? '').trim();
     final address = (line?.address ?? outlet?.address ?? '').trim();
     final contact = (customer?.contactName ?? '').trim();
-    final note = _firstNonEmpty([line?.note, customer?.note]);
+    final note = _firstNonEmpty([line?.note, customer?.note, outlet?.note]);
     final accountId = (customer?.accountId ?? outlet?.code ?? '').trim();
     final visited = line?.status == 'visited';
-    final gps = customer?.gps;
+    final gps = customer?.gps ?? outlet?.gps;
     final canCheckIn =
         line?.sessionCustomerId != null && widget.onCheckIn != null;
 
@@ -285,6 +286,13 @@ class _OutletDetailPageState extends State<OutletDetailPage> {
                             ),
                             const Divider(height: 22),
                             _InfoRow(label: 'Khu vực', value: area),
+                            if ((outlet?.routeName ?? '').isNotEmpty) ...[
+                              const Divider(height: 22),
+                              _InfoRow(
+                                label: 'Tuyến',
+                                value: outlet!.routeName,
+                              ),
+                            ],
                             const Divider(height: 22),
                             _InfoRow(
                               label: 'Địa chỉ',
