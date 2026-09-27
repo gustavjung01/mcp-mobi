@@ -84,13 +84,13 @@ class OutletDetailPage extends StatelessWidget {
                       label: checkedIn
                           ? 'Đã check-in'
                           : visited
-                              ? 'Đã ghé'
-                              : 'Chưa ghé',
+                          ? 'Đã ghé'
+                          : 'Chưa ghé',
                       icon: checkedIn
                           ? Icons.location_on_rounded
                           : visited
-                              ? Icons.check_circle_outline_rounded
-                              : Icons.schedule_rounded,
+                          ? Icons.check_circle_outline_rounded
+                          : Icons.schedule_rounded,
                       backgroundColor: checkedIn || visited
                           ? AppColors.successSoft
                           : const Color(0x26FFFFFF),

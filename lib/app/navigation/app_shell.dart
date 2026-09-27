@@ -159,9 +159,7 @@ class _AppShellState extends State<AppShell> {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (context) => OutletDetailPage(
-          routeName: _selectedRoute?.name ??
-              customer?.routeName ??
-              'Điểm bán',
+          routeName: _selectedRoute?.name ?? customer?.routeName ?? 'Điểm bán',
           customer: customer,
           line: line,
         ),

@@ -47,8 +47,8 @@ class TodayPage extends StatelessWidget {
     final routeStatus = day?.sessionOpened == true
         ? _sessionStatusLabel(day!.run.status)
         : selectedRoute == null
-            ? 'Chưa chọn tuyến'
-            : 'Chưa mở phiên';
+        ? 'Chưa chọn tuyến'
+        : 'Chưa mở phiên';
 
     final list = ListView(
       padding: const EdgeInsets.fromLTRB(
@@ -156,10 +156,10 @@ class TodayPage extends StatelessWidget {
                         nextLine != null
                             ? _outletSubline(nextLine.area, nextLine.address)
                             : nextCustomer != null
-                                ? nextCustomer.area
-                                : selectedRoute == null
-                                    ? 'Chọn tuyến để xem điểm bán.'
-                                    : 'Chưa có điểm bán cần xử lý.',
+                            ? nextCustomer.area
+                            : selectedRoute == null
+                            ? 'Chọn tuyến để xem điểm bán.'
+                            : 'Chưa có điểm bán cần xử lý.',
                         style: const TextStyle(
                           color: AppColors.textSecondary,
                           fontSize: 12,
@@ -303,8 +303,9 @@ class _TodayOverview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final progress =
-        total > 0 ? (visited / total).clamp(0.0, 1.0).toDouble() : 0.0;
+    final progress = total > 0
+        ? (visited / total).clamp(0.0, 1.0).toDouble()
+        : 0.0;
 
     return AppCard(
       child: Column(

@@ -79,19 +79,22 @@ class _RoutesPageState extends State<RoutesPage> {
     final route = widget.selectedRoute;
     final day = widget.workspace?.day;
     final lines = day?.lines ?? const <FieldDayLine>[];
-    final visibleLines = lines.where((line) {
-      final query = _query.trim().toLowerCase();
-      if (query.isEmpty) return true;
-      return line.accountName.toLowerCase().contains(query) ||
-          line.area.toLowerCase().contains(query) ||
-          (line.address ?? '').toLowerCase().contains(query);
-    }).toList(growable: false);
+    final visibleLines = lines
+        .where((line) {
+          final query = _query.trim().toLowerCase();
+          if (query.isEmpty) return true;
+          return line.accountName.toLowerCase().contains(query) ||
+              line.area.toLowerCase().contains(query) ||
+              (line.address ?? '').toLowerCase().contains(query);
+        })
+        .toList(growable: false);
     final visited = lines.where((line) => line.status == 'visited').length;
     final total = day?.sessionOpened == true
         ? lines.length
         : route?.plannedCustomers ?? 0;
-    final progress =
-        total > 0 ? (visited / total).clamp(0.0, 1.0).toDouble() : 0.0;
+    final progress = total > 0
+        ? (visited / total).clamp(0.0, 1.0).toDouble()
+        : 0.0;
 
     final body = ListView(
       padding: const EdgeInsets.fromLTRB(
@@ -383,7 +386,9 @@ class _VisitLineCard extends StatelessWidget {
                 width: 34,
                 height: 34,
                 decoration: BoxDecoration(
-                  color: visited ? AppColors.successSoft : AppColors.primarySoft,
+                  color: visited
+                      ? AppColors.successSoft
+                      : AppColors.primarySoft,
                   shape: BoxShape.circle,
                 ),
                 alignment: Alignment.center,
@@ -422,9 +427,7 @@ class _VisitLineCard extends StatelessWidget {
               ),
               const SizedBox(width: AppSpacing.sm),
               Icon(
-                visited
-                    ? Icons.check_circle_rounded
-                    : Icons.navigation_rounded,
+                visited ? Icons.check_circle_rounded : Icons.navigation_rounded,
                 color: visited ? AppColors.success : AppColors.primary,
               ),
             ],

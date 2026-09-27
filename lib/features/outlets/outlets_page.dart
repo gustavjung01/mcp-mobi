@@ -27,7 +27,8 @@ class OutletsPage extends StatefulWidget {
   final void Function(
     FieldRouteCustomer customer,
     FieldDayLine? line,
-  )? onOpenOutlet;
+  )?
+  onOpenOutlet;
 
   @override
   State<OutletsPage> createState() => _OutletsPageState();
@@ -40,13 +41,15 @@ class _OutletsPageState extends State<OutletsPage> {
   Widget build(BuildContext context) {
     final customers =
         widget.workspace?.customers ?? const <FieldRouteCustomer>[];
-    final visible = customers.where((customer) {
-      final query = _query.trim().toLowerCase();
-      if (query.isEmpty) return true;
-      return customer.accountName.toLowerCase().contains(query) ||
-          customer.area.toLowerCase().contains(query) ||
-          customer.accountId.toLowerCase().contains(query);
-    }).toList(growable: false);
+    final visible = customers
+        .where((customer) {
+          final query = _query.trim().toLowerCase();
+          if (query.isEmpty) return true;
+          return customer.accountName.toLowerCase().contains(query) ||
+              customer.area.toLowerCase().contains(query) ||
+              customer.accountId.toLowerCase().contains(query);
+        })
+        .toList(growable: false);
 
     final list = ListView(
       padding: const EdgeInsets.fromLTRB(
@@ -149,8 +152,8 @@ class _OutletsPageState extends State<OutletsPage> {
         children: [
           NavyPageHeader(
             title: 'Điểm bán',
-            subtitle: widget.selectedRoute?.name ??
-                'Tra cứu và mở hồ sơ điểm bán',
+            subtitle:
+                widget.selectedRoute?.name ?? 'Tra cứu và mở hồ sơ điểm bán',
             trailing: widget.selectedRoute == null
                 ? null
                 : StatusPill(
@@ -305,8 +308,8 @@ String _customerSubtitle(
   final status = line?.checkedIn == true
       ? 'Đã check-in'
       : line?.status == 'visited'
-          ? 'Đã ghé'
-          : 'Chưa ghé';
+      ? 'Đã ghé'
+      : 'Chưa ghé';
   final parts = <String>[customer.area, status];
   if (phone.isNotEmpty) parts.add(phone);
   return parts.join(' · ');
