@@ -2,43 +2,43 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mcp_field/core/installation/installation_profile.dart';
 
 void main() {
-  test('selected system uses the selected gateway for MCP business APIs', () {
+  test('selected system uses one canonical MCP API origin', () {
     final profile = InstallationProfile.selected(
       name: 'Hưng Phát',
-      baseUrl: Uri.parse('https://mcp.example.vn'),
+      baseUrl: Uri.parse('https://mcp-api.example.vn'),
     );
 
-    expect(profile.baseUrl.toString(), 'https://mcp.example.vn');
-    expect(profile.fieldBaseUrl.toString(), 'https://mcp.example.vn');
-    expect(profile.installationKey, 'https://mcp.example.vn');
+    expect(profile.baseUrl.toString(), 'https://mcp-api.example.vn');
+    expect(profile.fieldBaseUrl.toString(), 'https://mcp-api.example.vn');
+    expect(profile.installationKey, 'https://mcp-api.example.vn');
+    expect(profile.toJson().containsKey('businessBaseUrl'), isFalse);
   });
 
   test(
-    'stored legacy hard-coded business IP is migrated back to selected gateway',
+    'stored split profile migrates the previous business API origin to canonical base',
     () {
       final profile = InstallationProfile.fromJson({
         'name': 'Hưng Phát',
-        'baseUrl': 'https://mcp.example.vn',
-        'businessBaseUrl': 'https://68.233.111.135',
+        'baseUrl': 'https://mcp-web.example.vn',
+        'businessBaseUrl': 'https://mcp-api.example.vn',
       });
 
       expect(profile, isNotNull);
-      expect(profile!.baseUrl.toString(), 'https://mcp.example.vn');
-      expect(profile.fieldBaseUrl.toString(), 'https://mcp.example.vn');
+      expect(profile!.baseUrl.toString(), 'https://mcp-api.example.vn');
+      expect(profile.fieldBaseUrl.toString(), 'https://mcp-api.example.vn');
     },
   );
 
-  test('stored explicit non-legacy business endpoint is preserved', () {
-    final profile = InstallationProfile.fromJson({
-      'name': 'Khách hàng khác',
-      'baseUrl': 'https://company.example.vn',
-      'businessBaseUrl': 'https://mcp.customer.example.vn',
-    });
-
-    expect(profile, isNotNull);
+  test('system origin must not contain a web application path', () {
     expect(
-      profile!.fieldBaseUrl.toString(),
-      'https://mcp.customer.example.vn',
+      InstallationProfile.parseBaseUrl(
+        'https://mcp.example.vn/api/backend',
+      ),
+      isNull,
+    );
+    expect(
+      InstallationProfile.parseBaseUrl('https://mcp.example.vn/'),
+      Uri.parse('https://mcp.example.vn'),
     );
   });
 }

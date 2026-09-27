@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/auth/mobile_auth_client.dart';
 import '../../core/installation/installation_profile.dart';
+import '../../core/installation/system_endpoint_probe.dart';
 import '../../core/session/session_store.dart';
 import '../../features/auth/login_page.dart';
 import '../../features/bootstrap/system_setup_page.dart';
@@ -21,11 +22,13 @@ class BootstrapFlow extends StatefulWidget {
   const BootstrapFlow({
     required this.authClient,
     required this.sessionStore,
+    required this.endpointProbe,
     super.key,
   });
 
   final MobileAuthClient authClient;
   final SessionStore sessionStore;
+  final SystemEndpointProbe endpointProbe;
 
   @override
   State<BootstrapFlow> createState() => _BootstrapFlowState();
@@ -197,7 +200,10 @@ class _BootstrapFlowState extends State<BootstrapFlow> {
       case _BootstrapState.loading:
         return const _LoadingScreen();
       case _BootstrapState.setup:
-        return SystemSetupPage(onContinue: _selectProfile);
+        return SystemSetupPage(
+          onContinue: _selectProfile,
+          endpointProbe: widget.endpointProbe,
+        );
       case _BootstrapState.login:
         final profile = _profile;
         if (profile == null) return const _LoadingScreen();

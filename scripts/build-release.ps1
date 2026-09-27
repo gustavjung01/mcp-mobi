@@ -2,6 +2,8 @@ param(
     [Parameter(Mandatory = $false)]
     [string]$Flutter = "flutter",
     [Parameter(Mandatory = $true)]
+    [string]$ApiBaseUrl,
+    [Parameter(Mandatory = $true)]
     [string]$UpdateBaseUrl
 )
 
@@ -15,9 +17,21 @@ if ($version -notmatch '^\d+\.\d+\.\d+$') {
     throw "MCP Field release version must use major.minor.patch."
 }
 
+$ApiBaseUrl = $ApiBaseUrl.Trim().TrimEnd("/")
 $UpdateBaseUrl = $UpdateBaseUrl.Trim().TrimEnd("/")
-if ($UpdateBaseUrl -notmatch '^https://') {
+$apiUri = $null
+$updateUri = $null
+if (-not [Uri]::TryCreate($ApiBaseUrl, [UriKind]::Absolute, [ref]$apiUri) -or
+    $apiUri.Scheme -ne "https" -or
+    $apiUri.AbsolutePath -ne "/") {
+    throw "ApiBaseUrl must be the root public HTTPS origin of the MCP backend."
+}
+if (-not [Uri]::TryCreate($UpdateBaseUrl, [UriKind]::Absolute, [ref]$updateUri) -or
+    $updateUri.Scheme -ne "https") {
     throw "UpdateBaseUrl must be a public HTTPS URL."
+}
+if ($updateUri.Host.EndsWith(".r2.cloudflarestorage.com", [StringComparison]::OrdinalIgnoreCase)) {
+    throw "UpdateBaseUrl must not use the private R2 S3 endpoint. Use the public R2 download URL or custom domain."
 }
 
 $releaseConfigPath = Join-Path $PSScriptRoot "..\release-config.json"
@@ -57,7 +71,7 @@ try {
     & $Flutter pub get
     if ($LASTEXITCODE -ne 0) { throw "flutter pub get failed." }
 
-    & $Flutter build apk --release "--build-name=$version" "--build-number=$buildNumber" "--dart-define=MCP_UPDATE_BASE_URL=$UpdateBaseUrl"
+    & $Flutter build apk --release "--build-name=$version" "--build-number=$buildNumber" "--dart-define=MCP_API_BASE_URL=$ApiBaseUrl" "--dart-define=MCP_UPDATE_BASE_URL=$UpdateBaseUrl"
     if ($LASTEXITCODE -ne 0) { throw "flutter build apk --release failed." }
 }
 finally {
@@ -97,3 +111,6 @@ Write-Host "Version: $version"
 Write-Host "Build number: $buildNumber"
 Write-Host "APK: $apkPath"
 Write-Host "Manifest: $manifestPath"
+
+Write-Host "After publishing latest.json and the APK to R2, verify the public update path:"
+Write-Host "powershell -ExecutionPolicy Bypass -File scripts\verify-release-publication.ps1 -UpdateBaseUrl <public-update-url>"
