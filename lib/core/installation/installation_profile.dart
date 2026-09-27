@@ -16,8 +16,8 @@ class InstallationProfile {
 
   static InstallationProfile? fromJson(Object? value) {
     if (value is! Map<String, dynamic>) return null;
-    final name = String(value['name'] ?? '').trim();
-    final baseUrl = parseBaseUrl(String(value['baseUrl'] ?? ''));
+    final name = (value['name'] ?? '').toString().trim();
+    final baseUrl = parseBaseUrl((value['baseUrl'] ?? '').toString());
     if (name.isEmpty || baseUrl == null) return null;
     return InstallationProfile(name: name, baseUrl: baseUrl);
   }

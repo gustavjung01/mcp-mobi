@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 
-import '../../core/auth/mobile_auth_client.dart';
-import '../../core/session/session_store.dart';
-import '../../features/bootstrap/bootstrap_flow.dart';
-import '../theme/app_theme.dart';
+import '../core/auth/mobile_auth_client.dart';
+import '../core/session/session_store.dart';
+import '../features/bootstrap/bootstrap_flow.dart';
+import 'theme/app_theme.dart';
 
 class McpFieldApp extends StatelessWidget {
   const McpFieldApp({

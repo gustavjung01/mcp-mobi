@@ -73,7 +73,7 @@ class HttpMobileAuthClient implements MobileAuthClient {
   }
 
   String _requestId() {
-    return 'mobile_' + DateTime.now().microsecondsSinceEpoch.toString();
+    return 'mobile_${DateTime.now().microsecondsSinceEpoch}';
   }
 
   Map<String, dynamic> _object(Object? value) {
@@ -104,10 +104,11 @@ class HttpMobileAuthClient implements MobileAuthClient {
     final payload = _object(decoded);
     final error = _object(payload['error']);
     final status = response.statusCode;
-    final code = String(
-      error['code'] ?? (status == 401 ? 'UNAUTHORIZED' : 'REQUEST_FAILED'),
-    ).trim();
-    final serverMessage = String(error['message'] ?? '').trim();
+    final code =
+        (error['code'] ?? (status == 401 ? 'UNAUTHORIZED' : 'REQUEST_FAILED'))
+            .toString()
+            .trim();
+    final serverMessage = (error['message'] ?? '').toString().trim();
 
     String message;
     if (code == 'INTERNAL_AUTH_INVALID_CREDENTIALS') {
@@ -168,10 +169,10 @@ class HttpMobileAuthClient implements MobileAuthClient {
     final data = _object(payload['data']);
     final user = _object(data['user']);
     final session = _object(data['session']);
-    final token = String(data['token'] ?? '').trim();
-    final employeeId = String(user['employeeId'] ?? '').trim();
-    final loginName = String(user['loginName'] ?? '').trim();
-    final displayName = String(user['employeeFullName'] ?? '').trim();
+    final token = (data['token'] ?? '').toString().trim();
+    final employeeId = (user['employeeId'] ?? '').toString().trim();
+    final loginName = (user['loginName'] ?? '').toString().trim();
+    final displayName = (user['employeeFullName'] ?? '').toString().trim();
     if (!token.startsWith('nppusr.') ||
         employeeId.isEmpty ||
         loginName.isEmpty ||
@@ -188,7 +189,7 @@ class HttpMobileAuthClient implements MobileAuthClient {
       employeeId: employeeId,
       loginName: loginName,
       displayName: displayName,
-      expiresAt: DateTime.tryParse(String(session['expiresAt'] ?? '')),
+      expiresAt: DateTime.tryParse((session['expiresAt'] ?? '').toString()),
       roles: _strings(user['roles']),
       permissions: _strings(user['permissions']),
       scopes: _scopeStrings(user['scopes']),
@@ -199,9 +200,9 @@ class HttpMobileAuthClient implements MobileAuthClient {
     final payload = _object(decoded);
     final data = _object(payload['data']);
     final session = _object(data['session']);
-    final employeeId = String(data['employeeId'] ?? '').trim();
-    final loginName = String(session['loginName'] ?? '').trim();
-    final displayName = String(session['employeeFullName'] ?? '').trim();
+    final employeeId = (data['employeeId'] ?? '').toString().trim();
+    final loginName = (session['loginName'] ?? '').toString().trim();
+    final displayName = (session['employeeFullName'] ?? '').toString().trim();
     if (employeeId.isEmpty || loginName.isEmpty || displayName.isEmpty) {
       throw const AuthFailure(
         code: 'RESPONSE_INVALID',
@@ -215,7 +216,7 @@ class HttpMobileAuthClient implements MobileAuthClient {
       employeeId: employeeId,
       loginName: loginName,
       displayName: displayName,
-      expiresAt: DateTime.tryParse(String(session['expiresAt'] ?? '')),
+      expiresAt: DateTime.tryParse((session['expiresAt'] ?? '').toString()),
       roles: _strings(data['roles']),
       permissions: _strings(data['permissions']),
       scopes: _scopeStrings(data['scopes']),
