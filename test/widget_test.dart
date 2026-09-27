@@ -304,6 +304,13 @@ void main() {
 
     await tester.tap(navLabel('Thêm'));
     await tester.pumpAndSettle();
+
+    final moreList = find.descendant(
+      of: find.byKey(const Key('more-screen')),
+      matching: find.byType(ListView),
+    );
+    await tester.drag(moreList, const Offset(0, -500));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('logout-button')));
     await tester.pumpAndSettle();
 
