@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../app/theme/app_theme.dart';
+import '../../shared/widgets/app_button.dart';
 import '../../shared/widgets/app_card.dart';
-import '../../shared/widgets/empty_state.dart';
 import '../../shared/widgets/screen_header.dart';
 
 class TodayPage extends StatelessWidget {
@@ -13,13 +13,9 @@ class TodayPage extends StatelessWidget {
     return SafeArea(
       key: const Key('today-screen'),
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(
-          AppSpacing.md,
-          AppSpacing.lg,
-          AppSpacing.md,
-          AppSpacing.xxl,
-        ),
+        padding: const EdgeInsets.all(AppSpacing.md),
         children: [
+          const SizedBox(height: AppSpacing.xs),
           const ScreenHeader(
             title: 'Hôm nay',
             subtitle: 'Tổng quan công việc cần xử lý',
@@ -35,16 +31,11 @@ class TodayPage extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    const Expanded(
-                      child: Text(
-                        'Tuyến hôm nay',
-                        style: TextStyle(
-                          color: AppColors.textPrimary,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
+                    Text(
+                      'Tuyến hôm nay',
+                      style: Theme.of(context).textTheme.titleMedium,
                     ),
+                    const Spacer(),
                     Text(
                       '0 / 0 điểm',
                       style: Theme.of(context).textTheme.bodyMedium,
@@ -52,26 +43,19 @@ class TodayPage extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: AppSpacing.md),
-                const LinearProgressIndicator(
-                  value: 0,
-                  minHeight: 7,
-                  borderRadius: BorderRadius.all(Radius.circular(999)),
-                ),
+                const LinearProgressIndicator(value: 0, minHeight: 8),
                 const SizedBox(height: AppSpacing.md),
                 Text(
-                  'Chưa có tuyến được đồng bộ cho hôm nay.',
+                  'Chưa có tuyến được đồng bộ.',
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
+                const SizedBox(height: AppSpacing.lg),
+                const AppPrimaryButton(
+                  label: 'Đi tuyến',
+                  icon: Icons.route_outlined,
+                  onPressed: null,
+                ),
               ],
-            ),
-          ),
-          const SizedBox(height: AppSpacing.md),
-          const AppCard(
-            child: EmptyState(
-              icon: Icons.near_me_outlined,
-              title: 'Chưa có điểm bán tiếp theo',
-              message:
-                  'Khi có tuyến làm việc, điểm bán cần ghé tiếp theo sẽ xuất hiện tại đây.',
             ),
           ),
           const SizedBox(height: AppSpacing.xl),
