@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as image_lib;
 import 'package:mcp_field/core/media/outlet_media_client.dart';
+import 'package:mcp_field/core/data/field_data_client.dart';
 import 'package:mcp_field/core/media/outlet_photo_picker.dart';
+import 'package:mcp_field/features/outlets/outlet_detail_page.dart';
 import 'package:mcp_field/features/outlets/outlet_photo_section.dart';
 
 class FakeOutletMediaClient implements OutletMediaClient {
@@ -70,6 +72,52 @@ class FakeOutletPhotoPicker implements OutletPhotoPicker {
 }
 
 void main() {
+  testWidgets('selected outlet photo stays above the blue hero decoration', (
+    WidgetTester tester,
+  ) async {
+    final media = FakeOutletMediaClient()..failFirstUpload = false;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: OutletDetailPage(
+          routeName: 'Tuyến Quận 1',
+          outlet: const FieldOutlet(
+            id: 'rc-1',
+            routeId: 'route-1',
+            routeName: 'Tuyến Quận 1',
+            code: 'MCP001',
+            name: 'Cửa hàng Minh Phát',
+            phone: '0909000111',
+            area: 'Quận 1',
+            address: '123 Nguyễn Văn Cừ',
+            status: 'linked_existing',
+            note: '',
+          ),
+          mediaClient: media,
+          photoPicker: FakeOutletPhotoPicker(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('outlet-hero-blue-overlay')), findsOneWidget);
+    expect(find.byKey(const Key('outlet-hero-photo-preview')), findsNothing);
+
+    final camera = find.byKey(const Key('outlet-photo-camera'));
+    final detailList = find.byType(ListView);
+    for (var attempt = 0; attempt < 5 && camera.evaluate().isEmpty; attempt++) {
+      await tester.drag(detailList, const Offset(0, -320));
+      await tester.pumpAndSettle();
+    }
+    expect(camera, findsOneWidget);
+    await tester.ensureVisible(camera);
+    await tester.tap(camera);
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('outlet-hero-photo-preview')), findsOneWidget);
+    expect(find.byKey(const Key('outlet-hero-blue-overlay')), findsNothing);
+  });
+
   testWidgets('failed outlet photo retry keeps the same upload identity', (
     WidgetTester tester,
   ) async {

@@ -286,6 +286,49 @@ class _SettingsPageState extends State<SettingsPage> {
                 ),
                 const SizedBox(height: AppSpacing.md),
                 AppCard(
+                  key: const Key('update-install-guide'),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Row(
+                        children: [
+                          Icon(
+                            Icons.help_outline_rounded,
+                            color: AppColors.primary,
+                          ),
+                          SizedBox(width: AppSpacing.sm),
+                          Expanded(
+                            child: Text(
+                              'Nếu Android chặn cài đặt',
+                              style: TextStyle(
+                                color: AppColors.textPrimary,
+                                fontSize: 15,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                      const _InstallGuideStep(
+                        number: '1',
+                        text: 'Nếu Google Play Protect hiện cảnh báo, chọn “Tiếp tục cài đặt”.',
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                      const _InstallGuideStep(
+                        number: '2',
+                        text: 'Nếu máy yêu cầu quyền cài ứng dụng không xác định, bật “Cho phép từ nguồn này” cho MCP Field.',
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                      const _InstallGuideStep(
+                        number: '3',
+                        text: 'Quay lại MCP Field và bấm cài bản cập nhật một lần nữa.',
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                AppCard(
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -296,7 +339,7 @@ class _SettingsPageState extends State<SettingsPage> {
                       const SizedBox(width: AppSpacing.sm),
                       Expanded(
                         child: Text(
-                          'MCP Field kiểm tra mã SHA-256 của file trước khi mở trình cài đặt Android.',
+                          'MCP Field kiểm tra file cập nhật trước khi mở trình cài đặt Android.',
                           style: Theme.of(context).textTheme.bodyMedium,
                         ),
                       ),
@@ -308,6 +351,49 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _InstallGuideStep extends StatelessWidget {
+  const _InstallGuideStep({
+    required this.number,
+    required this.text,
+  });
+
+  final String number;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 24,
+          height: 24,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: AppColors.primarySoft,
+            borderRadius: BorderRadius.circular(999),
+          ),
+          child: Text(
+            number,
+            style: const TextStyle(
+              color: AppColors.primary,
+              fontSize: 11,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ),
+        const SizedBox(width: AppSpacing.sm),
+        Expanded(
+          child: Text(
+            text,
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
+        ),
+      ],
     );
   }
 }

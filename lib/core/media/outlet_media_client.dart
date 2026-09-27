@@ -322,6 +322,12 @@ String _mediaErrorMessage(
       return 'Định dạng ảnh chưa được hỗ trợ.';
     case 'route_customer_not_found':
       return 'Điểm bán này không còn tồn tại trong MCP.';
+    case 'linked_customer_not_found':
+      return 'Điểm bán chưa liên kết đúng hồ sơ khách hàng. Vui lòng đồng bộ lại.';
+    case 'linked_customer_inactive':
+      return 'Hồ sơ khách hàng của điểm bán đã ngừng sử dụng.';
+    case 'INTERNAL_ERROR':
+      return 'Hệ thống ảnh đang bận. Vui lòng thử lại sau.';
     case 'r2_not_configured':
       return 'Kho ảnh của hệ thống chưa được cấu hình.';
     case 'r2_object_not_found':
