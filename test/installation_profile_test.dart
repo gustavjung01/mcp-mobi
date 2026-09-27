@@ -13,17 +13,20 @@ void main() {
     expect(profile.installationKey, 'https://mcp.example.vn');
   });
 
-  test('stored legacy hard-coded business IP is migrated back to selected gateway', () {
-    final profile = InstallationProfile.fromJson({
-      'name': 'Hưng Phát',
-      'baseUrl': 'https://mcp.example.vn',
-      'businessBaseUrl': 'https://68.233.111.135',
-    });
+  test(
+    'stored legacy hard-coded business IP is migrated back to selected gateway',
+    () {
+      final profile = InstallationProfile.fromJson({
+        'name': 'Hưng Phát',
+        'baseUrl': 'https://mcp.example.vn',
+        'businessBaseUrl': 'https://68.233.111.135',
+      });
 
-    expect(profile, isNotNull);
-    expect(profile!.baseUrl.toString(), 'https://mcp.example.vn');
-    expect(profile.fieldBaseUrl.toString(), 'https://mcp.example.vn');
-  });
+      expect(profile, isNotNull);
+      expect(profile!.baseUrl.toString(), 'https://mcp.example.vn');
+      expect(profile.fieldBaseUrl.toString(), 'https://mcp.example.vn');
+    },
+  );
 
   test('stored explicit non-legacy business endpoint is preserved', () {
     final profile = InstallationProfile.fromJson({
