@@ -7,11 +7,13 @@ class NavyPageHeader extends StatelessWidget {
     required this.title,
     super.key,
     this.subtitle,
+    this.leading,
     this.trailing,
   });
 
   final String title;
   final String? subtitle;
+  final Widget? leading;
   final Widget? trailing;
 
   @override
@@ -40,6 +42,13 @@ class NavyPageHeader extends StatelessWidget {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              if (leading != null) ...[
+                IconTheme.merge(
+                  data: const IconThemeData(color: Colors.white),
+                  child: leading!,
+                ),
+                const SizedBox(width: AppSpacing.sm),
+              ],
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,

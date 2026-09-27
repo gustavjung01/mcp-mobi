@@ -92,7 +92,9 @@ const session = MobileSession(
 class FakeFieldDataClient implements FieldDataClient, FieldActionClient {
   bool checkInCalled = false;
   bool addCustomerCalled = false;
+  bool failFirstAddCustomer = false;
   String? addCustomerKey;
+  final List<String> addCustomerKeys = [];
 
   @override
   Future<List<FieldRoute>> loadRoutes() async => const [route];
@@ -137,8 +139,16 @@ class FakeFieldDataClient implements FieldDataClient, FieldActionClient {
   }) async {
     addCustomerCalled = true;
     addCustomerKey = idempotencyKey;
+    addCustomerKeys.add(idempotencyKey);
     expect(sessionId, 'session-1');
     expect(customerName, 'Cửa hàng Mới');
+    if (failFirstAddCustomer && addCustomerKeys.length == 1) {
+      throw const FieldDataFailure(
+        code: 'NETWORK_UNAVAILABLE',
+        message: 'Mạng tạm thời gián đoạn. Vui lòng thử lại.',
+        retryable: true,
+      );
+    }
     return const FieldAddedCustomer(
       routeCustomerId: 'customer-new',
       sessionCustomerId: 'line-new',
@@ -260,11 +270,60 @@ void main() {
       find.byKey(const Key('route-add-customer-name')),
       'Cửa hàng Mới',
     );
-    await tester.tap(find.byKey(const Key('route-add-customer-submit')));
+    final submit = find.byKey(const Key('route-add-customer-submit'));
+    await tester.ensureVisible(submit);
+    await tester.pumpAndSettle();
+    await tester.tap(submit);
     await tester.pumpAndSettle();
 
     expect(client.addCustomerCalled, isTrue);
     expect(client.addCustomerKey, startsWith('session-customer.add-'));
+    expect(find.byKey(const Key('routes-screen')), findsOneWidget);
+  });
+
+  testWidgets('retrying the same add-customer intent reuses its key', (
+    WidgetTester tester,
+  ) async {
+    final client = FakeFieldDataClient()..failFirstAddCustomer = true;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AppShell(
+          session: session,
+          fieldDataClient: client,
+          fieldLocationProvider: FakeLocationProvider(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(navLabel('Đi tuyến'));
+    await tester.pumpAndSettle();
+
+    final addButton = find.byKey(const Key('route-add-customer-button'));
+    await tester.ensureVisible(addButton);
+    await tester.tap(addButton);
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const Key('route-add-customer-name')),
+      'Cửa hàng Mới',
+    );
+    final submit = find.byKey(const Key('route-add-customer-submit'));
+    await tester.ensureVisible(submit);
+    await tester.pumpAndSettle();
+    await tester.tap(submit);
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('Mạng tạm thời gián đoạn. Vui lòng thử lại.'),
+      findsOneWidget,
+    );
+    await tester.ensureVisible(submit);
+    await tester.tap(submit);
+    await tester.pumpAndSettle();
+
+    expect(client.addCustomerKeys, hasLength(2));
+    expect(client.addCustomerKeys[1], client.addCustomerKeys[0]);
     expect(find.byKey(const Key('routes-screen')), findsOneWidget);
   });
 

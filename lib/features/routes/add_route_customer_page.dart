@@ -138,6 +138,7 @@ class _AddRouteCustomerPageState extends State<AddRouteCustomerPage> {
     return Scaffold(
       key: const Key('route-add-customer-screen'),
       body: SafeArea(
+        top: false,
         child: Column(
           children: [
             NavyPageHeader(
