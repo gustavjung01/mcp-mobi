@@ -120,6 +120,38 @@ class FieldRouteCustomer {
   }
 }
 
+class FieldOutlet {
+  const FieldOutlet({
+    required this.id,
+    required this.code,
+    required this.name,
+    required this.phone,
+    required this.address,
+    required this.status,
+    this.addressId,
+  });
+
+  final String id;
+  final String code;
+  final String name;
+  final String phone;
+  final String address;
+  final String status;
+  final String? addressId;
+
+  factory FieldOutlet.fromJson(Map<String, dynamic> json) {
+    return FieldOutlet(
+      id: _text(json['id']),
+      code: _text(json['customerCode']),
+      name: _text(json['name'], fallback: 'Điểm bán'),
+      phone: _text(json['phone']),
+      address: _text(json['defaultAddressLine1']),
+      status: _text(json['status'], fallback: 'active'),
+      addressId: _nullableText(json['defaultAddressId']),
+    );
+  }
+}
+
 class FieldDayRun {
   const FieldDayRun({
     required this.id,
@@ -260,6 +292,8 @@ class FieldRouteWorkspace {
 
 abstract interface class FieldDataClient {
   Future<List<FieldRoute>> loadRoutes();
+
+  Future<List<FieldOutlet>> loadOutlets();
 
   Future<FieldRouteWorkspace> loadRouteWorkspace({
     required FieldRoute route,
@@ -423,6 +457,15 @@ class HttpFieldDataClient implements FieldDataClient, FieldActionClient {
     final shell = await _get('/api/local-read/mcp-shell');
     final snapshot = _object(shell['snapshot']);
     return _routesFromShellSnapshot(snapshot);
+  }
+
+  @override
+  Future<List<FieldOutlet>> loadOutlets() async {
+    final data = await _get('/api/core-customers');
+    return _objects(data['customers'])
+        .map(FieldOutlet.fromJson)
+        .where((outlet) => outlet.id.isNotEmpty)
+        .toList(growable: false);
   }
 
   @override
