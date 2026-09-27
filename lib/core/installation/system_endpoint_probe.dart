@@ -101,9 +101,78 @@ class HttpSystemEndpointProbe implements SystemEndpointProbe {
     }
   }
 
+  Future<void> _checkMobileApiBoundary(Uri baseUrl) async {
+    http.Response response;
+    try {
+      response = await _client
+          .get(
+            _endpoint(baseUrl, '/api/mobile-auth/me'),
+            headers: const {'Accept': 'application/json'},
+          )
+          .timeout(timeout);
+    } on TimeoutException {
+      throw const SystemEndpointFailure(
+        code: 'SYSTEM_ENDPOINT_TIMEOUT',
+        message: 'Kết nối máy chủ quá thời gian. Vui lòng thử lại.',
+        retryable: true,
+      );
+    } on http.ClientException {
+      throw const SystemEndpointFailure(
+        code: 'SYSTEM_ENDPOINT_UNREACHABLE',
+        message: 'Không kết nối được máy chủ hệ thống.',
+        retryable: true,
+      );
+    }
+
+    if (response.statusCode == 404) {
+      throw const SystemEndpointFailure(
+        code: 'SYSTEM_ENDPOINT_NOT_MCP',
+        message:
+            'Địa chỉ này không phải máy chủ MCP Field. Không nhập địa chỉ trang web quản lý.',
+      );
+    }
+    if (response.statusCode >= 500) {
+      throw const SystemEndpointFailure(
+        code: 'SYSTEM_ENDPOINT_API_UNAVAILABLE',
+        message:
+            'Máy chủ đang hoạt động nhưng API MCP Field chưa sẵn sàng. Vui lòng thử lại.',
+        retryable: true,
+      );
+    }
+    if (response.statusCode != 401) {
+      throw const SystemEndpointFailure(
+        code: 'SYSTEM_ENDPOINT_API_INVALID',
+        message:
+            'Địa chỉ này không trả về API đăng nhập MCP Field hợp lệ.',
+      );
+    }
+
+    Object? decoded;
+    try {
+      decoded = jsonDecode(utf8.decode(response.bodyBytes));
+    } on FormatException {
+      throw const SystemEndpointFailure(
+        code: 'SYSTEM_ENDPOINT_API_INVALID',
+        message:
+            'Địa chỉ này không trả về API đăng nhập MCP Field hợp lệ.',
+      );
+    }
+    final payload = _object(decoded);
+    final error = _object(payload['error']);
+    final code = (error['code'] ?? '').toString().trim().toLowerCase();
+    if (code != 'unauthorized') {
+      throw const SystemEndpointFailure(
+        code: 'SYSTEM_ENDPOINT_API_INVALID',
+        message:
+            'Địa chỉ này không trả về API đăng nhập MCP Field hợp lệ.',
+      );
+    }
+  }
+
   @override
   Future<void> verify(Uri baseUrl) async {
     await _check(baseUrl, '/health/live', 'live');
     await _check(baseUrl, '/health/ready', 'ready');
+    await _checkMobileApiBoundary(baseUrl);
   }
 }

@@ -24,6 +24,14 @@ void main() {
           200,
         );
       }
+      if (request.url.path == '/api/mobile-auth/me') {
+        return http.Response(
+          jsonEncode({
+            'error': {'code': 'UNAUTHORIZED'},
+          }),
+          401,
+        );
+      }
       return http.Response('', 404);
     });
 
@@ -34,6 +42,39 @@ void main() {
     );
   });
 
+  test('probe rejects a health-only gateway that still freezes API routes', () async {
+    final client = MockClient((request) async {
+      if (request.url.path == '/health/live') {
+        return http.Response(
+          jsonEncode({
+            'data': {'status': 'live'},
+          }),
+          200,
+        );
+      }
+      if (request.url.path == '/health/ready') {
+        return http.Response(
+          jsonEncode({
+            'data': {'status': 'ready'},
+          }),
+          200,
+        );
+      }
+      return http.Response('', 503);
+    });
+    final probe = HttpSystemEndpointProbe(client: client);
+
+    await expectLater(
+      probe.verify(Uri.parse('https://mcp-api.example.vn')),
+      throwsA(
+        isA<SystemEndpointFailure>().having(
+          (failure) => failure.code,
+          'code',
+          'SYSTEM_ENDPOINT_API_UNAVAILABLE',
+        ),
+      ),
+    );
+  });
   test('probe rejects a web frontend origin returning 404', () async {
     final client = MockClient((request) async => http.Response('<html/>', 404));
     final probe = HttpSystemEndpointProbe(client: client);
