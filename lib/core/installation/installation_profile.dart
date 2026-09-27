@@ -5,9 +5,14 @@ class InstallationProfile {
     this.businessBaseUrl,
   });
 
+  static const _configuredApiBaseUrl = String.fromEnvironment(
+    'MCP_API_BASE_URL',
+    defaultValue: 'https://68.233.111.135',
+  );
   static const _configuredBusinessBaseUrl = String.fromEnvironment(
     'MCP_BUSINESS_BASE_URL',
   );
+  static const _productionName = 'Hưng Phát';
   static const _legacyBusinessBaseUrl = 'https://68.233.111.135';
 
   final String name;
@@ -54,8 +59,22 @@ class InstallationProfile {
     );
   }
 
+  static Uri? configuredApiBaseUrl() {
+    return parseBaseUrl(_configuredApiBaseUrl);
+  }
+
   static Uri? configuredBusinessBaseUrl() {
     return parseBaseUrl(_configuredBusinessBaseUrl);
+  }
+
+  static InstallationProfile? productionDefault() {
+    final apiBaseUrl = configuredApiBaseUrl();
+    if (apiBaseUrl == null) return null;
+    return InstallationProfile(
+      name: _productionName,
+      baseUrl: apiBaseUrl,
+      businessBaseUrl: configuredBusinessBaseUrl(),
+    );
   }
 
   static Uri? parseBaseUrl(String value) {

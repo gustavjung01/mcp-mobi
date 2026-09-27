@@ -39,6 +39,18 @@ class FakeUpdatePlatform implements AppUpdatePlatform {
 }
 
 void main() {
+  test('updater defaults to the MCP Field public R2 release path', () {
+    final service = AppUpdateService(
+      platform: FakeUpdatePlatform(),
+      client: MockClient((request) async => http.Response('', 500)),
+    );
+
+    expect(
+      service.baseUrl,
+      'https://pub-7d2987fab97d4e3ebb2021a823973862.r2.dev/mcp-filed',
+    );
+  });
+
   test('update service reads latest.json and resolves a newer APK', () async {
     final platform = FakeUpdatePlatform();
     final client = MockClient((request) async {

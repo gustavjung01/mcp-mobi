@@ -2,6 +2,16 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mcp_field/core/installation/installation_profile.dart';
 
 void main() {
+  test('production default uses the canonical MCP API for auth and business', () {
+    final profile = InstallationProfile.productionDefault();
+
+    expect(profile, isNotNull);
+    expect(profile!.name, 'Hưng Phát');
+    expect(profile.baseUrl.toString(), 'https://68.233.111.135');
+    expect(profile.fieldBaseUrl.toString(), 'https://68.233.111.135');
+    expect(profile.installationKey, 'https://68.233.111.135');
+  });
+
   test('selected system uses the selected gateway for MCP business APIs', () {
     final profile = InstallationProfile.selected(
       name: 'Hưng Phát',

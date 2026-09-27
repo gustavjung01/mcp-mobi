@@ -1,8 +1,10 @@
 param(
     [Parameter(Mandatory = $false)]
     [string]$Flutter = "flutter",
-    [Parameter(Mandatory = $true)]
-    [string]$UpdateBaseUrl
+    [Parameter(Mandatory = $false)]
+    [string]$UpdateBaseUrl = "https://pub-7d2987fab97d4e3ebb2021a823973862.r2.dev/mcp-filed",
+    [Parameter(Mandatory = $false)]
+    [string]$ApiBaseUrl = "https://68.233.111.135"
 )
 
 $ErrorActionPreference = "Stop"
@@ -16,8 +18,12 @@ if ($version -notmatch '^\d+\.\d+\.\d+$') {
 }
 
 $UpdateBaseUrl = $UpdateBaseUrl.Trim().TrimEnd("/")
+$ApiBaseUrl = $ApiBaseUrl.Trim().TrimEnd("/")
 if ($UpdateBaseUrl -notmatch '^https://') {
     throw "UpdateBaseUrl must be a public HTTPS URL."
+}
+if ($ApiBaseUrl -notmatch '^https://') {
+    throw "ApiBaseUrl must be a public HTTPS URL."
 }
 
 $releaseConfigPath = Join-Path $PSScriptRoot "..\release-config.json"
@@ -57,7 +63,7 @@ try {
     & $Flutter pub get
     if ($LASTEXITCODE -ne 0) { throw "flutter pub get failed." }
 
-    & $Flutter build apk --release "--build-name=$version" "--build-number=$buildNumber" "--dart-define=MCP_UPDATE_BASE_URL=$UpdateBaseUrl"
+    & $Flutter build apk --release "--build-name=$version" "--build-number=$buildNumber" "--dart-define=MCP_API_BASE_URL=$ApiBaseUrl" "--dart-define=MCP_UPDATE_BASE_URL=$UpdateBaseUrl"
     if ($LASTEXITCODE -ne 0) { throw "flutter build apk --release failed." }
 }
 finally {

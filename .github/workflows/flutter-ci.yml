@@ -47,4 +47,14 @@ jobs:
         run: flutter build apk --debug
 
       - name: Build release APK
-        run: flutter build apk --release
+        run: >-
+          flutter build apk --release
+          --dart-define=MCP_API_BASE_URL=https://68.233.111.135
+          --dart-define=MCP_UPDATE_BASE_URL=https://pub-7d2987fab97d4e3ebb2021a823973862.r2.dev/mcp-filed
+
+      - name: Upload release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: mcp-field-release-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error

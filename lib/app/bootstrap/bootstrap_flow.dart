@@ -59,8 +59,18 @@ class _BootstrapFlowState extends State<BootstrapFlow> {
     }
 
     try {
-      final profile = await widget.sessionStore.readProfile();
+      var profile = await widget.sessionStore.readProfile();
       if (!mounted) return;
+
+      final productionProfile = InstallationProfile.productionDefault();
+      if (productionProfile != null &&
+          (profile == null ||
+              profile.baseUrl != productionProfile.baseUrl ||
+              profile.fieldBaseUrl != productionProfile.fieldBaseUrl)) {
+        await widget.sessionStore.saveProfile(productionProfile);
+        profile = productionProfile;
+      }
+
       if (profile == null) {
         setState(() {
           _profile = null;
@@ -162,6 +172,18 @@ class _BootstrapFlowState extends State<BootstrapFlow> {
     }
 
     if (!mounted) return;
+    final productionProfile = InstallationProfile.productionDefault();
+    if (productionProfile != null) {
+      await widget.sessionStore.saveProfile(productionProfile);
+      if (!mounted) return;
+      setState(() {
+        _profile = productionProfile;
+        _session = null;
+        _state = _BootstrapState.login;
+      });
+      return;
+    }
+
     setState(() {
       _profile = null;
       _session = null;

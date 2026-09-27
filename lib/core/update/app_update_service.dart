@@ -159,7 +159,12 @@ class AppUpdateService {
     AppUpdatePlatform? platform,
     this.timeout = const Duration(seconds: 12),
   }) : baseUrl =
-           (baseUrl ?? const String.fromEnvironment('MCP_UPDATE_BASE_URL'))
+           (baseUrl ??
+                   const String.fromEnvironment(
+                     'MCP_UPDATE_BASE_URL',
+                     defaultValue:
+                         'https://pub-7d2987fab97d4e3ebb2021a823973862.r2.dev/mcp-filed',
+                   ))
                .trim(),
        _client = client ?? http.Client(),
        platform = platform ?? const MethodChannelAppUpdatePlatform();
