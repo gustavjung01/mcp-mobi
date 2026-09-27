@@ -5,6 +5,8 @@ import '../../core/data/field_data_client.dart';
 import '../../core/idempotency/canonical_idempotency.dart';
 import '../../core/installation/installation_profile.dart';
 import '../../core/location/field_location.dart';
+import '../../core/media/outlet_media_client.dart';
+import '../../core/media/outlet_photo_picker.dart';
 import '../../features/more/more_page.dart';
 import '../../features/orders/orders_page.dart';
 import '../../features/outlets/outlet_detail_page.dart';
@@ -21,6 +23,8 @@ class AppShell extends StatefulWidget {
     this.session,
     this.fieldDataClient,
     this.fieldLocationProvider,
+    this.outletMediaClient,
+    this.outletPhotoPicker,
     this.onLogout,
   });
 
@@ -28,6 +32,8 @@ class AppShell extends StatefulWidget {
   final MobileSession? session;
   final FieldDataClient? fieldDataClient;
   final FieldLocationProvider? fieldLocationProvider;
+  final OutletMediaClient? outletMediaClient;
+  final OutletPhotoPicker? outletPhotoPicker;
   final Future<void> Function()? onLogout;
 
   @override
@@ -37,7 +43,9 @@ class AppShell extends StatefulWidget {
 class _AppShellState extends State<AppShell> {
   int _selectedIndex = 0;
   FieldDataClient? _fieldDataClient;
+  OutletMediaClient? _outletMediaClient;
   late final FieldLocationProvider _locationProvider;
+  late final OutletPhotoPicker _photoPicker;
   final Map<String, String> _mutationKeys = {};
   final Map<String, _PendingCheckIn> _pendingCheckIns = {};
   List<FieldRoute> _routes = const [];
@@ -61,8 +69,11 @@ class _AppShellState extends State<AppShell> {
   void initState() {
     super.initState();
     _fieldDataClient = widget.fieldDataClient ?? _defaultFieldDataClient();
+    _outletMediaClient =
+        widget.outletMediaClient ?? _defaultOutletMediaClient();
     _locationProvider =
         widget.fieldLocationProvider ?? const DeviceFieldLocationProvider();
+    _photoPicker = widget.outletPhotoPicker ?? DeviceOutletPhotoPicker();
     if (_fieldDataClient != null) {
       _loadingRoutes = true;
       _loadingOutlets = true;
@@ -76,6 +87,16 @@ class _AppShellState extends State<AppShell> {
     final session = widget.session;
     if (profile == null || session == null) return null;
     return HttpFieldDataClient(
+      profile: profile,
+      token: session.token,
+    );
+  }
+
+  OutletMediaClient? _defaultOutletMediaClient() {
+    final profile = widget.profile;
+    final session = widget.session;
+    if (profile == null || session == null) return null;
+    return HttpOutletMediaClient(
       profile: profile,
       token: session.token,
     );
@@ -393,6 +414,11 @@ class _AppShellState extends State<AppShell> {
           routeName: _selectedRoute?.name ?? customer?.routeName ?? 'Đi tuyến',
           customer: customer,
           line: line,
+          sessionId: _workspace?.day.sessionOpened == true
+              ? _workspace?.day.run.id
+              : null,
+          mediaClient: _outletMediaClient,
+          photoPicker: _photoPicker,
           onCheckIn: _fieldActions == null ? null : _checkIn,
         ),
       ),
@@ -405,6 +431,8 @@ class _AppShellState extends State<AppShell> {
         builder: (context) => OutletDetailPage(
           routeName: outlet.routeName.isEmpty ? 'Điểm bán' : outlet.routeName,
           outlet: outlet,
+          mediaClient: _outletMediaClient,
+          photoPicker: _photoPicker,
         ),
       ),
     );

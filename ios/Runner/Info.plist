@@ -26,6 +26,10 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>MCP Field dùng camera để chụp ảnh điểm bán khi nhân viên làm việc ngoài thị trường.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>MCP Field dùng thư viện ảnh để chọn ảnh điểm bán cần bổ sung vào hồ sơ.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>MCP Field dùng vị trí hiện tại để xác nhận nhân viên đã đến đúng điểm bán.</string>
 	<key>UIApplicationSceneManifest</key>

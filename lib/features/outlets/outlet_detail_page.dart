@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 
 import '../../app/theme/app_theme.dart';
 import '../../core/data/field_data_client.dart';
+import '../../core/media/outlet_media_client.dart';
+import '../../core/media/outlet_photo_picker.dart';
 import '../../shared/widgets/app_card.dart';
+import 'outlet_photo_section.dart';
 
 class OutletDetailPage extends StatefulWidget {
   const OutletDetailPage({
@@ -11,6 +14,9 @@ class OutletDetailPage extends StatefulWidget {
     this.customer,
     this.outlet,
     this.line,
+    this.sessionId,
+    this.mediaClient,
+    this.photoPicker,
     this.onCheckIn,
   });
 
@@ -18,6 +24,9 @@ class OutletDetailPage extends StatefulWidget {
   final FieldRouteCustomer? customer;
   final FieldOutlet? outlet;
   final FieldDayLine? line;
+  final String? sessionId;
+  final OutletMediaClient? mediaClient;
+  final OutletPhotoPicker? photoPicker;
   final Future<void> Function(FieldDayLine line)? onCheckIn;
 
   @override
@@ -29,6 +38,7 @@ class _OutletDetailPageState extends State<OutletDetailPage> {
   bool _checkingIn = false;
   late bool _checkedIn;
   String? _checkinAt;
+  String? _heroPhotoUrl;
 
   @override
   void initState() {
@@ -95,6 +105,8 @@ class _OutletDetailPageState extends State<OutletDetailPage> {
     final accountId = (customer?.accountId ?? outlet?.code ?? '').trim();
     final visited = line?.status == 'visited';
     final gps = customer?.gps ?? outlet?.gps;
+    final routeCustomerId =
+        (line?.routeCustomerId ?? customer?.id ?? outlet?.id ?? '').trim();
     final canCheckIn =
         line?.sessionCustomerId != null && widget.onCheckIn != null;
 
@@ -117,15 +129,38 @@ class _OutletDetailPageState extends State<OutletDetailPage> {
             ),
             child: Stack(
               children: [
-                Positioned(
-                  right: -22,
-                  bottom: -36,
-                  child: Icon(
-                    Icons.storefront_rounded,
-                    size: 180,
-                    color: Colors.white.withValues(alpha: 0.08),
+                if ((_heroPhotoUrl ?? '').isNotEmpty)
+                  Positioned.fill(
+                    child: Image.network(
+                      _heroPhotoUrl!,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                    ),
+                  ),
+                Positioned.fill(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          AppColors.primaryDeep.withValues(alpha: 0.46),
+                          AppColors.primaryDeep.withValues(alpha: 0.92),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
+                if ((_heroPhotoUrl ?? '').isEmpty)
+                  Positioned(
+                    right: -22,
+                    bottom: -36,
+                    child: Icon(
+                      Icons.storefront_rounded,
+                      size: 180,
+                      color: Colors.white.withValues(alpha: 0.08),
+                    ),
+                  ),
                 SafeArea(
                   bottom: false,
                   child: Padding(
@@ -313,6 +348,28 @@ class _OutletDetailPageState extends State<OutletDetailPage> {
                           ],
                         ),
                       ),
+                      if (routeCustomerId.isNotEmpty &&
+                          widget.mediaClient != null) ...[
+                        const SizedBox(height: AppSpacing.md),
+                        OutletPhotoSection(
+                          routeCustomerId: routeCustomerId,
+                          customerName: name,
+                          sessionId: widget.sessionId,
+                          mediaClient: widget.mediaClient!,
+                          photoPicker:
+                              widget.photoPicker ?? DeviceOutletPhotoPicker(),
+                          onProfileChanged: (profile) {
+                            final hero = profile.media.isEmpty
+                                ? null
+                                : profile.media.first.viewUrl;
+                            if (mounted && hero != _heroPhotoUrl) {
+                              setState(() {
+                                _heroPhotoUrl = hero;
+                              });
+                            }
+                          },
+                        ),
+                      ],
                       const SizedBox(height: AppSpacing.md),
                       if (line != null) ...[
                         const Text(
