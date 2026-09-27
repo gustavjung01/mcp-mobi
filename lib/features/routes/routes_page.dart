@@ -14,9 +14,12 @@ class RoutesPage extends StatefulWidget {
     this.workspace,
     this.loading = false,
     this.message,
+    this.routeActionBusy = false,
     this.onSelectRoute,
     this.onRefresh,
     this.onOpenOutlet,
+    this.onStartRoute,
+    this.onFinishRoute,
   });
 
   final List<FieldRoute> routes;
@@ -24,9 +27,12 @@ class RoutesPage extends StatefulWidget {
   final FieldRouteWorkspace? workspace;
   final bool loading;
   final String? message;
+  final bool routeActionBusy;
   final Future<void> Function(FieldRoute route)? onSelectRoute;
   final Future<void> Function()? onRefresh;
   final void Function(FieldDayLine line)? onOpenOutlet;
+  final Future<void> Function()? onStartRoute;
+  final Future<void> Function()? onFinishRoute;
 
   @override
   State<RoutesPage> createState() => _RoutesPageState();
@@ -95,6 +101,7 @@ class _RoutesPageState extends State<RoutesPage> {
     final progress = total > 0
         ? (visited / total).clamp(0.0, 1.0).toDouble()
         : 0.0;
+    final percent = total > 0 ? (progress * 100).round() : 0;
 
     final body = ListView(
       padding: const EdgeInsets.fromLTRB(
@@ -125,39 +132,31 @@ class _RoutesPageState extends State<RoutesPage> {
                   children: [
                     Expanded(
                       child: Text(
-                        route.name,
+                        '$visited/$total điểm đã ghé',
                         style: const TextStyle(
                           color: AppColors.textPrimary,
-                          fontSize: 16,
+                          fontSize: 17,
                           fontWeight: FontWeight.w900,
                         ),
                       ),
                     ),
                     Text(
-                      '$visited / $total điểm',
+                      '$percent%',
                       style: const TextStyle(
                         color: AppColors.textPrimary,
-                        fontSize: 13,
+                        fontSize: 16,
                         fontWeight: FontWeight.w900,
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  route.area,
-                  style: const TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 12,
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.md),
+                const SizedBox(height: AppSpacing.sm),
                 LinearProgressIndicator(
                   value: progress,
                   minHeight: 7,
-                  borderRadius: const BorderRadius.all(
-                    Radius.circular(999),
-                  ),
+                  borderRadius: const BorderRadius.all(Radius.circular(999)),
+                  color: AppColors.success,
+                  backgroundColor: AppColors.successSoft,
                 ),
                 const SizedBox(height: AppSpacing.md),
                 Row(
@@ -177,26 +176,42 @@ class _RoutesPageState extends State<RoutesPage> {
                     const Spacer(),
                     if (widget.routes.length > 1)
                       TextButton.icon(
-                        onPressed: _showRoutePicker,
+                        onPressed: widget.routeActionBusy
+                            ? null
+                            : _showRoutePicker,
                         icon: const Icon(Icons.swap_horiz_rounded, size: 18),
                         label: const Text('Đổi tuyến'),
                       ),
                   ],
                 ),
+                if (day?.sessionOpened != true) ...[
+                  const SizedBox(height: AppSpacing.md),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      key: const Key('route-start-button'),
+                      onPressed: widget.routeActionBusy
+                          ? null
+                          : widget.onStartRoute,
+                      icon: widget.routeActionBusy
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Icon(Icons.play_arrow_rounded),
+                      label: Text(
+                        widget.routeActionBusy
+                            ? 'Đang bắt đầu...'
+                            : 'Bắt đầu tuyến',
+                      ),
+                    ),
+                  ),
+                ],
               ],
-            ),
-          ),
-          const SizedBox(height: AppSpacing.md),
-          TextField(
-            key: const Key('route-outlet-search'),
-            onChanged: (value) {
-              setState(() {
-                _query = value;
-              });
-            },
-            decoration: const InputDecoration(
-              hintText: 'Tìm điểm bán trong tuyến...',
-              prefixIcon: Icon(Icons.search_rounded),
             ),
           ),
           const SizedBox(height: AppSpacing.md),
@@ -204,32 +219,70 @@ class _RoutesPageState extends State<RoutesPage> {
             AppCard(
               child: EmptyState(
                 icon: Icons.route_outlined,
-                title: 'Chưa có phiên đi tuyến',
+                title: 'Chưa bắt đầu tuyến hôm nay',
                 message: total > 0
-                    ? 'Tuyến có $total điểm bán. Phiên hôm nay chưa được mở.'
+                    ? 'Tuyến có $total điểm bán. Bắt đầu tuyến để tạo danh sách ghé hôm nay.'
                     : 'Tuyến chưa có điểm bán để thực hiện.',
               ),
             )
-          else if (visibleLines.isEmpty)
-            const AppCard(
-              child: EmptyState(
-                icon: Icons.storefront_outlined,
-                title: 'Không có điểm bán phù hợp',
-                message: 'Thử đổi từ khóa tìm kiếm.',
-              ),
-            )
-          else
-            ...visibleLines.map(
-              (line) => Padding(
-                padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                child: _VisitLineCard(
-                  line: line,
-                  onTap: widget.onOpenOutlet == null
-                      ? null
-                      : () => widget.onOpenOutlet!(line),
+          else ...[
+            Row(
+              children: [
+                const Expanded(
+                  child: Text(
+                    'Danh sách điểm bán',
+                    style: TextStyle(
+                      color: AppColors.primary,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
                 ),
+                Text(
+                  '${visibleLines.length} điểm',
+                  style: const TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            TextField(
+              key: const Key('route-outlet-search'),
+              onChanged: (value) {
+                setState(() {
+                  _query = value;
+                });
+              },
+              decoration: const InputDecoration(
+                hintText: 'Tìm điểm bán trong tuyến...',
+                prefixIcon: Icon(Icons.search_rounded),
               ),
             ),
+            const SizedBox(height: AppSpacing.md),
+            if (visibleLines.isEmpty)
+              const AppCard(
+                child: EmptyState(
+                  icon: Icons.storefront_outlined,
+                  title: 'Không có điểm bán phù hợp',
+                  message: 'Thử đổi từ khóa tìm kiếm.',
+                ),
+              )
+            else
+              ...visibleLines.map(
+                (line) => Padding(
+                  padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                  child: _VisitLineCard(
+                    line: line,
+                    onTap: widget.onOpenOutlet == null
+                        ? null
+                        : () => widget.onOpenOutlet!(line),
+                  ),
+                ),
+              ),
+          ],
         ],
       ],
     );
@@ -240,10 +293,15 @@ class _RoutesPageState extends State<RoutesPage> {
         children: [
           NavyPageHeader(
             title: route?.name ?? 'Đi tuyến',
-            subtitle: _formatVietnameseDate(DateTime.now()),
-            trailing: route == null
-                ? null
-                : _HeaderStatus(label: _statusLabel(day)),
+            subtitle: route == null
+                ? _formatVietnameseDate(DateTime.now())
+                : '${_formatVietnameseDate(DateTime.now())} · ${route.area}',
+            trailing: day?.sessionOpened == true
+                ? _FinishButton(
+                    busy: widget.routeActionBusy,
+                    onPressed: widget.onFinishRoute,
+                  )
+                : null,
           ),
           Expanded(
             child: widget.onRefresh == null
@@ -255,6 +313,31 @@ class _RoutesPageState extends State<RoutesPage> {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _FinishButton extends StatelessWidget {
+  const _FinishButton({
+    required this.busy,
+    this.onPressed,
+  });
+
+  final bool busy;
+  final Future<void> Function()? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return FilledButton(
+      key: const Key('route-finish-button'),
+      onPressed: busy || onPressed == null ? null : () => onPressed!(),
+      style: FilledButton.styleFrom(
+        minimumSize: const Size(0, 38),
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        backgroundColor: AppColors.danger,
+        disabledBackgroundColor: const Color(0x66FFFFFF),
+      ),
+      child: Text(busy ? 'Đang lưu' : 'Kết thúc'),
     );
   }
 }
@@ -426,37 +509,22 @@ class _VisitLineCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: AppSpacing.sm),
-              Icon(
-                visited ? Icons.check_circle_rounded : Icons.navigation_rounded,
-                color: visited ? AppColors.success : AppColors.primary,
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: visited ? AppColors.successSoft : AppColors.primary,
+                  borderRadius: BorderRadius.circular(AppRadius.sm),
+                ),
+                alignment: Alignment.center,
+                child: Icon(
+                  visited ? Icons.check_rounded : Icons.navigation_rounded,
+                  color: visited ? AppColors.success : Colors.white,
+                  size: 20,
+                ),
               ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _HeaderStatus extends StatelessWidget {
-  const _HeaderStatus({required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-      decoration: BoxDecoration(
-        color: const Color(0x26FFFFFF),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        label,
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 11,
-          fontWeight: FontWeight.w800,
         ),
       ),
     );

@@ -155,4 +155,67 @@ void main() {
     expect(workspace.day.sessionOpened, isTrue);
     expect(workspace.day.lines.single.phone, '0903123456');
   });
+  test('field actions send canonical mutation contracts', () async {
+    final seen = <String>[];
+    final client = HttpFieldDataClient(
+      profile: profile,
+      token: 'nppusr.test-token',
+      client: MockClient((request) async {
+        seen.add(request.url.path);
+        expect(
+          request.headers['Authorization'],
+          'Bearer nppusr.test-token',
+        );
+        expect(request.headers['Idempotency-Key'], startsWith('test-key-'));
+
+        final body = jsonDecode(request.body) as Map<String, dynamic>;
+        if (request.url.path == '/api/mcp-day/open-session') {
+          expect(body['routeId'], 'route-1');
+          expect(body['sessionDate'], '2026-09-27');
+        } else if (request.url.path ==
+            '/api/mcp-day/session-customer/checkin') {
+          expect(body['sessionCustomerId'], 'line-1');
+          expect(body['checkedIn'], isTrue);
+          expect(body['geoSource'], 'mobile_gps');
+        } else {
+          expect(request.url.path, '/api/mcp-sessions/session-1');
+          expect(body['status'], 'done');
+        }
+        return http.Response(
+          jsonEncode({
+            'data': {'ok': true},
+          }),
+          200,
+          headers: {'content-type': 'application/json; charset=utf-8'},
+        );
+      }),
+    );
+
+    await client.openRouteSession(
+      routeId: 'route-1',
+      date: DateTime(2026, 9, 27),
+      owner: 'Nguyễn Văn A',
+      idempotencyKey: 'test-key-open-12345678',
+    );
+    await client.setSessionCustomerCheckIn(
+      sessionCustomerId: 'line-1',
+      latitude: 10.75,
+      longitude: 106.67,
+      accuracy: 8,
+      idempotencyKey: 'test-key-checkin-12345678',
+    );
+    await client.finishRouteSession(
+      sessionId: 'session-1',
+      idempotencyKey: 'test-key-finish-12345678',
+    );
+
+    expect(
+      seen,
+      [
+        '/api/mcp-day/open-session',
+        '/api/mcp-day/session-customer/checkin',
+        '/api/mcp-sessions/session-1',
+      ],
+    );
+  });
 }
