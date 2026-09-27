@@ -101,65 +101,10 @@ class _LoginPageState extends State<LoginPage> {
       key: const Key('login-screen'),
       body: Column(
         children: [
-          Container(
-            width: double.infinity,
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  AppColors.primaryDeep,
-                  AppColors.primaryDark,
-                ],
-              ),
-            ),
-            child: SafeArea(
-              bottom: false,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  AppSpacing.md,
-                  AppSpacing.md,
-                  AppSpacing.md,
-                  AppSpacing.xl,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    IconButton.filledTonal(
-                      onPressed: _busy
-                          ? null
-                          : () {
-                              widget.onChangeSystem();
-                            },
-                      style: IconButton.styleFrom(
-                        backgroundColor: const Color(0x26FFFFFF),
-                        foregroundColor: Colors.white,
-                        disabledForegroundColor: const Color(0x88FFFFFF),
-                      ),
-                      icon: const Icon(Icons.arrow_back_rounded),
-                    ),
-                    const SizedBox(height: AppSpacing.lg),
-                    const Text(
-                      'Đăng nhập',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 28,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.xs),
-                    Text(
-                      widget.profile.name,
-                      style: const TextStyle(
-                        color: Color(0xFFD9E9FF),
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+          _LoginHeroHeader(
+            profileName: widget.profile.name,
+            busy: _busy,
+            onChangeSystem: widget.onChangeSystem,
           ),
           Expanded(
             child: ListView(
@@ -324,6 +269,111 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                 ),
               ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LoginHeroHeader extends StatelessWidget {
+  const _LoginHeroHeader({
+    required this.profileName,
+    required this.busy,
+    required this.onChangeSystem,
+  });
+
+  final String profileName;
+  final bool busy;
+  final Future<void> Function() onChangeSystem;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 218,
+      width: double.infinity,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          Image.asset(
+            'nguyen-lieu-pha-che.webp',
+            key: const Key('login-hero-image'),
+            fit: BoxFit.cover,
+            alignment: Alignment.center,
+          ),
+          const DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Color(0xE80A315F),
+                  Color(0xD40B356D),
+                  Color(0xC5082B5A),
+                ],
+              ),
+            ),
+          ),
+          SafeArea(
+            bottom: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.md,
+                AppSpacing.md,
+                AppSpacing.md,
+                AppSpacing.xl,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  IconButton.filledTonal(
+                    onPressed: busy
+                        ? null
+                        : () {
+                            onChangeSystem();
+                          },
+                    style: IconButton.styleFrom(
+                      backgroundColor: const Color(0x2FFFFFFF),
+                      foregroundColor: Colors.white,
+                      disabledForegroundColor: const Color(0x88FFFFFF),
+                    ),
+                    icon: const Icon(Icons.arrow_back_rounded),
+                  ),
+                  const Spacer(),
+                  const Text(
+                    'Đăng nhập',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 28,
+                      fontWeight: FontWeight.w900,
+                      shadows: [
+                        Shadow(
+                          color: Color(0x66000000),
+                          blurRadius: 8,
+                          offset: Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.xs),
+                  Text(
+                    profileName,
+                    style: const TextStyle(
+                      color: Color(0xFFE8F2FF),
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      shadows: [
+                        Shadow(
+                          color: Color(0x55000000),
+                          blurRadius: 6,
+                          offset: Offset(0, 1),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ],
