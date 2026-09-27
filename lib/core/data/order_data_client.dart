@@ -88,10 +88,10 @@ class OrderLineInput {
   final String? note;
 
   Map<String, Object?> toJson() => {
-        'variantId': variantId,
-        'quantity': quantity.toString(),
-        if ((note ?? '').trim().isNotEmpty) 'note': note!.trim(),
-      };
+    'variantId': variantId,
+    'quantity': quantity.toString(),
+    if ((note ?? '').trim().isNotEmpty) 'note': note!.trim(),
+  };
 }
 
 class FieldOrder {
@@ -168,9 +168,9 @@ class HttpOrderDataClient implements OrderDataClient {
 
   Uri _endpoint(String path, [Map<String, String>? query]) {
     final base = profile.fieldBaseUrl.toString().replaceFirst(
-          RegExp(r'/+$'),
-          '',
-        );
+      RegExp(r'/+$'),
+      '',
+    );
     final uri = Uri.parse(base + path);
     if (query == null || query.isEmpty) return uri;
     return uri.replace(queryParameters: query);
@@ -188,8 +188,7 @@ class HttpOrderDataClient implements OrderDataClient {
       'Authorization': 'Bearer $token',
       'X-Request-Id': _requestId(),
       if (hasBody) 'Content-Type': 'application/json',
-      if ((idempotencyKey ?? '').isNotEmpty)
-        'Idempotency-Key': idempotencyKey!,
+      if ((idempotencyKey ?? '').isNotEmpty) 'Idempotency-Key': idempotencyKey!,
     };
   }
 

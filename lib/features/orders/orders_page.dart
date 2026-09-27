@@ -84,13 +84,17 @@ class _OrdersPageState extends State<OrdersPage> {
   List<FieldOrder> get _filteredOrders {
     final query = _searchController.text.trim().toLowerCase();
     if (query.isEmpty) return _orders;
-    return _orders.where((order) {
-      return [
-        order.number,
-        order.customerCode,
-        order.customerName,
-      ].whereType<String>().any((value) => value.toLowerCase().contains(query));
-    }).toList(growable: false);
+    return _orders
+        .where((order) {
+          return [
+            order.number,
+            order.customerCode,
+            order.customerName,
+          ].whereType<String>().any(
+            (value) => value.toLowerCase().contains(query),
+          );
+        })
+        .toList(growable: false);
   }
 
   int get _todayCount {
@@ -192,8 +196,7 @@ class _OrdersPageState extends State<OrdersPage> {
                       child: EmptyState(
                         icon: Icons.receipt_long_outlined,
                         title: 'Chưa có đơn hàng',
-                        message:
-                            'Đơn tạo từ điểm bán sẽ hiển thị tại đây.',
+                        message: 'Đơn tạo từ điểm bán sẽ hiển thị tại đây.',
                       ),
                     )
                   else
@@ -304,9 +307,7 @@ class _OrderCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 3),
                   Text(
-                    order.customerName ??
-                        order.customerCode ??
-                        'Khách hàng',
+                    order.customerName ?? order.customerCode ?? 'Khách hàng',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
@@ -388,8 +389,7 @@ Future<void> _showOrderDetail(
               const SizedBox(height: AppSpacing.md),
               _DetailRow(
                 label: 'Khách hàng',
-                value:
-                    order.customerName ?? order.customerCode ?? 'Chưa có',
+                value: order.customerName ?? order.customerCode ?? 'Chưa có',
               ),
               const Divider(),
               _DetailRow(

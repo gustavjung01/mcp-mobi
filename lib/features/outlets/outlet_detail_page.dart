@@ -674,7 +674,12 @@ class _ActivityCard extends StatelessWidget {
             ),
             const SizedBox(height: 3),
             Text(
-              value ?? (active ? 'Đã có' : onTap == null ? 'Chưa có' : 'Mở'),
+              value ??
+                  (active
+                      ? 'Đã có'
+                      : onTap == null
+                      ? 'Chưa có'
+                      : 'Mở'),
               style: TextStyle(
                 color: active
                     ? AppColors.success

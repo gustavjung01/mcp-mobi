@@ -143,8 +143,7 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
     final addressId = (widget.outlet.coreCustomerAddressId ?? '').trim();
     if (customerId.isEmpty || addressId.isEmpty) {
       setState(() {
-        _message =
-            'Điểm bán chưa liên kết đủ khách Công Ty và địa chỉ giao hàng để ra đơn.';
+        _message = 'Điểm bán chưa liên kết đủ khách Công Ty và địa chỉ giao hàng để ra đơn.';
       });
       return;
     }
@@ -183,13 +182,17 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
               (item) => OrderLineInput(
                 variantId: item.product.variantId,
                 quantity: item.quantity,
-                note: [
-                  item.product.name,
-                  item.product.variantName,
-                  item.product.sku,
-                ].whereType<String>().where((value) => value.isNotEmpty).join(
-                      ' · ',
-                    ),
+                note:
+                    [
+                          item.product.name,
+                          item.product.variantName,
+                          item.product.sku,
+                        ]
+                        .whereType<String>()
+                        .where((value) => value.isNotEmpty)
+                        .join(
+                          ' · ',
+                        ),
               ),
             )
             .toList(growable: false),
@@ -214,9 +217,9 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
   }
 
   double get _estimatedTotal => _cart.values.fold<double>(
-        0,
-        (sum, item) => sum + (item.product.price ?? 0) * item.quantity,
-      );
+    0,
+    (sum, item) => sum + (item.product.price ?? 0) * item.quantity,
+  );
 
   bool get _hasUnknownPrice =>
       _cart.values.any((item) => item.product.price == null);
@@ -281,10 +284,12 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
                             const SizedBox(height: 3),
                             Text(
                               [
-                                widget.outlet.coreCustomerCode ??
-                                    widget.outlet.code,
-                                widget.outlet.address,
-                              ].where((value) => value.trim().isNotEmpty).join(
+                                    widget.outlet.coreCustomerCode ??
+                                        widget.outlet.code,
+                                    widget.outlet.address,
+                                  ]
+                                  .where((value) => value.trim().isNotEmpty)
+                                  .join(
                                     ' · ',
                                   ),
                               style: const TextStyle(
@@ -449,9 +454,7 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
                   AppCard(
                     child: Column(
                       children: [
-                        for (var index = 0;
-                            index < _cart.length;
-                            index++) ...[
+                        for (var index = 0; index < _cart.length; index++) ...[
                           _CartRow(
                             item: _cart.values.elementAt(index),
                             enabled: !_saving,
@@ -671,8 +674,7 @@ class _CartRow extends StatelessWidget {
 
   final _CartItem item;
   final bool enabled;
-  final void Function(OrderCatalogItem product, int quantity)
-      onQuantityChanged;
+  final void Function(OrderCatalogItem product, int quantity) onQuantityChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -708,9 +710,9 @@ class _CartRow extends StatelessWidget {
           key: Key('order-minus-${item.product.variantId}'),
           onPressed: enabled
               ? () => onQuantityChanged(
-                    item.product,
-                    item.quantity - 1,
-                  )
+                  item.product,
+                  item.quantity - 1,
+                )
               : null,
           icon: const Icon(Icons.remove_circle_outline_rounded),
         ),
@@ -729,9 +731,9 @@ class _CartRow extends StatelessWidget {
           key: Key('order-plus-${item.product.variantId}'),
           onPressed: enabled
               ? () => onQuantityChanged(
-                    item.product,
-                    item.quantity + 1,
-                  )
+                  item.product,
+                  item.quantity + 1,
+                )
               : null,
           icon: const Icon(Icons.add_circle_outline_rounded),
         ),
