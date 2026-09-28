@@ -27,7 +27,25 @@ CI release Android chỉ dùng debug signing khi biến `MCP_CI_RELEASE_VALIDATI
 
 ## Đóng gói Android để phát hành
 
-Release thật bắt buộc dùng keystore riêng qua biến môi trường, không lưu secret hoặc keystore trong repo:
+### Hợp đồng chữ ký phát hành — không được tự ý thay đổi
+
+**Đây là ràng buộc tương thích của bản đã phát hành, không phải cấu hình tùy chọn.**
+
+- Các APK MCP Field đã phát hành đến **1.0.4** dùng cùng signing identity từ Android debug keystore mặc định trên máy phát hành: `%USERPROFILE%\.android\debug.keystore`.
+- Bản cập nhật cài đè phải tiếp tục dùng **đúng signing identity đó**. Không đổi keystore, alias hoặc signing mode chỉ vì muốn "chuẩn hóa production".
+- Muốn chuyển sang signing key khác phải có kế hoạch migration riêng và kiểm chứng đường nâng cấp từ bản đang cài; không gộp thay đổi signing vào lô nghiệp vụ/UI.
+- `scripts/build-release.ps1` cố ý giữ fallback tương thích với signing identity lịch sử. Không được xóa fallback này nếu chưa có migration signing được phê duyệt và test cài đè.
+- Nếu dùng keystore khác với identity lịch sử thì bắt buộc cấu hình đủ `MCP_ANDROID_KEYSTORE`, `MCP_ANDROID_KEYSTORE_PASSWORD`, `MCP_ANDROID_KEY_ALIAS`, `MCP_ANDROID_KEY_PASSWORD`.
+- Key Manager chỉ điều phối version/build/publish; không được sửa Key Manager hoặc app khác để chữa lỗi signing riêng của MCP.
+
+### Hợp đồng version phát hành
+
+- `release-config.json` và dòng `version:` trong `pubspec.yaml` phải cùng phản ánh version hiện tại trước khi phát hành.
+- Khi build thất bại, Key Manager rollback hai metadata này về version trước build.
+- Trước `git pull`, `git restore`, xóa stash hoặc bỏ local changes liên quan hai file trên, phải đối chiếu version đã phát hành. **Không được làm mất metadata bản phát hành chỉ để làm sạch working tree.**
+- `KM_RELEASE_VERSION` phải khớp `release-config.json`; `KM_RELEASE_NOTES` là tùy chọn.
+
+Các biến signing khi cần cấu hình rõ ràng:
 
 - `MCP_ANDROID_KEYSTORE`
 - `MCP_ANDROID_KEYSTORE_PASSWORD`
@@ -35,8 +53,6 @@ Release thật bắt buộc dùng keystore riêng qua biến môi trường, kh�
 - `MCP_ANDROID_KEY_PASSWORD`
 - `KM_RELEASE_VERSION`
 - `KM_RELEASE_NOTES` (không bắt buộc)
-
-`KM_RELEASE_VERSION` phải khớp `release-config.json`.
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\build-release.ps1 `
