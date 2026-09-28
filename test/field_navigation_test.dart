@@ -538,11 +538,9 @@ void main() {
     await tester.tap(find.byKey(const Key('outlet-row-outlet-1')));
     await tester.pumpAndSettle();
 
-    final orderButton = find.byKey(
-      const Key('outlet-directory-create-order'),
-    );
-    await tester.ensureVisible(orderButton);
-    await tester.tap(orderButton);
+    const orderKey = Key('outlet-directory-create-order');
+    await revealOutletActivityAction(tester, orderKey);
+    await tester.tap(find.byKey(orderKey));
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('create-order-screen')), findsOneWidget);

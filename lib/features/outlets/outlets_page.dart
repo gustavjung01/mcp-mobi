@@ -288,39 +288,87 @@ class _OutletRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final routeLine = [
+      if (outlet.routeName.isNotEmpty) outlet.routeName,
+      if (outlet.area.isNotEmpty) outlet.area,
+    ].join(' · ');
+    final contactLine = [
+      if (outlet.code.isNotEmpty) outlet.code,
+      if (outlet.phone.isNotEmpty) outlet.phone,
+      if (outlet.address.isNotEmpty) outlet.address,
+    ].join(' · ');
+
     return AppCard(
       padding: EdgeInsets.zero,
-      child: ListTile(
+      child: InkWell(
         key: Key('outlet-row-${outlet.id}'),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
         onTap: onTap,
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.md,
-          vertical: AppSpacing.xs,
-        ),
-        leading: const CircleAvatar(
-          backgroundColor: AppColors.primarySoft,
-          child: Icon(Icons.storefront_outlined, color: AppColors.primary),
-        ),
-        title: Text(
-          outlet.name,
-          style: const TextStyle(
-            color: AppColors.textPrimary,
-            fontSize: 14,
-            fontWeight: FontWeight.w800,
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.md),
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: AppColors.primarySoft,
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                ),
+                alignment: Alignment.center,
+                child: const Icon(
+                  Icons.storefront_outlined,
+                  color: AppColors.primary,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      outlet.name,
+                      style: const TextStyle(
+                        color: AppColors.textPrimary,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    if (routeLine.isNotEmpty) ...[
+                      Text(
+                        routeLine,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: AppColors.primary,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                    ],
+                    Text(
+                      contactLine.isEmpty
+                          ? 'Chưa có thông tin liên hệ'
+                          : contactLine,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              const Icon(
+                Icons.chevron_right_rounded,
+                color: AppColors.primary,
+              ),
+            ],
           ),
-        ),
-        subtitle: Text(
-          [
-            outlet.routeName,
-            outlet.area,
-            outlet.address,
-          ].where((value) => value.trim().isNotEmpty).join(' · '),
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-        ),
-        trailing: const Icon(
-          Icons.chevron_right_rounded,
-          color: AppColors.textSecondary,
         ),
       ),
     );
