@@ -25,6 +25,7 @@ import '../../features/reports/field_activity_history_page.dart';
 import '../../features/reports/market_report_page.dart';
 import '../../features/outlets/outlets_page.dart';
 import '../../features/routes/add_route_customer_page.dart';
+import '../../features/routes/fixed_routes_page.dart';
 import '../../features/routes/routes_page.dart';
 import '../../features/tasks/followup_page.dart';
 import '../../features/today/today_page.dart';
@@ -1036,6 +1037,18 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     );
   }
 
+  Future<void> _openFixedRoutes() async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (context) => FixedRoutesPage(
+          routes: _routes,
+          initialRoute: _selectedRoute,
+          dataClient: _fieldDataClient,
+        ),
+      ),
+    );
+  }
+
   FieldRouteCustomer? _customerForLine(FieldDayLine line) {
     final routeCustomerId = line.routeCustomerId;
     if (routeCustomerId == null) return null;
@@ -1095,6 +1108,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
         refreshToken: _orderRefreshToken,
       ),
       MorePage(
+        onFixedRoutes: _fieldDataClient == null ? null : _openFixedRoutes,
         onReports: _fieldActivityClient == null
             ? null
             : () => _openActivityHistory(FieldActivityKind.report),

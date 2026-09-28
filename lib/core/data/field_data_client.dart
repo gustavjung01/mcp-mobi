@@ -27,6 +27,7 @@ class FieldRoute {
     required this.visitedCustomers,
     required this.orderCount,
     required this.status,
+    this.lastVisitDate = '',
   });
 
   final String id;
@@ -37,6 +38,7 @@ class FieldRoute {
   final int visitedCustomers;
   final int orderCount;
   final String status;
+  final String lastVisitDate;
 
   factory FieldRoute.fromJson(Map<String, dynamic> json) {
     return FieldRoute(
@@ -48,6 +50,7 @@ class FieldRoute {
       visitedCustomers: _integer(json['visitedCustomers']),
       orderCount: _integer(json['orderCount']),
       status: _text(json['status'], fallback: 'active'),
+      lastVisitDate: _text(json['lastVisitDate']),
     );
   }
 }
@@ -758,6 +761,7 @@ List<FieldRoute> _routesFromShellSnapshot(
           visitedCustomers: _integer(session['visited_customers']),
           orderCount: _integer(session['order_count']),
           status: 'active',
+          lastVisitDate: _text(session['session_date']),
         );
       })
       .where((route) => route.id.isNotEmpty)

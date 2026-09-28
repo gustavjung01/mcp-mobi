@@ -42,8 +42,6 @@ class RoutesPage extends StatefulWidget {
 
 class _RoutesPageState extends State<RoutesPage> {
   String _sessionQuery = '';
-  String _fixedRouteQuery = '';
-  String _section = 'session';
   String _filter = 'all';
 
   Future<void> _showRoutePicker() async {
@@ -223,28 +221,6 @@ class _RoutesPageState extends State<RoutesPage> {
           ),
           const SizedBox(height: AppSpacing.md),
           if (day?.sessionOpened == true) ...[
-            _RouteSectionSwitch(
-              selected: _section,
-              onSelected: (value) {
-                setState(() {
-                  _section = value;
-                });
-              },
-            ),
-            const SizedBox(height: AppSpacing.md),
-          ],
-          if (day?.sessionOpened != true || _section == 'fixed')
-            _FixedRoutePreview(
-              customers:
-                  widget.workspace?.customers ?? const <FieldRouteCustomer>[],
-              query: _fixedRouteQuery,
-              onQueryChanged: (value) {
-                setState(() {
-                  _fixedRouteQuery = value;
-                });
-              },
-            )
-          else ...[
             Row(
               children: [
                 Expanded(
@@ -326,7 +302,14 @@ class _RoutesPageState extends State<RoutesPage> {
                   ),
                 ),
               ),
-          ],
+          ] else
+            const AppCard(
+              child: EmptyState(
+                icon: Icons.today_outlined,
+                title: 'Phiên hôm nay chưa bắt đầu',
+                message: 'Bấm “Bắt đầu tuyến” để mở phiên làm việc hôm nay.',
+              ),
+            ),
         ],
       ],
     );
@@ -356,153 +339,6 @@ class _RoutesPageState extends State<RoutesPage> {
                   ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _FixedRoutePreview extends StatelessWidget {
-  const _FixedRoutePreview({
-    required this.customers,
-    required this.query,
-    required this.onQueryChanged,
-  });
-
-  final List<FieldRouteCustomer> customers;
-  final String query;
-  final ValueChanged<String> onQueryChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final normalized = query.trim().toLowerCase();
-    final visible = customers
-        .where((customer) {
-          if (normalized.isEmpty) return true;
-          return customer.accountName.toLowerCase().contains(normalized) ||
-              customer.area.toLowerCase().contains(normalized) ||
-              customer.accountId.toLowerCase().contains(normalized);
-        })
-        .toList(growable: false);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Tuyến cố định',
-          style: TextStyle(
-            color: AppColors.primary,
-            fontSize: 14,
-            fontWeight: FontWeight.w900,
-          ),
-        ),
-        const SizedBox(height: 3),
-        Text(
-          '${customers.length} điểm bán đã được xếp sẵn cho tuyến này.',
-          style: const TextStyle(
-            color: AppColors.textSecondary,
-            fontSize: 11,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        TextField(
-          key: const Key('route-preview-search'),
-          onChanged: onQueryChanged,
-          decoration: const InputDecoration(
-            hintText: 'Tìm điểm bán cố định...',
-            prefixIcon: Icon(Icons.search_rounded),
-          ),
-        ),
-        const SizedBox(height: AppSpacing.md),
-        if (customers.isEmpty)
-          const AppCard(
-            child: EmptyState(
-              icon: Icons.route_outlined,
-              title: 'Tuyến chưa có điểm bán',
-              message: 'Danh sách cố định của tuyến hiện đang trống.',
-            ),
-          )
-        else if (visible.isEmpty)
-          const AppCard(
-            child: EmptyState(
-              icon: Icons.storefront_outlined,
-              title: 'Không có điểm bán phù hợp',
-              message: 'Thử đổi từ khóa tìm kiếm.',
-            ),
-          )
-        else
-          ...visible.map(
-            (customer) => Padding(
-              padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-              child: AppCard(
-                padding: EdgeInsets.zero,
-                child: ListTile(
-                  key: Key('route-preview-${customer.id}'),
-                  leading: CircleAvatar(
-                    backgroundColor: AppColors.primarySoft,
-                    foregroundColor: AppColors.primary,
-                    child: Text(
-                      customer.sortOrder > 0
-                          ? customer.sortOrder.toString()
-                          : '•',
-                    ),
-                  ),
-                  title: Text(
-                    customer.accountName,
-                    style: const TextStyle(fontWeight: FontWeight.w800),
-                  ),
-                  subtitle: Text(
-                    customer.area,
-                    style: const TextStyle(
-                      color: AppColors.textSecondary,
-                      fontSize: 12,
-                    ),
-                  ),
-                  trailing: const Icon(
-                    Icons.schedule_rounded,
-                    color: AppColors.primary,
-                  ),
-                ),
-              ),
-            ),
-          ),
-      ],
-    );
-  }
-}
-
-class _RouteSectionSwitch extends StatelessWidget {
-  const _RouteSectionSwitch({
-    required this.selected,
-    required this.onSelected,
-  });
-
-  final String selected;
-  final ValueChanged<String> onSelected;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      child: SegmentedButton<String>(
-        key: const Key('route-section-switch'),
-        showSelectedIcon: false,
-        segments: const [
-          ButtonSegment<String>(
-            value: 'session',
-            icon: Icon(Icons.today_rounded, size: 18),
-            label: Text('Phiên hôm nay'),
-          ),
-          ButtonSegment<String>(
-            value: 'fixed',
-            icon: Icon(Icons.route_rounded, size: 18),
-            label: Text('Tuyến cố định'),
-          ),
-        ],
-        selected: <String>{selected},
-        onSelectionChanged: (selection) {
-          if (selection.isNotEmpty) onSelected(selection.first);
-        },
       ),
     );
   }
