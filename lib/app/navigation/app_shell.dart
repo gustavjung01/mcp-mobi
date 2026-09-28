@@ -1037,6 +1037,64 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     );
   }
 
+  Future<void> _openOrderForCompanyCustomer(
+    CompanyCustomer customer,
+  ) async {
+    final client = _orderDataClient;
+    if (client == null) return;
+
+    final addressId = (customer.defaultAddressId ?? '').trim();
+    if (customer.status.trim().toLowerCase() != 'active' || addressId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Khách Công Ty chưa có địa chỉ giao hàng đang hoạt động.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    final target = FieldOutlet(
+      id: 'company-${customer.id}',
+      routeId: '',
+      routeName: 'Đơn hàng',
+      code: customer.customerCode ?? '',
+      name: customer.name,
+      phone: customer.phone ?? '',
+      area: '',
+      address:
+          customer.defaultAddressLine1 ?? customer.defaultAddressLabel ?? '',
+      status: 'linked_existing',
+      note: '',
+      coreCustomerId: customer.id,
+      coreCustomerAddressId: addressId,
+      coreCustomerCode: customer.customerCode,
+    );
+
+    final outcome = await Navigator.of(context).push<OrderSubmitOutcome>(
+      MaterialPageRoute<OrderSubmitOutcome>(
+        builder: (context) => CreateOrderPage(
+          outlet: target,
+          orderClient: client,
+          offlineStore: _orderOfflineStore,
+        ),
+      ),
+    );
+    if (outcome == null || !mounted) return;
+
+    setState(() {
+      _orderRefreshToken += 1;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          outcome == OrderSubmitOutcome.created ? 'Đã tạo đơn hàng.' : 'Đã lưu đơn chờ gửi. Ứng dụng sẽ dùng lại đúng lần gửi này khi đồng bộ.',
+        ),
+      ),
+    );
+  }
+
   Future<void> _openFixedRoutes() async {
     await Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
@@ -1105,6 +1163,15 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       OrdersPage(
         orderClient: _orderDataClient,
         offlineStore: _orderOfflineStore,
+        companyCustomers: _companyCustomers,
+        onCreateOrder: _orderDataClient == null
+            ? null
+            : _openOrderForCompanyCustomer,
+        onCustomerOnboarding: _customerBoundaryClient == null
+            ? null
+            : () async {
+                await _openCustomerOnboarding();
+              },
         refreshToken: _orderRefreshToken,
       ),
       MorePage(

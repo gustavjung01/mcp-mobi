@@ -63,17 +63,39 @@ class OrderCatalogItem {
     );
   }
 
-  String get secondaryLabel {
-    final values = <String?>[variantName, sizeLabel, sellUnit, sku];
+  String get purchaseUnitLabel {
+    final unit = (sellUnit ?? '').trim().toLowerCase();
+    if (RegExp(r'(^|\s)(thùng|thung|case|carton)(\s|$)').hasMatch(unit)) {
+      return 'Thùng';
+    }
+    return 'Lẻ';
+  }
+
+  String get purchaseUnitDetail {
+    final rawVariant = (variantName ?? '').trim();
+    final variant =
+        const {'mặc định', 'mac dinh'}.contains(rawVariant.toLowerCase())
+        ? ''
+        : rawVariant;
+    final pack = (packUnit ?? '').trim().isNotEmpty && packQuantity != null
+        ? '${packUnit!.trim()} ${_compactNumber(packQuantity!)}'
+        : '';
+    final values = <String?>[variant, sizeLabel, sellUnit, pack, sku];
     final seen = <String>{};
     final normalized = <String>[];
     for (final value in values) {
       final text = (value ?? '').trim();
-      if (text.isEmpty || !seen.add(text.toLowerCase())) continue;
+      if (text.isEmpty ||
+          text.toLowerCase() == purchaseUnitLabel.toLowerCase() ||
+          !seen.add(text.toLowerCase())) {
+        continue;
+      }
       normalized.add(text);
     }
-    return normalized.isEmpty ? 'Quy cách bán' : normalized.join(' · ');
+    return normalized.isEmpty ? 'Quy cách chuẩn' : normalized.join(' · ');
   }
+
+  String get secondaryLabel => '$purchaseUnitLabel · $purchaseUnitDetail';
 }
 
 class OrderLineInput {
@@ -94,43 +116,185 @@ class OrderLineInput {
   };
 }
 
+class FieldOrderLine {
+  const FieldOrderLine({
+    required this.id,
+    required this.variantId,
+    required this.itemName,
+    this.lineNumber = 0,
+    this.sku,
+    this.unitCode,
+    this.unitName,
+    this.quantity = 0,
+    this.unitPrice = 0,
+    this.lineTotal = 0,
+    this.note,
+  });
+
+  final String id;
+  final int lineNumber;
+  final String variantId;
+  final String itemName;
+  final String? sku;
+  final String? unitCode;
+  final String? unitName;
+  final double quantity;
+  final double unitPrice;
+  final double lineTotal;
+  final String? note;
+
+  String get unitLabel {
+    final name = (unitName ?? '').trim();
+    if (name.isNotEmpty) return name;
+    return (unitCode ?? '').trim();
+  }
+
+  factory FieldOrderLine.fromJson(Map<String, dynamic> json) {
+    return FieldOrderLine(
+      id: _text(json['id']),
+      lineNumber: _integer(json['lineNumber']),
+      variantId: _text(json['variantId']),
+      itemName: _text(
+        json['itemName'],
+        fallback: _text(json['productName'], fallback: 'Sản phẩm'),
+      ),
+      sku: _nullableText(json['sku']),
+      unitCode: _nullableText(json['unitCode']),
+      unitName: _nullableText(json['unitName']),
+      quantity: _optionalDouble(json['quantity']) ?? 0,
+      unitPrice: _optionalDouble(json['unitPrice']) ?? 0,
+      lineTotal: _optionalDouble(json['lineTotal']) ?? 0,
+      note: _nullableText(json['note']),
+    );
+  }
+}
+
+class FieldOrderVersion {
+  const FieldOrderVersion({
+    required this.versionNumber,
+    required this.status,
+    this.subtotal = 0,
+    this.discountTotal = 0,
+    this.taxTotal = 0,
+    this.total = 0,
+    this.note,
+    this.createdAt,
+    this.lines = const [],
+  });
+
+  final String versionNumber;
+  final String status;
+  final double subtotal;
+  final double discountTotal;
+  final double taxTotal;
+  final double total;
+  final String? note;
+  final String? createdAt;
+  final List<FieldOrderLine> lines;
+
+  factory FieldOrderVersion.fromJson(Map<String, dynamic> json) {
+    return FieldOrderVersion(
+      versionNumber: _text(json['versionNumber'], fallback: '1'),
+      status: _text(json['status'], fallback: 'draft'),
+      subtotal: _optionalDouble(json['subtotal']) ?? 0,
+      discountTotal: _optionalDouble(json['discountTotal']) ?? 0,
+      taxTotal: _optionalDouble(json['taxTotal']) ?? 0,
+      total: _optionalDouble(json['total']) ?? 0,
+      note: _nullableText(json['note']),
+      createdAt: _nullableText(json['createdAt']),
+      lines: _objects(json['lines'])
+          .map(FieldOrderLine.fromJson)
+          .toList(growable: false),
+    );
+  }
+}
+
 class FieldOrder {
   const FieldOrder({
     required this.id,
     required this.status,
     this.number,
     this.sourceOutletId,
+    this.sourceType,
     this.customerId,
     this.customerCode,
     this.customerName,
     this.createdAt,
     this.updatedAt,
+    this.currentVersionNumber,
+    this.revision,
+    this.note,
     this.total,
+    this.versions = const [],
   });
 
   final String id;
   final String status;
   final String? number;
   final String? sourceOutletId;
+  final String? sourceType;
   final String? customerId;
   final String? customerCode;
   final String? customerName;
   final String? createdAt;
   final String? updatedAt;
+  final String? currentVersionNumber;
+  final String? revision;
+  final String? note;
   final double? total;
+  final List<FieldOrderVersion> versions;
+
+  FieldOrderVersion? get currentVersion {
+    if (versions.isEmpty) return null;
+    final wanted = (currentVersionNumber ?? '').trim();
+    if (wanted.isNotEmpty) {
+      for (final version in versions) {
+        if (version.versionNumber == wanted) return version;
+      }
+    }
+    return versions.last;
+  }
 
   factory FieldOrder.fromJson(Map<String, dynamic> json) {
+    final versions =
+        _objects(json['versions'])
+            .map(FieldOrderVersion.fromJson)
+            .toList(growable: true)
+          ..sort(
+            (left, right) =>
+                _integer(left.versionNumber)
+                    .compareTo(_integer(right.versionNumber)),
+          );
+    final currentVersionNumber =
+        _nullableText(json['currentVersionNumber']) ??
+        (versions.isEmpty ? null : versions.last.versionNumber);
+    FieldOrderVersion? current;
+    if (currentVersionNumber != null) {
+      for (final version in versions) {
+        if (version.versionNumber == currentVersionNumber) {
+          current = version;
+          break;
+        }
+      }
+    }
+    current ??= versions.isEmpty ? null : versions.last;
+
     return FieldOrder(
       id: _text(json['id']),
       status: _text(json['status'], fallback: 'draft'),
       number: _nullableText(json['number']),
       sourceOutletId: _nullableText(json['sourceOutletId']),
+      sourceType: _nullableText(json['sourceType']),
       customerId: _nullableText(json['customerId']),
       customerCode: _nullableText(json['customerCode']),
       customerName: _nullableText(json['customerName']),
-      createdAt: _nullableText(json['createdAt']),
+      createdAt: _nullableText(json['createdAt']) ?? current?.createdAt,
       updatedAt: _nullableText(json['updatedAt']),
+      currentVersionNumber: currentVersionNumber,
+      revision: _nullableText(json['revision']),
+      note: _nullableText(json['note']) ?? current?.note,
       total: _orderTotal(json),
+      versions: List<FieldOrderVersion>.unmodifiable(versions),
     );
   }
 }
@@ -424,4 +588,9 @@ double? _optionalDouble(Object? value) {
   if (value == null || _text(value).isEmpty) return null;
   if (value is num) return value.toDouble();
   return double.tryParse(_text(value));
+}
+
+String _compactNumber(double value) {
+  if (value == value.truncateToDouble()) return value.toInt().toString();
+  return value.toString();
 }
