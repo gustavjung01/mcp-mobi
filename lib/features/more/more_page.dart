@@ -8,6 +8,7 @@ import '../settings/settings_page.dart';
 class MorePage extends StatelessWidget {
   const MorePage({
     super.key,
+    this.onFixedRoutes,
     this.onReports,
     this.onProductTrials,
     this.onTasks,
@@ -15,6 +16,7 @@ class MorePage extends StatelessWidget {
     this.onLogout,
   });
 
+  final VoidCallback? onFixedRoutes;
   final VoidCallback? onReports;
   final VoidCallback? onProductTrials;
   final VoidCallback? onTasks;
@@ -22,6 +24,7 @@ class MorePage extends StatelessWidget {
   final Future<void> Function()? onLogout;
 
   static const _items = <_MoreItem>[
+    _MoreItem(Icons.route_outlined, 'Tuyến cố định'),
     _MoreItem(Icons.history, 'Lịch sử phiên'),
     _MoreItem(Icons.assignment_outlined, 'Báo cáo'),
     _MoreItem(Icons.science_outlined, 'Kết quả thử sản phẩm'),
@@ -51,6 +54,7 @@ class MorePage extends StatelessWidget {
                   _MoreTile(
                     item: _items[index],
                     onTap: switch (_items[index].label) {
+                      'Tuyến cố định' => onFixedRoutes,
                       'Báo cáo' => onReports,
                       'Kết quả thử sản phẩm' => onProductTrials,
                       'Kế hoạch & Công việc' => onTasks,

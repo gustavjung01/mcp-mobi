@@ -20,6 +20,7 @@ const route = FieldRoute(
   visitedCustomers: 0,
   orderCount: 0,
   status: 'active',
+  lastVisitDate: '2026-09-26',
 );
 
 const routeTwo = FieldRoute(
@@ -792,30 +793,36 @@ void main() {
     },
   );
 
-  testWidgets('fixed route customers are visible before opening the day run', (
+  testWidgets('fixed routes is a separate item under More', (
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(
       MaterialApp(
         home: AppShell(
           session: session,
-          fieldDataClient: FakeFieldDataClient(
-            workspaceValue: unopenedWorkspace,
-          ),
+          fieldDataClient: FakeFieldDataClient(),
         ),
       ),
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(navLabel('Đi tuyến'));
+    await tester.tap(navLabel('Thêm'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Tuyến cố định'));
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const Key('route-start-button')), findsOneWidget);
-    expect(find.byKey(const Key('route-preview-customer-1')), findsOneWidget);
-    expect(find.text('Tuyến cố định'), findsOneWidget);
+    expect(find.byKey(const Key('fixed-routes-screen')), findsOneWidget);
+    expect(find.text('Tuyến Quận 1'), findsWidgets);
+    expect(find.text('Nguyễn Văn A'), findsOneWidget);
+    expect(find.text('26/09/2026'), findsOneWidget);
+    expect(
+      find.byKey(const Key('fixed-route-customer-customer-1')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('route-finish-button')), findsNothing);
   });
 
-  testWidgets('fixed route remains available while the day run is active', (
+  testWidgets('route work screen contains only the day session', (
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(
@@ -829,44 +836,31 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Phiên hôm nay'), findsWidgets);
-    expect(find.byKey(const Key('route-preview-customer-1')), findsNothing);
-
-    await tester.tap(find.text('Tuyến cố định').first);
-    await tester.pumpAndSettle();
-
-    expect(find.byKey(const Key('route-preview-customer-1')), findsOneWidget);
-    expect(
-      find.text('1 điểm bán đã được xếp sẵn cho tuyến này.'),
-      findsOneWidget,
-    );
+    expect(find.text('Phiên hôm nay'), findsOneWidget);
+    expect(find.text('Tuyến cố định'), findsNothing);
+    expect(find.byKey(const Key('route-section-switch')), findsNothing);
+    expect(find.byKey(const Key('route-finish-button')), findsOneWidget);
   });
 
-  testWidgets(
-    'completed route session is read only and can still show fixed route',
-    (
-      WidgetTester tester,
-    ) async {
-      await tester.pumpWidget(
-        const MaterialApp(
-          home: RoutesPage(
-            routes: [route],
-            selectedRoute: route,
-            workspace: doneWorkspace,
-          ),
+  testWidgets('completed route session is read only', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: RoutesPage(
+          routes: [route],
+          selectedRoute: route,
+          workspace: doneWorkspace,
         ),
-      );
-      await tester.pumpAndSettle();
+      ),
+    );
+    await tester.pumpAndSettle();
 
-      expect(find.text('Đã kết thúc'), findsOneWidget);
-      expect(find.byKey(const Key('route-finish-button')), findsNothing);
-      expect(find.byKey(const Key('route-add-customer-button')), findsNothing);
-
-      await tester.tap(find.text('Tuyến cố định').first);
-      await tester.pumpAndSettle();
-      expect(find.byKey(const Key('route-preview-customer-1')), findsOneWidget);
-    },
-  );
+    expect(find.text('Đã kết thúc'), findsOneWidget);
+    expect(find.byKey(const Key('route-finish-button')), findsNothing);
+    expect(find.byKey(const Key('route-add-customer-button')), findsNothing);
+    expect(find.text('Tuyến cố định'), findsNothing);
+  });
 
   testWidgets('bottom navigation is anchored outside scrollable tab content', (
     WidgetTester tester,
