@@ -4,6 +4,7 @@ import 'package:mcp_field/app/navigation/app_shell.dart';
 import 'package:mcp_field/core/auth/mobile_auth_client.dart';
 import 'package:mcp_field/core/data/field_data_client.dart';
 import 'package:mcp_field/core/location/field_location.dart';
+import 'package:mcp_field/features/outlets/outlet_detail_page.dart';
 
 const route = FieldRoute(
   id: 'route-1',
@@ -341,6 +342,51 @@ void main() {
     expect(client.addCustomerKeys, hasLength(2));
     expect(client.addCustomerKeys[1], client.addCustomerKeys[0]);
     expect(find.byKey(const Key('routes-screen')), findsOneWidget);
+  });
+
+  testWidgets('outlet exposes the three field activity actions', (
+    WidgetTester tester,
+  ) async {
+    var reports = 0;
+    var trials = 0;
+    var followups = 0;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: OutletDetailPage(
+          routeName: route.name,
+          customer: customer,
+          line: line,
+          onCreateReport: () async {
+            reports += 1;
+          },
+          onCreateProductTrial: () async {
+            trials += 1;
+          },
+          onCreateFollowup: () async {
+            followups += 1;
+          },
+        ),
+      ),
+    );
+
+    final reportButton = find.byKey(const Key('outlet-create-report'));
+    await tester.ensureVisible(reportButton);
+    await tester.tap(reportButton);
+    final trialButton = find.byKey(
+      const Key('outlet-create-product-trial'),
+    );
+    await tester.ensureVisible(trialButton);
+    await tester.tap(trialButton);
+    final followupButton = find.byKey(
+      const Key('outlet-create-followup'),
+    );
+    await tester.ensureVisible(followupButton);
+    await tester.tap(followupButton);
+    await tester.pump();
+
+    expect(reports, 1);
+    expect(trials, 1);
+    expect(followups, 1);
   });
 
   testWidgets('check-in is only available from active route context', (

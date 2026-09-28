@@ -1,7 +1,31 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mcp_field/core/data/order_data_client.dart';
 import 'package:mcp_field/core/idempotency/canonical_idempotency.dart';
+import 'package:mcp_field/core/sync/mutation_queue.dart';
 import 'package:mcp_field/core/sync/order_offline_store.dart';
+
+class MemoryMutationQueueStore implements MutationQueueStore {
+  final rows = <String, QueuedMutation>{};
+
+  @override
+  Future<List<QueuedMutation>> load({Set<String>? operations}) async {
+    final values = rows.values.toList(growable: false);
+    if (operations == null || operations.isEmpty) return values;
+    return values
+        .where((item) => operations.contains(item.operation))
+        .toList(growable: false);
+  }
+
+  @override
+  Future<void> remove(String idempotencyKey) async {
+    rows.remove(idempotencyKey);
+  }
+
+  @override
+  Future<void> save(QueuedMutation mutation) async {
+    rows[mutation.idempotencyKey] = mutation;
+  }
+}
 
 class MemoryOrderOfflineStore implements OrderOfflineStore {
   final drafts = <String, OrderDraft>{};
@@ -103,6 +127,39 @@ void main() {
     expect(restored!.lines.single.product.name, 'Trà đào');
     expect(restored.lines.single.quantity, 2);
     expect(restored.note, 'Giao buổi sáng');
+  });
+
+  test('secure order store writes mutations through the shared queue', () async {
+    final queue = MemoryMutationQueueStore();
+    final store = SecureOrderOfflineStore(
+      installationKey: 'https://mcp.example.vn',
+      employeeId: 'employee-1',
+      mutationQueueStore: queue,
+    );
+    const key =
+        'mcp.sales-order.create-123e4567-e89b-42d3-a456-426614174000';
+    await store.saveMutation(
+      QueuedOrderMutation(
+        idempotencyKey: key,
+        outletId: 'outlet-1',
+        outletName: 'Cửa hàng Minh Phát',
+        customerId: 'customer-1',
+        customerAddressId: 'address-1',
+        note: '',
+        lines: const [
+          OrderLineInput(variantId: 'variant-1', quantity: 1),
+        ],
+        createdAt: DateTime.utc(2026, 9, 28, 5),
+      ),
+    );
+
+    expect(queue.rows[key], isNotNull);
+    expect(queue.rows[key]!.operation, orderMutationOperation);
+    expect(queue.rows[key]!.entityType, 'order');
+
+    final restored = await store.loadMutations();
+    expect(restored.single.idempotencyKey, key);
+    expect(restored.single.lines.single.variantId, 'variant-1');
   });
 
   test('sync retry reuses the exact queued idempotency key', () async {

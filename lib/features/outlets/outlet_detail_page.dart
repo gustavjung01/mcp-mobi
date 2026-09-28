@@ -21,6 +21,9 @@ class OutletDetailPage extends StatefulWidget {
     this.photoPicker,
     this.onCheckIn,
     this.onCreateOrder,
+    this.onCreateReport,
+    this.onCreateProductTrial,
+    this.onCreateFollowup,
   });
 
   final String routeName;
@@ -32,6 +35,9 @@ class OutletDetailPage extends StatefulWidget {
   final OutletPhotoPicker? photoPicker;
   final Future<void> Function(FieldDayLine line)? onCheckIn;
   final Future<void> Function()? onCreateOrder;
+  final Future<void> Function()? onCreateReport;
+  final Future<void> Function()? onCreateProductTrial;
+  final Future<void> Function()? onCreateFollowup;
 
   @override
   State<OutletDetailPage> createState() => _OutletDetailPageState();
@@ -419,10 +425,12 @@ class _OutletDetailPageState extends State<OutletDetailPage> {
                             const SizedBox(width: AppSpacing.sm),
                             Expanded(
                               child: _ActivityCard(
+                                key: const Key('outlet-create-report'),
                                 icon: Icons.assignment_outlined,
                                 label: 'Báo cáo',
                                 active: line.hasReport,
                                 accent: AppColors.warning,
+                                onTap: widget.onCreateReport,
                               ),
                             ),
                           ],
@@ -432,20 +440,24 @@ class _OutletDetailPageState extends State<OutletDetailPage> {
                           children: [
                             Expanded(
                               child: _ActivityCard(
+                                key: const Key('outlet-create-product-trial'),
                                 icon: Icons.science_outlined,
                                 label: 'Thử sản phẩm',
                                 active: line.hasTest,
                                 accent: const Color(0xFF805AD5),
+                                onTap: widget.onCreateProductTrial,
                               ),
                             ),
                             const SizedBox(width: AppSpacing.sm),
                             Expanded(
                               child: _ActivityCard(
+                                key: const Key('outlet-create-followup'),
                                 icon: Icons.task_alt_outlined,
                                 label: 'Theo dõi',
                                 active: line.followupCount > 0,
                                 value: line.followupCount.toString(),
                                 accent: AppColors.danger,
+                                onTap: widget.onCreateFollowup,
                               ),
                             ),
                           ],
@@ -597,6 +609,18 @@ class _HistoryBody extends StatelessWidget {
               _InfoRow(
                 label: 'Báo cáo',
                 value: line?.hasReport == true ? 'Đã ghi nhận' : 'Chưa có',
+              ),
+              const Divider(height: 22),
+              _InfoRow(
+                label: 'Thử sản phẩm',
+                value: line?.hasTest == true ? 'Đã ghi nhận' : 'Chưa có',
+              ),
+              const Divider(height: 22),
+              _InfoRow(
+                label: 'Việc theo dõi',
+                value: (line?.followupCount ?? 0) > 0
+                    ? line!.followupCount.toString() + ' việc'
+                    : 'Chưa có',
               ),
             ],
           ),
