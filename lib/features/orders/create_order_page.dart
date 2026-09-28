@@ -7,18 +7,26 @@ import '../../app/theme/app_theme.dart';
 import '../../core/data/field_data_client.dart';
 import '../../core/data/order_data_client.dart';
 import '../../core/idempotency/canonical_idempotency.dart';
+import '../../core/sync/order_offline_store.dart';
 import '../../shared/widgets/app_card.dart';
 import '../../shared/widgets/navy_page_header.dart';
+
+enum OrderSubmitOutcome {
+  created,
+  queued,
+}
 
 class CreateOrderPage extends StatefulWidget {
   const CreateOrderPage({
     required this.outlet,
     required this.orderClient,
+    this.offlineStore,
     super.key,
   });
 
   final FieldOutlet outlet;
   final OrderDataClient orderClient;
+  final OrderOfflineStore? offlineStore;
 
   @override
   State<CreateOrderPage> createState() => _CreateOrderPageState();
@@ -38,20 +46,110 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
   String? _submissionKey;
   bool _loadingProducts = true;
   bool _saving = false;
+  bool _draftLoaded = false;
+  bool _submitted = false;
   Timer? _searchTimer;
+  Timer? _draftTimer;
 
   @override
   void initState() {
     super.initState();
+    _noteController.addListener(_scheduleDraftSave);
+    _restoreDraft();
     _loadProducts();
   }
 
   @override
   void dispose() {
     _searchTimer?.cancel();
+    _draftTimer?.cancel();
+    if (!_submitted) {
+      unawaited(_saveDraft());
+    }
+    _noteController.removeListener(_scheduleDraftSave);
     _searchController.dispose();
     _noteController.dispose();
     super.dispose();
+  }
+
+  Future<void> _restoreDraft() async {
+    final store = widget.offlineStore;
+    if (store == null) {
+      _draftLoaded = true;
+      return;
+    }
+
+    try {
+      final draft = await store.readDraft(widget.outlet.id);
+      final customerId = (widget.outlet.coreCustomerId ?? '').trim();
+      final addressId = (widget.outlet.coreCustomerAddressId ?? '').trim();
+      if (draft != null &&
+          draft.customerId == customerId &&
+          draft.customerAddressId == addressId) {
+        _noteController.text = draft.note;
+        for (final line in draft.lines) {
+          _cart[line.product.variantId] = _CartItem(
+            product: line.product,
+            quantity: line.quantity,
+          );
+        }
+      } else if (draft != null) {
+        await store.deleteDraft(widget.outlet.id);
+      }
+    } catch (_) {
+      // A storage problem must not block online order creation.
+    }
+    _draftLoaded = true;
+    if (mounted) setState(() {});
+  }
+
+  void _scheduleDraftSave() {
+    if (!_draftLoaded || _submitted || widget.offlineStore == null) return;
+    _draftTimer?.cancel();
+    _draftTimer = Timer(const Duration(milliseconds: 300), () {
+      unawaited(_saveDraft());
+    });
+  }
+
+  Future<void> _saveDraft() async {
+    final store = widget.offlineStore;
+    if (store == null || !_draftLoaded || _submitted) return;
+
+    final customerId = (widget.outlet.coreCustomerId ?? '').trim();
+    final addressId = (widget.outlet.coreCustomerAddressId ?? '').trim();
+    if (customerId.isEmpty || addressId.isEmpty) return;
+
+    final items = _cart.values.toList(growable: false)
+      ..sort(
+        (left, right) =>
+            left.product.variantId.compareTo(right.product.variantId),
+      );
+    final note = _noteController.text.trim();
+    try {
+      if (items.isEmpty && note.isEmpty) {
+        await store.deleteDraft(widget.outlet.id);
+        return;
+      }
+      await store.saveDraft(
+        OrderDraft(
+          outletId: widget.outlet.id,
+          customerId: customerId,
+          customerAddressId: addressId,
+          note: note,
+          lines: items
+              .map(
+                (item) => OrderDraftLine(
+                  product: item.product,
+                  quantity: item.quantity,
+                ),
+              )
+              .toList(growable: false),
+          updatedAt: DateTime.now().toUtc(),
+        ),
+      );
+    } catch (_) {
+      // Draft persistence is best effort. Submission still uses the API contract.
+    }
   }
 
   void _scheduleSearch(String _) {
@@ -106,6 +204,7 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
       );
       _message = null;
     });
+    _scheduleDraftSave();
   }
 
   void _changeQuantity(OrderCatalogItem product, int quantity) {
@@ -120,6 +219,7 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
       }
       _message = null;
     });
+    _scheduleDraftSave();
   }
 
   String _fingerprint(List<_CartItem> items) {
@@ -168,41 +268,95 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
       );
     }
 
+    final orderLines = items
+        .map(
+          (item) => OrderLineInput(
+            variantId: item.product.variantId,
+            quantity: item.quantity,
+            note:
+                [
+                      item.product.name,
+                      item.product.variantName,
+                      item.product.sku,
+                    ]
+                    .whereType<String>()
+                    .where((value) => value.isNotEmpty)
+                    .join(' · '),
+          ),
+        )
+        .toList(growable: false);
+    final mutation = QueuedOrderMutation(
+      idempotencyKey: _submissionKey!,
+      outletId: widget.outlet.id,
+      outletName: widget.outlet.name,
+      customerId: customerId,
+      customerAddressId: addressId,
+      note: _noteController.text.trim(),
+      lines: orderLines,
+      createdAt: DateTime.now().toUtc(),
+    );
+
     setState(() {
       _saving = true;
       _message = null;
     });
+
+    var mutationPersisted = false;
+    final store = widget.offlineStore;
+    if (store != null) {
+      try {
+        await store.saveMutation(mutation);
+        mutationPersisted = true;
+      } catch (_) {
+        mutationPersisted = false;
+      }
+    }
+
     try {
-      await widget.orderClient.createOrder(
+      final order = await widget.orderClient.createOrder(
         customerId: customerId,
         customerAddressId: addressId,
-        note: _noteController.text,
-        lines: items
-            .map(
-              (item) => OrderLineInput(
-                variantId: item.product.variantId,
-                quantity: item.quantity,
-                note:
-                    [
-                          item.product.name,
-                          item.product.variantName,
-                          item.product.sku,
-                        ]
-                        .whereType<String>()
-                        .where((value) => value.isNotEmpty)
-                        .join(
-                          ' · ',
-                        ),
-              ),
-            )
-            .toList(growable: false),
-        idempotencyKey: _submissionKey!,
+        note: mutation.note,
+        lines: orderLines,
+        idempotencyKey: mutation.idempotencyKey,
       );
+      if (mutationPersisted) {
+        await store!.saveMutation(mutation.acknowledged(order));
+      }
+      if (store != null) {
+        await store.deleteDraft(widget.outlet.id);
+      }
+      _submitted = true;
       _submissionFingerprint = null;
       _submissionKey = null;
       if (!mounted) return;
-      Navigator.of(context).pop(true);
+      Navigator.of(context).pop(OrderSubmitOutcome.created);
     } on OrderDataFailure catch (failure) {
+      if (mutationPersisted && failure.retryable) {
+        try {
+          await store!.saveMutation(mutation.failed(failure));
+          await store.deleteDraft(widget.outlet.id);
+          _submitted = true;
+          if (!mounted) return;
+          Navigator.of(context).pop(OrderSubmitOutcome.queued);
+          return;
+        } catch (_) {
+          if (!mounted) return;
+          setState(() {
+            _message =
+                'Chưa lưu được đơn chờ gửi. Giữ màn hình này và thử gửi lại.';
+          });
+          return;
+        }
+      }
+
+      if (mutationPersisted) {
+        try {
+          await store!.removeMutation(mutation.idempotencyKey);
+        } catch (_) {
+          // Keep the draft visible; a later sync can safely reuse the same key.
+        }
+      }
       if (!mounted) return;
       setState(() {
         _message = failure.message;
