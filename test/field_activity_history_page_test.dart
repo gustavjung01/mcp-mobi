@@ -56,6 +56,12 @@ class FakeHistoryClient implements FieldHistoryClient {
   String? lastStatus;
 
   @override
+  Future<List<FieldSessionHistoryItem>> loadSessionHistory() async => const [];
+
+  @override
+  Future<List<FieldTaskItem>> loadTasks() async => const [];
+
+  @override
   Future<List<SessionReportSummary>> loadSessionReports() async {
     return const [
       SessionReportSummary(

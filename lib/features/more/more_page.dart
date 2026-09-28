@@ -9,6 +9,7 @@ class MorePage extends StatelessWidget {
   const MorePage({
     super.key,
     this.onFixedRoutes,
+    this.onSessionHistory,
     this.onReports,
     this.onProductTrials,
     this.onTasks,
@@ -17,6 +18,7 @@ class MorePage extends StatelessWidget {
   });
 
   final VoidCallback? onFixedRoutes;
+  final VoidCallback? onSessionHistory;
   final VoidCallback? onReports;
   final VoidCallback? onProductTrials;
   final VoidCallback? onTasks;
@@ -55,6 +57,7 @@ class MorePage extends StatelessWidget {
                     item: _items[index],
                     onTap: switch (_items[index].label) {
                       'Tuyến cố định' => onFixedRoutes,
+                      'Lịch sử phiên' => onSessionHistory,
                       'Báo cáo' => onReports,
                       'Kết quả thử sản phẩm' => onProductTrials,
                       'Kế hoạch & Công việc' => onTasks,
