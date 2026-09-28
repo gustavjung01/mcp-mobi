@@ -292,8 +292,7 @@ class RouteMutationSyncService {
 
     for (final mutation in mutations) {
       if (!mutation.isOutstanding) continue;
-      if (mutation.state == MutationQueueState.failed &&
-          !mutation.retryable) {
+      if (mutation.state == MutationQueueState.failed && !mutation.retryable) {
         continue;
       }
 

@@ -219,8 +219,7 @@ void main() {
             expect(body.containsKey('geoLat'), isFalse);
             expect(body.containsKey('geoSource'), isFalse);
           }
-        } else if (request.url.path ==
-            '/api/mcp-day/session-customer/status') {
+        } else if (request.url.path == '/api/mcp-day/session-customer/status') {
           expect(body['sessionCustomerId'], 'line-1');
           expect(body['visitStatus'], 'skipped');
           expect(body['statusReason'], 'no_demand');
@@ -314,5 +313,4 @@ void main() {
       ],
     );
   });
-
 }

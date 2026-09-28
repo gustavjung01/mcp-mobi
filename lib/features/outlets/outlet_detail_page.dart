@@ -40,7 +40,8 @@ class OutletDetailPage extends StatefulWidget {
     FieldDayLine line,
     String reason,
     String note,
-  )? onSkip;
+  )?
+  onSkip;
   final Future<void> Function()? onCreateOrder;
   final Future<void> Function()? onCustomerOnboarding;
   final Future<void> Function()? onCreateReport;
@@ -83,9 +84,7 @@ class _OutletDetailPageState extends State<OutletDetailPage> {
       if (!mounted || !saved) return;
       setState(() {
         _checkedIn = nextCheckedIn;
-        _checkinAt = nextCheckedIn
-            ? DateTime.now().toIso8601String()
-            : null;
+        _checkinAt = nextCheckedIn ? DateTime.now().toIso8601String() : null;
       });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -188,9 +187,7 @@ class _OutletDetailPageState extends State<OutletDetailPage> {
     final canCheckIn =
         line?.sessionCustomerId != null && widget.onSetCheckIn != null;
     final canSkip =
-        line?.sessionCustomerId != null &&
-        widget.onSkip != null &&
-        !skipped;
+        line?.sessionCustomerId != null && widget.onSkip != null && !skipped;
     final linkedToCompany =
         (outlet?.coreCustomerId ?? '').trim().isNotEmpty &&
         (outlet?.coreCustomerAddressId ?? '').trim().isNotEmpty;
@@ -789,19 +786,21 @@ class _SkipVisitDialogState extends State<_SkipVisitDialog> {
             Wrap(
               spacing: AppSpacing.xs,
               runSpacing: AppSpacing.xs,
-              children: _reasons.map((item) {
-                return ChoiceChip(
-                  key: Key('outlet-skip-reason-${item.$1}'),
-                  label: Text(item.$2),
-                  selected: _reason == item.$1,
-                  onSelected: (_) {
-                    setState(() {
-                      _reason = item.$1;
-                      _message = null;
-                    });
-                  },
-                );
-              }).toList(growable: false),
+              children: _reasons
+                  .map((item) {
+                    return ChoiceChip(
+                      key: Key('outlet-skip-reason-${item.$1}'),
+                      label: Text(item.$2),
+                      selected: _reason == item.$1,
+                      onSelected: (_) {
+                        setState(() {
+                          _reason = item.$1;
+                          _message = null;
+                        });
+                      },
+                    );
+                  })
+                  .toList(growable: false),
             ),
             const SizedBox(height: AppSpacing.md),
             TextField(

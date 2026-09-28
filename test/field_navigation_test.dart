@@ -723,38 +723,41 @@ void main() {
     expect(find.text('Check-in điểm bán'), findsOneWidget);
   });
 
-  testWidgets('route outlet records skip reason through original MCP contract', (
-    WidgetTester tester,
-  ) async {
-    final client = FakeFieldDataClient();
-    await tester.pumpWidget(
-      MaterialApp(
-        home: AppShell(
-          session: session,
-          fieldDataClient: client,
-          fieldLocationProvider: FakeLocationProvider(),
-          mutationQueueStore: MemoryMutationQueueStore(),
+  testWidgets(
+    'route outlet records skip reason through original MCP contract',
+    (
+      WidgetTester tester,
+    ) async {
+      final client = FakeFieldDataClient();
+      await tester.pumpWidget(
+        MaterialApp(
+          home: AppShell(
+            session: session,
+            fieldDataClient: client,
+            fieldLocationProvider: FakeLocationProvider(),
+            mutationQueueStore: MemoryMutationQueueStore(),
+          ),
         ),
-      ),
-    );
-    await tester.pumpAndSettle();
+      );
+      await tester.pumpAndSettle();
 
-    await tester.tap(navLabel('Đi tuyến'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('route-line-line-1')));
-    await tester.pumpAndSettle();
+      await tester.tap(navLabel('Đi tuyến'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('route-line-line-1')));
+      await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const Key('outlet-skip-button')));
-    await tester.pumpAndSettle();
-    await tester.tap(
-      find.byKey(const Key('outlet-skip-reason-no_demand')),
-    );
-    await tester.tap(find.byKey(const Key('outlet-skip-submit')));
-    await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('outlet-skip-button')));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const Key('outlet-skip-reason-no_demand')),
+      );
+      await tester.tap(find.byKey(const Key('outlet-skip-submit')));
+      await tester.pumpAndSettle();
 
-    expect(client.skipReasons, ['no_demand']);
-    expect(find.text('Bỏ qua'), findsWidgets);
-  });
+      expect(client.skipReasons, ['no_demand']);
+      expect(find.text('Bỏ qua'), findsWidgets);
+    },
+  );
 
   testWidgets('fixed route customers are visible before opening the day run', (
     WidgetTester tester,

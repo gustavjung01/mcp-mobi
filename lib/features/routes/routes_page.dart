@@ -482,20 +482,22 @@ class _SessionFilterBar extends StatelessWidget {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: Row(
-        children: filters.map((item) {
-          final count = lines
-              .where((line) => _matchesSessionFilter(line, item.$1))
-              .length;
-          return Padding(
-            padding: const EdgeInsets.only(right: AppSpacing.xs),
-            child: ChoiceChip(
-              key: Key('route-filter-${item.$1}'),
-              label: Text('${item.$2}  $count'),
-              selected: selected == item.$1,
-              onSelected: (_) => onSelected(item.$1),
-            ),
-          );
-        }).toList(growable: false),
+        children: filters
+            .map((item) {
+              final count = lines
+                  .where((line) => _matchesSessionFilter(line, item.$1))
+                  .length;
+              return Padding(
+                padding: const EdgeInsets.only(right: AppSpacing.xs),
+                child: ChoiceChip(
+                  key: Key('route-filter-${item.$1}'),
+                  label: Text('${item.$2}  $count'),
+                  selected: selected == item.$1,
+                  onSelected: (_) => onSelected(item.$1),
+                ),
+              );
+            })
+            .toList(growable: false),
       ),
     );
   }

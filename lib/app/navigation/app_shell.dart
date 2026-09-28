@@ -354,8 +354,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     try {
       await _routeSelectionStore?.save(route.id);
     } catch (_) {
-      saveWarning =
-          'Đã chọn tuyến nhưng chưa lưu được lựa chọn trên thiết bị.';
+      saveWarning = 'Đã chọn tuyến nhưng chưa lưu được lựa chọn trên thiết bị.';
     }
     await _loadWorkspace(route);
     if (saveWarning != null && mounted) {
@@ -564,9 +563,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            checkedIn
-                ? 'Đã lưu check-in chờ gửi. Ứng dụng sẽ tự đồng bộ lại.'
-                : 'Đã lưu hoàn tác check-in chờ gửi. Ứng dụng sẽ tự đồng bộ lại.',
+            checkedIn ? 'Đã lưu check-in chờ gửi. Ứng dụng sẽ tự đồng bộ lại.' : 'Đã lưu hoàn tác check-in chờ gửi. Ứng dụng sẽ tự đồng bộ lại.',
           ),
         ),
       );
@@ -622,8 +619,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       return;
     }
 
-    final outcome = await Navigator.of(context)
-        .push<RouteMutationSubmitStatus>(
+    final outcome = await Navigator.of(context).push<RouteMutationSubmitStatus>(
       MaterialPageRoute<RouteMutationSubmitStatus>(
         builder: (context) => AddRouteCustomerPage(
           routeName: route.name,
