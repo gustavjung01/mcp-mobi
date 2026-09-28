@@ -46,11 +46,71 @@ $requiredSigningVariables = @(
     "MCP_ANDROID_KEY_ALIAS",
     "MCP_ANDROID_KEY_PASSWORD"
 )
+
+# MCP releases up to 1.0.4 were signed with the standard Android debug
+# keystore on this workstation. Keep that signing identity for in-place
+# updates until a planned signing migration is performed.
+$defaultDebugKeystore = if ([string]::IsNullOrWhiteSpace($env:USERPROFILE)) {
+    $null
+} else {
+    Join-Path $env:USERPROFILE ".android\debug.keystore"
+}
+
+$signingValues = @{}
+foreach ($name in $requiredSigningVariables) {
+    $signingValues[$name] = [Environment]::GetEnvironmentVariable($name)
+}
+
+$allSigningValuesMissing = $true
+foreach ($name in $requiredSigningVariables) {
+    if (-not [string]::IsNullOrWhiteSpace($signingValues[$name])) {
+        $allSigningValuesMissing = $false
+        break
+    }
+}
+
+$usingLegacyDebugKeystore = $false
+if ($allSigningValuesMissing -and
+    -not [string]::IsNullOrWhiteSpace($defaultDebugKeystore) -and
+    (Test-Path -LiteralPath $defaultDebugKeystore -PathType Leaf)) {
+    $env:MCP_ANDROID_KEYSTORE = (Resolve-Path -LiteralPath $defaultDebugKeystore).Path
+    $env:MCP_ANDROID_KEYSTORE_PASSWORD = "android"
+    $env:MCP_ANDROID_KEY_ALIAS = "androiddebugkey"
+    $env:MCP_ANDROID_KEY_PASSWORD = "android"
+    $usingLegacyDebugKeystore = $true
+}
+elseif (-not [string]::IsNullOrWhiteSpace($signingValues["MCP_ANDROID_KEYSTORE"]) -and
+    -not [string]::IsNullOrWhiteSpace($defaultDebugKeystore) -and
+    (Test-Path -LiteralPath $defaultDebugKeystore -PathType Leaf)) {
+    $configuredKeystore = Remove-OuterQuotes $signingValues["MCP_ANDROID_KEYSTORE"]
+    if (Test-Path -LiteralPath $configuredKeystore -PathType Leaf) {
+        $configuredPath = (Resolve-Path -LiteralPath $configuredKeystore).Path
+        $debugPath = (Resolve-Path -LiteralPath $defaultDebugKeystore).Path
+        if ([string]::Equals($configuredPath, $debugPath, [StringComparison]::OrdinalIgnoreCase)) {
+            $env:MCP_ANDROID_KEYSTORE = $configuredPath
+            if ([string]::IsNullOrWhiteSpace($signingValues["MCP_ANDROID_KEYSTORE_PASSWORD"])) {
+                $env:MCP_ANDROID_KEYSTORE_PASSWORD = "android"
+            }
+            if ([string]::IsNullOrWhiteSpace($signingValues["MCP_ANDROID_KEY_ALIAS"])) {
+                $env:MCP_ANDROID_KEY_ALIAS = "androiddebugkey"
+            }
+            if ([string]::IsNullOrWhiteSpace($signingValues["MCP_ANDROID_KEY_PASSWORD"])) {
+                $env:MCP_ANDROID_KEY_PASSWORD = "android"
+            }
+            $usingLegacyDebugKeystore = $true
+        }
+    }
+}
+
 foreach ($name in $requiredSigningVariables) {
     $value = [Environment]::GetEnvironmentVariable($name)
     if ([string]::IsNullOrWhiteSpace($value)) {
         throw "$name is required for a distributable Android release."
     }
+}
+
+if ($usingLegacyDebugKeystore) {
+    Write-Host "SIGNING OK: reused the existing MCP Android signing identity for update compatibility."
 }
 
 $keystorePath = Remove-OuterQuotes $env:MCP_ANDROID_KEYSTORE
