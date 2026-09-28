@@ -821,31 +821,37 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('route-preview-customer-1')), findsOneWidget);
-    expect(find.text('1 điểm bán đã được xếp sẵn cho tuyến này.'), findsOneWidget);
-  });
-
-  testWidgets('completed route session is read only and can still show fixed route', (
-    WidgetTester tester,
-  ) async {
-    await tester.pumpWidget(
-      const MaterialApp(
-        home: RoutesPage(
-          routes: [route],
-          selectedRoute: route,
-          workspace: doneWorkspace,
-        ),
-      ),
+    expect(
+      find.text('1 điểm bán đã được xếp sẵn cho tuyến này.'),
+      findsOneWidget,
     );
-    await tester.pumpAndSettle();
-
-    expect(find.text('Đã kết thúc'), findsOneWidget);
-    expect(find.byKey(const Key('route-finish-button')), findsNothing);
-    expect(find.byKey(const Key('route-add-customer-button')), findsNothing);
-
-    await tester.tap(find.text('Tuyến cố định').first);
-    await tester.pumpAndSettle();
-    expect(find.byKey(const Key('route-preview-customer-1')), findsOneWidget);
   });
+
+  testWidgets(
+    'completed route session is read only and can still show fixed route',
+    (
+      WidgetTester tester,
+    ) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: RoutesPage(
+            routes: [route],
+            selectedRoute: route,
+            workspace: doneWorkspace,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Đã kết thúc'), findsOneWidget);
+      expect(find.byKey(const Key('route-finish-button')), findsNothing);
+      expect(find.byKey(const Key('route-add-customer-button')), findsNothing);
+
+      await tester.tap(find.text('Tuyến cố định').first);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('route-preview-customer-1')), findsOneWidget);
+    },
+  );
 
   testWidgets('bottom navigation is anchored outside scrollable tab content', (
     WidgetTester tester,
