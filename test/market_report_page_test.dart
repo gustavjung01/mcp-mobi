@@ -148,9 +148,14 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Đối thủ'), findsOneWidget);
+    expect(find.text('Đối thủ A'), findsOneWidget);
+
+    await tester.scrollUntilVisible(
+      find.text('SP khách đang dùng'),
+      300,
+    );
     expect(find.text('SP khách đang dùng'), findsOneWidget);
     expect(find.text('SP đang dùng · Trà'), findsOneWidget);
-    expect(find.text('Đối thủ A'), findsOneWidget);
     expect(find.text('Trà A'), findsOneWidget);
     expect(find.text('Không render chip field'), findsNothing);
 

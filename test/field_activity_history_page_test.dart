@@ -197,8 +197,18 @@ void main() {
     );
     expect(find.text('Báo cáo điểm bán'), findsOneWidget);
     expect(find.textContaining('Đối thủ: Đối thủ A'), findsOneWidget);
+
+    await tester.scrollUntilVisible(
+      find.text('Điểm bỏ qua / không mua'),
+      300,
+    );
     expect(find.text('Điểm bỏ qua / không mua'), findsOneWidget);
     expect(find.text('Đóng cửa'), findsOneWidget);
+
+    await tester.scrollUntilVisible(
+      find.text('Công việc theo dõi'),
+      300,
+    );
     expect(find.text('Công việc theo dõi'), findsOneWidget);
   });
 
