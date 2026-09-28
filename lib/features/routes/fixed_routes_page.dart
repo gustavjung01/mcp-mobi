@@ -370,7 +370,9 @@ class _RouteSummaryCard extends StatelessWidget {
           const SizedBox(height: AppSpacing.sm),
           _InfoRow(
             label: 'Phụ trách',
-            value: route.salesOwner.isEmpty ? 'Chưa phân công' : route.salesOwner,
+            value: route.salesOwner.isEmpty
+                ? 'Chưa phân công'
+                : route.salesOwner,
           ),
           _InfoRow(
             label: 'Lần ghé gần nhất',
