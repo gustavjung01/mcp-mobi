@@ -41,7 +41,9 @@ class RoutesPage extends StatefulWidget {
 }
 
 class _RoutesPageState extends State<RoutesPage> {
-  String _query = '';
+  String _sessionQuery = '';
+  String _fixedRouteQuery = '';
+  String _section = 'session';
   String _filter = 'all';
 
   Future<void> _showRoutePicker() async {
@@ -87,8 +89,9 @@ class _RoutesPageState extends State<RoutesPage> {
   Widget build(BuildContext context) {
     final route = widget.selectedRoute;
     final day = widget.workspace?.day;
+    final activeSession = _isSessionActive(day);
     final lines = day?.lines ?? const <FieldDayLine>[];
-    final query = _query.trim().toLowerCase();
+    final query = _sessionQuery.trim().toLowerCase();
     final visibleLines = lines
         .where((line) {
           if (!_matchesSessionFilter(line, _filter)) return false;
@@ -167,13 +170,13 @@ class _RoutesPageState extends State<RoutesPage> {
                   children: [
                     StatusPill(
                       label: _statusLabel(day),
-                      icon: day?.sessionOpened == true
+                      icon: activeSession
                           ? Icons.play_circle_outline_rounded
                           : Icons.schedule_rounded,
-                      backgroundColor: day?.sessionOpened == true
+                      backgroundColor: activeSession
                           ? AppColors.successSoft
                           : AppColors.primarySoft,
-                      foregroundColor: day?.sessionOpened == true
+                      foregroundColor: activeSession
                           ? AppColors.success
                           : AppColors.primaryDark,
                     ),
@@ -219,14 +222,25 @@ class _RoutesPageState extends State<RoutesPage> {
             ),
           ),
           const SizedBox(height: AppSpacing.md),
-          if (day?.sessionOpened != true)
+          if (day?.sessionOpened == true) ...[
+            _RouteSectionSwitch(
+              selected: _section,
+              onSelected: (value) {
+                setState(() {
+                  _section = value;
+                });
+              },
+            ),
+            const SizedBox(height: AppSpacing.md),
+          ],
+          if (day?.sessionOpened != true || _section == 'fixed')
             _FixedRoutePreview(
               customers:
                   widget.workspace?.customers ?? const <FieldRouteCustomer>[],
-              query: _query,
+              query: _fixedRouteQuery,
               onQueryChanged: (value) {
                 setState(() {
-                  _query = value;
+                  _fixedRouteQuery = value;
                 });
               },
             )
@@ -238,7 +252,7 @@ class _RoutesPageState extends State<RoutesPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        'Danh sách điểm bán',
+                        'Phiên hôm nay',
                         style: TextStyle(
                           color: AppColors.primary,
                           fontSize: 14,
@@ -283,11 +297,11 @@ class _RoutesPageState extends State<RoutesPage> {
               key: const Key('route-outlet-search'),
               onChanged: (value) {
                 setState(() {
-                  _query = value;
+                  _sessionQuery = value;
                 });
               },
               decoration: const InputDecoration(
-                hintText: 'Tìm điểm bán trong tuyến...',
+                hintText: 'Tìm điểm bán trong phiên...',
                 prefixIcon: Icon(Icons.search_rounded),
               ),
             ),
@@ -326,7 +340,7 @@ class _RoutesPageState extends State<RoutesPage> {
             subtitle: route == null
                 ? _formatVietnameseDate(DateTime.now())
                 : '${_formatVietnameseDate(DateTime.now())} · ${route.area}',
-            trailing: day?.sessionOpened == true
+            trailing: activeSession
                 ? _FinishButton(
                     busy: widget.routeActionBusy,
                     onPressed: widget.onFinishRoute,
@@ -374,7 +388,7 @@ class _FixedRoutePreview extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Điểm bán cố định của tuyến',
+          'Tuyến cố định',
           style: TextStyle(
             color: AppColors.primary,
             fontSize: 14,
@@ -383,7 +397,7 @@ class _FixedRoutePreview extends StatelessWidget {
         ),
         const SizedBox(height: 3),
         Text(
-          '${customers.length} điểm sẽ được đưa vào phiên khi bắt đầu tuyến.',
+          '${customers.length} điểm bán đã được xếp sẵn cho tuyến này.',
           style: const TextStyle(
             color: AppColors.textSecondary,
             fontSize: 11,
@@ -453,6 +467,43 @@ class _FixedRoutePreview extends StatelessWidget {
             ),
           ),
       ],
+    );
+  }
+}
+
+class _RouteSectionSwitch extends StatelessWidget {
+  const _RouteSectionSwitch({
+    required this.selected,
+    required this.onSelected,
+  });
+
+  final String selected;
+  final ValueChanged<String> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      child: SegmentedButton<String>(
+        key: const Key('route-section-switch'),
+        showSelectedIcon: false,
+        segments: const [
+          ButtonSegment<String>(
+            value: 'session',
+            icon: Icon(Icons.today_rounded, size: 18),
+            label: Text('Phiên hôm nay'),
+          ),
+          ButtonSegment<String>(
+            value: 'fixed',
+            icon: Icon(Icons.route_rounded, size: 18),
+            label: Text('Tuyến cố định'),
+          ),
+        ],
+        selected: <String>{selected},
+        onSelectionChanged: (selection) {
+          if (selection.isNotEmpty) onSelected(selection.first);
+        },
+      ),
     );
   }
 }
@@ -760,18 +811,21 @@ class _Notice extends StatelessWidget {
   }
 }
 
-bool _canAddCustomer(FieldDayData? day) {
+bool _isSessionActive(FieldDayData? day) {
   if (day?.sessionOpened != true) return false;
   final status = day!.run.status.trim().toLowerCase();
-  return !const {'done', 'completed', 'cancelled', 'closed'}.contains(status);
+  return const {'active', 'opened', 'open', 'in_progress'}.contains(status);
 }
+
+bool _canAddCustomer(FieldDayData? day) => _isSessionActive(day);
 
 String _statusLabel(FieldDayData? day) {
   if (day?.sessionOpened != true) return 'Chưa bắt đầu';
-  if (day!.run.status == 'done' || day.run.status == 'completed') {
+  final status = day!.run.status.trim().toLowerCase();
+  if (status == 'done' || status == 'completed' || status == 'closed') {
     return 'Đã kết thúc';
   }
-  if (day.run.status == 'cancelled') return 'Đã hủy';
+  if (status == 'cancelled') return 'Đã hủy';
   return 'Đang thực hiện';
 }
 

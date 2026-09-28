@@ -463,7 +463,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     final day = _workspace?.day;
     final actions = _fieldActions;
     if (route == null ||
-        day?.sessionOpened != true ||
+        !_isActiveRouteDay(day) ||
         actions == null ||
         _routeActionBusy) {
       return;
@@ -1112,49 +1112,61 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     ];
 
     return Scaffold(
+      key: const Key('app-shell-scaffold'),
+      resizeToAvoidBottomInset: false,
       body: IndexedStack(
         index: _selectedIndex,
         children: pages,
       ),
-      bottomNavigationBar: DecoratedBox(
-        decoration: const BoxDecoration(
-          border: Border(
-            top: BorderSide(color: AppColors.border),
+      bottomNavigationBar: SafeArea(
+        key: const Key('app-bottom-navigation'),
+        top: false,
+        child: DecoratedBox(
+          decoration: const BoxDecoration(
+            border: Border(
+              top: BorderSide(color: AppColors.border),
+            ),
           ),
-        ),
-        child: NavigationBar(
-          selectedIndex: _selectedIndex,
-          onDestinationSelected: _openTab,
-          destinations: const [
-            NavigationDestination(
-              icon: Icon(Icons.home_outlined),
-              selectedIcon: Icon(Icons.home_rounded),
-              label: 'Hôm nay',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.route_outlined),
-              selectedIcon: Icon(Icons.route_rounded),
-              label: 'Đi tuyến',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.storefront_outlined),
-              selectedIcon: Icon(Icons.storefront_rounded),
-              label: 'Điểm bán',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.receipt_long_outlined),
-              selectedIcon: Icon(Icons.receipt_long_rounded),
-              label: 'Đơn hàng',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.more_horiz_rounded),
-              label: 'Thêm',
-            ),
-          ],
+          child: NavigationBar(
+            selectedIndex: _selectedIndex,
+            onDestinationSelected: _openTab,
+            destinations: const [
+              NavigationDestination(
+                icon: Icon(Icons.home_outlined),
+                selectedIcon: Icon(Icons.home_rounded),
+                label: 'Hôm nay',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.route_outlined),
+                selectedIcon: Icon(Icons.route_rounded),
+                label: 'Đi tuyến',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.storefront_outlined),
+                selectedIcon: Icon(Icons.storefront_rounded),
+                label: 'Điểm bán',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.receipt_long_outlined),
+                selectedIcon: Icon(Icons.receipt_long_rounded),
+                label: 'Đơn hàng',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.more_horiz_rounded),
+                label: 'Thêm',
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
+}
+
+bool _isActiveRouteDay(FieldDayData? day) {
+  if (day?.sessionOpened != true) return false;
+  final status = day!.run.status.trim().toLowerCase();
+  return const {'active', 'opened', 'open', 'in_progress'}.contains(status);
 }
 
 String _dateOnly(DateTime value) {
