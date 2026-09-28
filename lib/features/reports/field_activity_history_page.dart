@@ -256,8 +256,7 @@ class _ServerActivityCard extends StatelessWidget {
     final detail = switch (kind) {
       FieldActivityKind.report => 'Báo cáo đã ghi nhận trong phiên',
       FieldActivityKind.productTrial => 'Kết quả thử đã ghi nhận trong phiên',
-      FieldActivityKind.followup =>
-        '${line.followupCount} việc cần theo dõi',
+      FieldActivityKind.followup => '${line.followupCount} việc cần theo dõi',
     };
     return AppCard(
       child: Row(
