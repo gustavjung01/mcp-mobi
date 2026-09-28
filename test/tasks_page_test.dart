@@ -91,10 +91,19 @@ void main() {
 
     expect(find.byKey(const Key('task-task-overdue')), findsOneWidget);
     expect(find.byKey(const Key('task-task-done')), findsOneWidget);
-    expect(find.byKey(const Key('task-task-blocked')), findsOneWidget);
     expect(find.text('Quá hạn · 27/09/2026'), findsOneWidget);
+
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('task-task-blocked')),
+      300,
+    );
+    expect(find.byKey(const Key('task-task-blocked')), findsOneWidget);
     expect(find.text('Bị chặn'), findsOneWidget);
 
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('tasks-due-filter')),
+      -300,
+    );
     await tester.tap(find.byKey(const Key('tasks-due-filter')));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Quá hạn').last);
