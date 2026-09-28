@@ -25,8 +25,7 @@ class OrdersPage extends StatefulWidget {
   State<OrdersPage> createState() => _OrdersPageState();
 }
 
-class _OrdersPageState extends State<OrdersPage>
-    with WidgetsBindingObserver {
+class _OrdersPageState extends State<OrdersPage> with WidgetsBindingObserver {
   final _searchController = TextEditingController();
   List<FieldOrder> _orders = const [];
   List<QueuedOrderMutation> _pending = const [];
@@ -272,8 +271,7 @@ class _OrdersPageState extends State<OrdersPage>
                         child: _QueuedOrderCard(
                           mutation: mutation,
                           syncing: _syncing,
-                          onRetry: () =>
-                              _retryQueued(mutation.idempotencyKey),
+                          onRetry: () => _retryQueued(mutation.idempotencyKey),
                         ),
                       ),
                     ),

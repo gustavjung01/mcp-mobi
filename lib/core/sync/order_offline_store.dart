@@ -43,7 +43,9 @@ class OrderDraftLine {
     final productJson = _object(json['product']);
     final product = OrderCatalogItem.fromJson(productJson);
     final quantity = _integer(json['quantity']);
-    if (product.variantId.isEmpty || product.productId.isEmpty || quantity <= 0) {
+    if (product.variantId.isEmpty ||
+        product.productId.isEmpty ||
+        quantity <= 0) {
       return null;
     }
     return OrderDraftLine(product: product, quantity: quantity);
@@ -324,7 +326,9 @@ class SecureOrderOfflineStore implements OrderOfflineStore {
           .map(QueuedOrderMutation.fromJson)
           .whereType<QueuedOrderMutation>()
           .toList(growable: true);
-      mutations.sort((left, right) => left.createdAt.compareTo(right.createdAt));
+      mutations.sort(
+        (left, right) => left.createdAt.compareTo(right.createdAt),
+      );
       return mutations;
     } on FormatException {
       return const [];
@@ -343,10 +347,9 @@ class SecureOrderOfflineStore implements OrderOfflineStore {
       mutations.add(mutation);
     }
 
-    final acknowledged = mutations
-        .where((item) => !item.isOutstanding)
-        .toList(growable: false)
-      ..sort((left, right) => right.createdAt.compareTo(left.createdAt));
+    final acknowledged =
+        mutations.where((item) => !item.isOutstanding).toList(growable: false)
+          ..sort((left, right) => right.createdAt.compareTo(left.createdAt));
     final keepAcknowledged = acknowledged.take(20).toSet();
     final compact = mutations
         .where((item) => item.isOutstanding || keepAcknowledged.contains(item))
@@ -395,8 +398,7 @@ class OrderSyncService {
 
     for (final mutation in mutations) {
       if (!mutation.isOutstanding) continue;
-      if (idempotencyKey != null &&
-          mutation.idempotencyKey != idempotencyKey) {
+      if (idempotencyKey != null && mutation.idempotencyKey != idempotencyKey) {
         continue;
       }
       if (idempotencyKey == null &&

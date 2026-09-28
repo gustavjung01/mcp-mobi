@@ -532,9 +532,7 @@ class _AppShellState extends State<AppShell> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          outcome == OrderSubmitOutcome.created
-              ? 'Đã tạo đơn hàng.'
-              : 'Đã lưu đơn chờ gửi. Ứng dụng sẽ dùng lại đúng lần gửi này khi đồng bộ.',
+          outcome == OrderSubmitOutcome.created ? 'Đã tạo đơn hàng.' : 'Đã lưu đơn chờ gửi. Ứng dụng sẽ dùng lại đúng lần gửi này khi đồng bộ.',
         ),
       ),
     );

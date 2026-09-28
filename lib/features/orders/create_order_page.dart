@@ -81,6 +81,7 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
 
     try {
       final draft = await store.readDraft(widget.outlet.id);
+      if (!mounted) return;
       final customerId = (widget.outlet.coreCustomerId ?? '').trim();
       final addressId = (widget.outlet.coreCustomerAddressId ?? '').trim();
       if (draft != null &&
@@ -321,10 +322,18 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
         idempotencyKey: mutation.idempotencyKey,
       );
       if (mutationPersisted) {
-        await store!.saveMutation(mutation.acknowledged(order));
+        try {
+          await store!.saveMutation(mutation.acknowledged(order));
+        } catch (_) {
+          // The server already accepted this canonical intent.
+        }
       }
       if (store != null) {
-        await store.deleteDraft(widget.outlet.id);
+        try {
+          await store.deleteDraft(widget.outlet.id);
+        } catch (_) {
+          // A stale local draft must not turn a successful order into an error.
+        }
       }
       _submitted = true;
       _submissionFingerprint = null;
@@ -335,7 +344,11 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
       if (mutationPersisted && failure.retryable) {
         try {
           await store!.saveMutation(mutation.failed(failure));
-          await store.deleteDraft(widget.outlet.id);
+          try {
+            await store.deleteDraft(widget.outlet.id);
+          } catch (_) {
+            // The durable queued mutation is authoritative once it is stored.
+          }
           _submitted = true;
           if (!mounted) return;
           Navigator.of(context).pop(OrderSubmitOutcome.queued);

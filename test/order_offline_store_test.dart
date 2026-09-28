@@ -144,40 +144,43 @@ void main() {
     expect(second.remaining, 0);
   });
 
-  test('blocked failure is not auto-retried without an explicit retry', () async {
-    final store = MemoryOrderOfflineStore();
-    final client = RetryOrderClient()..fail = false;
-    final key = CanonicalIdempotencyKey.create(
-      'mcp.sales-order.create',
-      uuid: '223e4567-e89b-42d3-a456-426614174000',
-    );
-    await store.saveMutation(
-      QueuedOrderMutation(
-        idempotencyKey: key,
-        outletId: 'outlet-1',
-        outletName: 'Cửa hàng Minh Phát',
-        customerId: 'customer-1',
-        customerAddressId: 'address-1',
-        note: '',
-        lines: const [
-          OrderLineInput(variantId: 'variant-1', quantity: 1),
-        ],
-        createdAt: DateTime.utc(2026, 9, 28, 2),
-        state: OrderQueueState.failed,
-        retryable: false,
-        retryCount: 1,
-        lastErrorCode: 'invalid_order_payload',
-        lastErrorMessage: 'Thông tin đơn hàng chưa hợp lệ.',
-      ),
-    );
+  test(
+    'blocked failure is not auto-retried without an explicit retry',
+    () async {
+      final store = MemoryOrderOfflineStore();
+      final client = RetryOrderClient()..fail = false;
+      final key = CanonicalIdempotencyKey.create(
+        'mcp.sales-order.create',
+        uuid: '223e4567-e89b-42d3-a456-426614174000',
+      );
+      await store.saveMutation(
+        QueuedOrderMutation(
+          idempotencyKey: key,
+          outletId: 'outlet-1',
+          outletName: 'Cửa hàng Minh Phát',
+          customerId: 'customer-1',
+          customerAddressId: 'address-1',
+          note: '',
+          lines: const [
+            OrderLineInput(variantId: 'variant-1', quantity: 1),
+          ],
+          createdAt: DateTime.utc(2026, 9, 28, 2),
+          state: OrderQueueState.failed,
+          retryable: false,
+          retryCount: 1,
+          lastErrorCode: 'invalid_order_payload',
+          lastErrorMessage: 'Thông tin đơn hàng chưa hợp lệ.',
+        ),
+      );
 
-    final service = OrderSyncService(client: client, store: store);
-    final automatic = await service.syncPending();
-    expect(automatic.sent, 0);
-    expect(client.keys, isEmpty);
+      final service = OrderSyncService(client: client, store: store);
+      final automatic = await service.syncPending();
+      expect(automatic.sent, 0);
+      expect(client.keys, isEmpty);
 
-    final manual = await service.syncPending(idempotencyKey: key);
-    expect(manual.sent, 1);
-    expect(client.keys, [key]);
-  });
+      final manual = await service.syncPending(idempotencyKey: key);
+      expect(manual.sent, 1);
+      expect(client.keys, [key]);
+    },
+  );
 }
