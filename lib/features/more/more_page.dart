@@ -8,9 +8,15 @@ import '../settings/settings_page.dart';
 class MorePage extends StatelessWidget {
   const MorePage({
     super.key,
+    this.onReports,
+    this.onProductTrials,
+    this.onTasks,
     this.onLogout,
   });
 
+  final VoidCallback? onReports;
+  final VoidCallback? onProductTrials;
+  final VoidCallback? onTasks;
   final Future<void> Function()? onLogout;
 
   static const _items = <_MoreItem>[
@@ -42,15 +48,19 @@ class MorePage extends StatelessWidget {
                 for (var index = 0; index < _items.length; index++) ...[
                   _MoreTile(
                     item: _items[index],
-                    onTap: _items[index].label == 'Thiết lập'
-                        ? () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute<void>(
-                                builder: (_) => const SettingsPage(),
-                              ),
-                            );
-                          }
-                        : null,
+                    onTap: switch (_items[index].label) {
+                      'Báo cáo' => onReports,
+                      'Kết quả thử sản phẩm' => onProductTrials,
+                      'Kế hoạch & Công việc' => onTasks,
+                      'Thiết lập' => () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => const SettingsPage(),
+                          ),
+                        );
+                      },
+                      _ => null,
+                    },
                   ),
                   if (index < _items.length - 1)
                     const Divider(height: 1, indent: 64),

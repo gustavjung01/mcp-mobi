@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/auth/mobile_auth_client.dart';
+import '../../core/data/field_activity_client.dart';
 import '../../core/data/field_data_client.dart';
 import '../../core/data/order_data_client.dart';
 import '../../core/idempotency/canonical_idempotency.dart';
@@ -8,14 +9,20 @@ import '../../core/installation/installation_profile.dart';
 import '../../core/location/field_location.dart';
 import '../../core/media/outlet_media_client.dart';
 import '../../core/media/outlet_photo_picker.dart';
+import '../../core/sync/field_activity_sync.dart';
+import '../../core/sync/mutation_queue.dart';
 import '../../core/sync/order_offline_store.dart';
 import '../../features/more/more_page.dart';
 import '../../features/orders/create_order_page.dart';
 import '../../features/orders/orders_page.dart';
 import '../../features/outlets/outlet_detail_page.dart';
+import '../../features/product_trials/product_trial_page.dart';
+import '../../features/reports/field_activity_history_page.dart';
+import '../../features/reports/market_report_page.dart';
 import '../../features/outlets/outlets_page.dart';
 import '../../features/routes/add_route_customer_page.dart';
 import '../../features/routes/routes_page.dart';
+import '../../features/tasks/followup_page.dart';
 import '../../features/today/today_page.dart';
 import '../theme/app_theme.dart';
 
@@ -25,10 +32,12 @@ class AppShell extends StatefulWidget {
     this.profile,
     this.session,
     this.fieldDataClient,
+    this.fieldActivityClient,
     this.orderDataClient,
     this.fieldLocationProvider,
     this.outletMediaClient,
     this.outletPhotoPicker,
+    this.mutationQueueStore,
     this.orderOfflineStore,
     this.onLogout,
   });
@@ -36,10 +45,12 @@ class AppShell extends StatefulWidget {
   final InstallationProfile? profile;
   final MobileSession? session;
   final FieldDataClient? fieldDataClient;
+  final FieldActivityClient? fieldActivityClient;
   final OrderDataClient? orderDataClient;
   final FieldLocationProvider? fieldLocationProvider;
   final OutletMediaClient? outletMediaClient;
   final OutletPhotoPicker? outletPhotoPicker;
+  final MutationQueueStore? mutationQueueStore;
   final OrderOfflineStore? orderOfflineStore;
   final Future<void> Function()? onLogout;
 
@@ -47,9 +58,11 @@ class AppShell extends StatefulWidget {
   State<AppShell> createState() => _AppShellState();
 }
 
-class _AppShellState extends State<AppShell> {
+class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   int _selectedIndex = 0;
   FieldDataClient? _fieldDataClient;
+  FieldActivityClient? _fieldActivityClient;
+  MutationQueueStore? _mutationQueueStore;
   OrderDataClient? _orderDataClient;
   OrderOfflineStore? _orderOfflineStore;
   OutletMediaClient? _outletMediaClient;
@@ -65,6 +78,7 @@ class _AppShellState extends State<AppShell> {
   bool _loadingOutlets = false;
   bool _loadingWorkspace = false;
   bool _routeActionBusy = false;
+  bool _fieldActivitySyncing = false;
   String? _fieldMessage;
   String? _outletMessage;
   int _workspaceLoadGeneration = 0;
@@ -78,7 +92,12 @@ class _AppShellState extends State<AppShell> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _fieldDataClient = widget.fieldDataClient ?? _defaultFieldDataClient();
+    _fieldActivityClient =
+        widget.fieldActivityClient ?? _defaultFieldActivityClient();
+    _mutationQueueStore =
+        widget.mutationQueueStore ?? _defaultMutationQueueStore();
     _orderDataClient = widget.orderDataClient ?? _defaultOrderDataClient();
     _orderOfflineStore =
         widget.orderOfflineStore ?? _defaultOrderOfflineStore();
@@ -93,6 +112,22 @@ class _AppShellState extends State<AppShell> {
       _loadRoutes();
       _loadOutlets();
     }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _syncFieldActivities();
+    });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _syncFieldActivities();
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
   }
 
   FieldDataClient? _defaultFieldDataClient() {
@@ -102,6 +137,26 @@ class _AppShellState extends State<AppShell> {
     return HttpFieldDataClient(
       profile: profile,
       token: session.token,
+    );
+  }
+
+  FieldActivityClient? _defaultFieldActivityClient() {
+    final profile = widget.profile;
+    final session = widget.session;
+    if (profile == null || session == null) return null;
+    return HttpFieldActivityClient(
+      profile: profile,
+      token: session.token,
+    );
+  }
+
+  MutationQueueStore? _defaultMutationQueueStore() {
+    final profile = widget.profile;
+    final session = widget.session;
+    if (profile == null || session == null) return null;
+    return SecureMutationQueueStore(
+      installationKey: profile.installationKey,
+      employeeId: session.employeeId,
     );
   }
 
@@ -122,6 +177,7 @@ class _AppShellState extends State<AppShell> {
     return SecureOrderOfflineStore(
       installationKey: profile.installationKey,
       employeeId: session.employeeId,
+      mutationQueueStore: _mutationQueueStore,
     );
   }
 
@@ -437,6 +493,158 @@ class _AppShellState extends State<AppShell> {
     ]);
   }
 
+  Future<void> _syncFieldActivities() async {
+    final client = _fieldActivityClient;
+    final queue = _mutationQueueStore;
+    if (client == null || queue == null || _fieldActivitySyncing) return;
+
+    _fieldActivitySyncing = true;
+    try {
+      final result = await FieldActivitySyncService(
+        client: client,
+        queue: queue,
+      ).syncPending();
+      if (result.sent > 0 && mounted) {
+        final route = _selectedRoute;
+        if (route != null) {
+          await _loadWorkspace(route);
+        }
+      }
+    } finally {
+      _fieldActivitySyncing = false;
+    }
+  }
+
+  FieldActivitySubmissionService? get _fieldActivitySubmissionService {
+    final client = _fieldActivityClient;
+    final queue = _mutationQueueStore;
+    if (client == null || queue == null) return null;
+    return FieldActivitySubmissionService(
+      client: client,
+      queue: queue,
+    );
+  }
+
+  Future<void> _openFieldActivity(
+    FieldActivityKind kind,
+    FieldDayLine line,
+  ) async {
+    final service = _fieldActivitySubmissionService;
+    final client = _fieldActivityClient;
+    if (service == null || client == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Chưa kết nối được chức năng tác nghiệp.'),
+        ),
+      );
+      return;
+    }
+
+    final day = _workspace?.day;
+    final route = _selectedRoute;
+    if (day?.sessionOpened != true ||
+        route == null ||
+        (line.sessionCustomerId ?? '').isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Bắt đầu tuyến trước khi ghi nhận tác nghiệp.'),
+        ),
+      );
+      return;
+    }
+
+    final currentDay = day!;
+    final FieldActivitySubmitStatus? outcome;
+    if (kind == FieldActivityKind.report) {
+      outcome = await Navigator.of(context).push<FieldActivitySubmitStatus>(
+        MaterialPageRoute<FieldActivitySubmitStatus>(
+          builder: (context) => MarketReportPage(
+            line: line,
+            routeName: route.name,
+            routeId: route.id,
+            sessionDate: currentDay.run.date,
+            owner: currentDay.run.owner,
+            sessionId: currentDay.run.id,
+            activityClient: client,
+            submissionService: service,
+            mediaClient: _outletMediaClient,
+            photoPicker: _photoPicker,
+          ),
+        ),
+      );
+    } else if (kind == FieldActivityKind.productTrial) {
+      outcome = await Navigator.of(context).push<FieldActivitySubmitStatus>(
+        MaterialPageRoute<FieldActivitySubmitStatus>(
+          builder: (context) => ProductTrialPage(
+            line: line,
+            submissionService: service,
+          ),
+        ),
+      );
+    } else {
+      outcome = await Navigator.of(context).push<FieldActivitySubmitStatus>(
+        MaterialPageRoute<FieldActivitySubmitStatus>(
+          builder: (context) => FollowupPage(
+            line: line,
+            owner: widget.session?.displayName ?? currentDay.run.owner,
+            submissionService: service,
+          ),
+        ),
+      );
+    }
+
+    if (outcome == null || !mounted) return;
+    if (outcome == FieldActivitySubmitStatus.completed) {
+      await _loadWorkspace(route);
+    }
+    if (!mounted) return;
+    final action = switch (kind) {
+      FieldActivityKind.report => 'báo cáo',
+      FieldActivityKind.productTrial => 'kết quả thử sản phẩm',
+      FieldActivityKind.followup => 'việc theo dõi',
+    };
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          outcome == FieldActivitySubmitStatus.completed
+              ? 'Đã lưu $action.'
+              : 'Đã lưu $action chờ gửi. Ứng dụng sẽ đồng bộ lại bằng đúng lần gửi này.',
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openActivityHistory(FieldActivityKind kind) async {
+    final client = _fieldActivityClient;
+    final queue = _mutationQueueStore;
+    if (client == null || queue == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Chưa kết nối được dữ liệu tác nghiệp.'),
+        ),
+      );
+      return;
+    }
+
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (context) => FieldActivityHistoryPage(
+          kind: kind,
+          lines: _workspace?.day.lines ?? const <FieldDayLine>[],
+          queue: queue,
+          syncService: FieldActivitySyncService(
+            client: client,
+            queue: queue,
+          ),
+          onSynchronized: () async {
+            final route = _selectedRoute;
+            if (route != null) await _loadWorkspace(route);
+          },
+        ),
+      ),
+    );
+  }
+
   void _openRouteOutlet(
     FieldRouteCustomer? customer,
     FieldDayLine line,
@@ -458,6 +666,18 @@ class _AppShellState extends State<AppShell> {
           onCreateOrder: _orderDataClient == null
               ? null
               : () => _openCreateOrder(line),
+          onCreateReport: _fieldActivityClient == null
+              ? null
+              : () => _openFieldActivity(FieldActivityKind.report, line),
+          onCreateProductTrial: _fieldActivityClient == null
+              ? null
+              : () => _openFieldActivity(
+                  FieldActivityKind.productTrial,
+                  line,
+                ),
+          onCreateFollowup: _fieldActivityClient == null
+              ? null
+              : () => _openFieldActivity(FieldActivityKind.followup, line),
         ),
       ),
     );
@@ -589,7 +809,18 @@ class _AppShellState extends State<AppShell> {
         offlineStore: _orderOfflineStore,
         refreshToken: _orderRefreshToken,
       ),
-      MorePage(onLogout: widget.onLogout),
+      MorePage(
+        onReports: _fieldActivityClient == null
+            ? null
+            : () => _openActivityHistory(FieldActivityKind.report),
+        onProductTrials: _fieldActivityClient == null
+            ? null
+            : () => _openActivityHistory(FieldActivityKind.productTrial),
+        onTasks: _fieldActivityClient == null
+            ? null
+            : () => _openActivityHistory(FieldActivityKind.followup),
+        onLogout: widget.onLogout,
+      ),
     ];
 
     return Scaffold(

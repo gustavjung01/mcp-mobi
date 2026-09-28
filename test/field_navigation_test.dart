@@ -4,6 +4,7 @@ import 'package:mcp_field/app/navigation/app_shell.dart';
 import 'package:mcp_field/core/auth/mobile_auth_client.dart';
 import 'package:mcp_field/core/data/field_data_client.dart';
 import 'package:mcp_field/core/location/field_location.dart';
+import 'package:mcp_field/features/outlets/outlet_detail_page.dart';
 
 const route = FieldRoute(
   id: 'route-1',
@@ -188,6 +189,27 @@ Finder navLabel(String label) {
   );
 }
 
+Future<void> revealOutletActivityAction(
+  WidgetTester tester,
+  Key key,
+) async {
+  final screen = find.byKey(const Key('outlet-detail-screen'));
+  final list = find.descendant(
+    of: screen,
+    matching: find.byType(ListView),
+  );
+  final target = find.byKey(key);
+
+  for (var attempt = 0; attempt < 6 && target.evaluate().isEmpty; attempt++) {
+    await tester.drag(list, const Offset(0, -320));
+    await tester.pumpAndSettle();
+  }
+
+  expect(target, findsOneWidget);
+  await tester.ensureVisible(target);
+  await tester.pumpAndSettle();
+}
+
 Future<void> revealAddCustomerSubmit(WidgetTester tester) async {
   final screen = find.byKey(const Key('route-add-customer-screen'));
   final list = find.descendant(
@@ -341,6 +363,49 @@ void main() {
     expect(client.addCustomerKeys, hasLength(2));
     expect(client.addCustomerKeys[1], client.addCustomerKeys[0]);
     expect(find.byKey(const Key('routes-screen')), findsOneWidget);
+  });
+
+  testWidgets('outlet exposes the three field activity actions', (
+    WidgetTester tester,
+  ) async {
+    var reports = 0;
+    var trials = 0;
+    var followups = 0;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: OutletDetailPage(
+          routeName: route.name,
+          customer: customer,
+          line: line,
+          onCreateReport: () async {
+            reports += 1;
+          },
+          onCreateProductTrial: () async {
+            trials += 1;
+          },
+          onCreateFollowup: () async {
+            followups += 1;
+          },
+        ),
+      ),
+    );
+
+    const reportKey = Key('outlet-create-report');
+    await revealOutletActivityAction(tester, reportKey);
+    await tester.tap(find.byKey(reportKey));
+
+    const trialKey = Key('outlet-create-product-trial');
+    await revealOutletActivityAction(tester, trialKey);
+    await tester.tap(find.byKey(trialKey));
+
+    const followupKey = Key('outlet-create-followup');
+    await revealOutletActivityAction(tester, followupKey);
+    await tester.tap(find.byKey(followupKey));
+    await tester.pump();
+
+    expect(reports, 1);
+    expect(trials, 1);
+    expect(followups, 1);
   });
 
   testWidgets('check-in is only available from active route context', (

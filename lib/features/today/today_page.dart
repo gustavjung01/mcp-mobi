@@ -38,6 +38,7 @@ class TodayPage extends StatelessWidget {
         : selectedRoute?.plannedCustomers ?? 0;
     final orders = lines.where((line) => line.hasOrder).length;
     final reports = lines.where((line) => line.hasReport).length;
+    final trials = lines.where((line) => line.hasTest).length;
     final followups = lines.fold<int>(
       0,
       (sum, line) => sum + line.followupCount,
@@ -207,6 +208,20 @@ class TodayPage extends StatelessWidget {
                 label: 'Đơn hàng đã ghi nhận',
                 value: orders.toString(),
                 color: AppColors.warning,
+              ),
+              const Divider(height: 22),
+              _TaskRow(
+                icon: Icons.science_outlined,
+                label: 'Thử sản phẩm đã ghi nhận',
+                value: trials.toString(),
+                color: const Color(0xFF805AD5),
+              ),
+              const Divider(height: 22),
+              _TaskRow(
+                icon: Icons.task_alt_outlined,
+                label: 'Việc cần theo dõi',
+                value: followups.toString(),
+                color: AppColors.danger,
               ),
             ],
           ),

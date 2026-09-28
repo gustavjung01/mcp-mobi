@@ -4,6 +4,9 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../data/order_data_client.dart';
 import '../idempotency/canonical_idempotency.dart';
+import 'mutation_queue.dart';
+
+const orderMutationOperation = 'mcp.sales-order.create';
 
 enum OrderQueueState {
   waiting,
@@ -265,17 +268,26 @@ class SecureOrderOfflineStore implements OrderOfflineStore {
     required String installationKey,
     required String employeeId,
     FlutterSecureStorage? storage,
+    MutationQueueStore? mutationQueueStore,
   }) : _storage = storage ?? const FlutterSecureStorage(),
        _scope = base64Url
            .encode(utf8.encode('$installationKey|$employeeId'))
-           .replaceAll('=', '');
+           .replaceAll('=', ''),
+       _mutationQueue =
+           mutationQueueStore ??
+           SecureMutationQueueStore(
+             installationKey: installationKey,
+             employeeId: employeeId,
+             storage: storage,
+           );
 
   final FlutterSecureStorage _storage;
   final String _scope;
+  final MutationQueueStore _mutationQueue;
 
   String get _draftsKey => 'mcp.orders.drafts.$_scope';
 
-  String get _mutationsKey => 'mcp.orders.mutations.$_scope';
+  String get _legacyMutationsKey => 'mcp.orders.mutations.$_scope';
 
   Future<String?> _read(String key) async {
     try {
@@ -317,57 +329,124 @@ class SecureOrderOfflineStore implements OrderOfflineStore {
     await _storage.write(key: _draftsKey, value: jsonEncode(drafts));
   }
 
-  @override
-  Future<List<QueuedOrderMutation>> loadMutations() async {
-    final raw = await _read(_mutationsKey);
+  Future<List<QueuedOrderMutation>> _loadLegacyMutations() async {
+    final raw = await _read(_legacyMutationsKey);
     if ((raw ?? '').isEmpty) return const [];
     try {
-      final mutations = _list(jsonDecode(raw!))
+      final decoded = jsonDecode(raw!);
+      if (decoded is! List) return const [];
+      return decoded
           .map(QueuedOrderMutation.fromJson)
           .whereType<QueuedOrderMutation>()
-          .toList(growable: true);
-      mutations.sort(
-        (left, right) => left.createdAt.compareTo(right.createdAt),
-      );
-      return mutations;
+          .toList(growable: false);
     } on FormatException {
       return const [];
     }
   }
 
   @override
-  Future<void> saveMutation(QueuedOrderMutation mutation) async {
-    final mutations = await loadMutations();
-    final index = mutations.indexWhere(
-      (item) => item.idempotencyKey == mutation.idempotencyKey,
+  Future<List<QueuedOrderMutation>> loadMutations() async {
+    final shared = await _mutationQueue.load(
+      operations: const {orderMutationOperation},
     );
-    if (index >= 0) {
-      mutations[index] = mutation;
-    } else {
-      mutations.add(mutation);
+    if (shared.isNotEmpty) {
+      return shared
+          .map(_orderMutationFromShared)
+          .whereType<QueuedOrderMutation>()
+          .toList(growable: false);
     }
 
-    final acknowledged =
-        mutations.where((item) => !item.isOutstanding).toList(growable: false)
-          ..sort((left, right) => right.createdAt.compareTo(left.createdAt));
-    final keepAcknowledged = acknowledged.take(20).toSet();
-    final compact = mutations
-        .where((item) => item.isOutstanding || keepAcknowledged.contains(item))
-        .map((item) => item.toJson())
-        .toList(growable: false);
-
-    await _storage.write(key: _mutationsKey, value: jsonEncode(compact));
+    final legacy = await _loadLegacyMutations();
+    if (legacy.isEmpty) return const [];
+    for (final mutation in legacy) {
+      await _mutationQueue.save(_orderMutationToShared(mutation));
+    }
+    try {
+      await _storage.delete(key: _legacyMutationsKey);
+    } catch (_) {
+      // The migrated shared queue is authoritative.
+    }
+    return legacy;
   }
 
   @override
-  Future<void> removeMutation(String idempotencyKey) async {
-    final mutations = await loadMutations();
-    final remaining = mutations
-        .where((item) => item.idempotencyKey != idempotencyKey)
-        .map((item) => item.toJson())
-        .toList(growable: false);
-    await _storage.write(key: _mutationsKey, value: jsonEncode(remaining));
+  Future<void> saveMutation(QueuedOrderMutation mutation) {
+    return _mutationQueue.save(_orderMutationToShared(mutation));
   }
+
+  @override
+  Future<void> removeMutation(String idempotencyKey) {
+    return _mutationQueue.remove(idempotencyKey);
+  }
+}
+
+QueuedMutation _orderMutationToShared(QueuedOrderMutation mutation) {
+  return QueuedMutation(
+    idempotencyKey: mutation.idempotencyKey,
+    operation: orderMutationOperation,
+    entityType: 'order',
+    entityLabel: mutation.outletName,
+    payload: {
+      'outletId': mutation.outletId,
+      'customerId': mutation.customerId,
+      'customerAddressId': mutation.customerAddressId,
+      'note': mutation.note,
+      'lines': mutation.lines
+          .map((line) => line.toJson())
+          .toList(growable: false),
+    },
+    createdAt: mutation.createdAt,
+    state: switch (mutation.state) {
+      OrderQueueState.waiting => MutationQueueState.waiting,
+      OrderQueueState.failed => MutationQueueState.failed,
+      OrderQueueState.acknowledged => MutationQueueState.acknowledged,
+    },
+    retryCount: mutation.retryCount,
+    retryable: mutation.retryable,
+    lastErrorCode: mutation.lastErrorCode,
+    lastErrorMessage: mutation.lastErrorMessage,
+    serverReference: mutation.serverOrderId,
+    acknowledgedAt: mutation.serverAcknowledgedAt,
+  );
+}
+
+QueuedOrderMutation? _orderMutationFromShared(QueuedMutation mutation) {
+  if (mutation.operation != orderMutationOperation) return null;
+  final payload = _object(mutation.payload);
+  final lines = _list(payload['lines'])
+      .map(_lineFromJson)
+      .whereType<OrderLineInput>()
+      .toList(growable: false);
+  final outletId = _text(payload['outletId']);
+  final customerId = _text(payload['customerId']);
+  final addressId = _text(payload['customerAddressId']);
+  if (outletId.isEmpty ||
+      customerId.isEmpty ||
+      addressId.isEmpty ||
+      lines.isEmpty) {
+    return null;
+  }
+  return QueuedOrderMutation(
+    idempotencyKey: mutation.idempotencyKey,
+    outletId: outletId,
+    outletName: mutation.entityLabel,
+    customerId: customerId,
+    customerAddressId: addressId,
+    note: _text(payload['note']),
+    lines: lines,
+    createdAt: mutation.createdAt,
+    state: switch (mutation.state) {
+      MutationQueueState.waiting => OrderQueueState.waiting,
+      MutationQueueState.failed => OrderQueueState.failed,
+      MutationQueueState.acknowledged => OrderQueueState.acknowledged,
+    },
+    retryCount: mutation.retryCount,
+    retryable: mutation.retryable,
+    lastErrorCode: mutation.lastErrorCode,
+    lastErrorMessage: mutation.lastErrorMessage,
+    serverOrderId: mutation.serverReference,
+    serverAcknowledgedAt: mutation.acknowledgedAt,
+  );
 }
 
 class OrderSyncResult {
