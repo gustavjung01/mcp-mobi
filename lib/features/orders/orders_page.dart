@@ -589,29 +589,32 @@ class _OrderCustomerPickerState extends State<_OrderCustomerPicker> {
                       final customer = customers[index];
                       return AppCard(
                         padding: EdgeInsets.zero,
-                        child: ListTile(
-                          key: Key('orders-customer-${customer.id}'),
-                          leading: const CircleAvatar(
-                            child: Icon(Icons.storefront_outlined),
-                          ),
-                          title: Text(
-                            customer.name,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w800,
+                        child: Material(
+                          color: Colors.transparent,
+                          child: ListTile(
+                            key: Key('orders-customer-${customer.id}'),
+                            leading: const CircleAvatar(
+                              child: Icon(Icons.storefront_outlined),
                             ),
+                            title: Text(
+                              customer.name,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            subtitle: Text(
+                              [
+                                    customer.customerCode,
+                                    customer.defaultAddressLine1 ??
+                                        customer.defaultAddressLabel,
+                                  ]
+                                  .whereType<String>()
+                                  .where((value) => value.trim().isNotEmpty)
+                                  .join(' · '),
+                            ),
+                            trailing: const Icon(Icons.chevron_right_rounded),
+                            onTap: () => Navigator.of(context).pop(customer),
                           ),
-                          subtitle: Text(
-                            [
-                                  customer.customerCode,
-                                  customer.defaultAddressLine1 ??
-                                      customer.defaultAddressLabel,
-                                ]
-                                .whereType<String>()
-                                .where((value) => value.trim().isNotEmpty)
-                                .join(' · '),
-                          ),
-                          trailing: const Icon(Icons.chevron_right_rounded),
-                          onTap: () => Navigator.of(context).pop(customer),
                         ),
                       );
                     },
