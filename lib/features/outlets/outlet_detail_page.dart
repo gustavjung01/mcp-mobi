@@ -619,7 +619,7 @@ class _HistoryBody extends StatelessWidget {
               _InfoRow(
                 label: 'Việc theo dõi',
                 value: (line?.followupCount ?? 0) > 0
-                    ? line!.followupCount.toString() + ' việc'
+                    ? '${line!.followupCount} việc'
                     : 'Chưa có',
               ),
             ],

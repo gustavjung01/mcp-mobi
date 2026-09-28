@@ -24,7 +24,7 @@ void main() {
       ),
       token: 'mobile-token',
       client: MockClient((request) async {
-        seen.add(request.method + ' ' + request.url.path);
+        seen.add('${request.method} ${request.url.path}');
         expect(request.headers['authorization'], 'Bearer mobile-token');
 
         if (request.method == 'GET') {

@@ -607,10 +607,8 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       SnackBar(
         content: Text(
           outcome == FieldActivitySubmitStatus.completed
-              ? 'Đã lưu ' + action + '.'
-              : 'Đã lưu ' +
-                    action +
-                    ' chờ gửi. Ứng dụng sẽ đồng bộ lại bằng đúng lần gửi này.',
+              ? 'Đã lưu $action.'
+              : 'Đã lưu $action chờ gửi. Ứng dụng sẽ đồng bộ lại bằng đúng lần gửi này.',
         ),
       ),
     );

@@ -124,7 +124,7 @@ class _FieldActivityHistoryPageState extends State<FieldActivityHistoryPage> {
   Widget build(BuildContext context) {
     final serverLines = _serverLines;
     return Scaffold(
-      key: Key('field-activity-history-' + widget.kind.name),
+      key: Key('field-activity-history-${widget.kind.name}'),
       body: Column(
         children: [
           NavyPageHeader(
@@ -257,7 +257,7 @@ class _ServerActivityCard extends StatelessWidget {
       FieldActivityKind.report => 'Báo cáo đã ghi nhận trong phiên',
       FieldActivityKind.productTrial => 'Kết quả thử đã ghi nhận trong phiên',
       FieldActivityKind.followup =>
-        line.followupCount.toString() + ' việc cần theo dõi',
+        '${line.followupCount} việc cần theo dõi',
     };
     return AppCard(
       child: Row(
@@ -371,7 +371,7 @@ class _MutationCard extends StatelessWidget {
                 const SizedBox(height: 4),
                 TextButton(
                   key: Key(
-                    'field-activity-retry-' + mutation.idempotencyKey,
+                    'field-activity-retry-${mutation.idempotencyKey}',
                   ),
                   onPressed: busy ? null : onRetry,
                   child: const Text('Gửi lại'),

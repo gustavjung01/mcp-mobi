@@ -183,7 +183,7 @@ class HttpFieldActivityClient implements FieldActivityClient {
   }
 
   String _requestId() =>
-      'mobile_activity_' + DateTime.now().microsecondsSinceEpoch.toString();
+      'mobile_activity_${DateTime.now().microsecondsSinceEpoch}';
 
   Map<String, String> _headers({
     bool hasBody = false,

@@ -109,8 +109,7 @@ class _MarketReportPageState extends State<MarketReportPage> {
       if (!mounted) return;
       setState(() {
         _message =
-            failure.message +
-            ' Vẫn có thể nhập báo cáo bằng nội dung bên dưới.';
+            '${failure.message} Vẫn có thể nhập báo cáo bằng nội dung bên dưới.';
       });
     } finally {
       if (mounted) {
@@ -147,14 +146,14 @@ class _MarketReportPageState extends State<MarketReportPage> {
   }
 
   bool _isCompetitor(FieldReportSettingItem item) {
-    final value = (item.groupKey + ' ' + item.groupTitle).toLowerCase();
+    final value = '${item.groupKey} ${item.groupTitle}'.toLowerCase();
     return value.contains('competitor') ||
         value.contains('đối thủ') ||
         value.contains('doi thu');
   }
 
   bool _isUsedProduct(FieldReportSettingItem item) {
-    final value = (item.groupKey + ' ' + item.groupTitle).toLowerCase();
+    final value = '${item.groupKey} ${item.groupTitle}'.toLowerCase();
     return value.contains('used_product') ||
         value.contains('sp đang dùng') ||
         value.contains('san pham dang dung') ||
@@ -186,7 +185,7 @@ class _MarketReportPageState extends State<MarketReportPage> {
     final parts = <String>[];
     if (selected.isNotEmpty) {
       parts.add(
-        selected.map((item) => item.groupTitle + ': ' + item.label).join('\n'),
+        selected.map((item) => '${item.groupTitle}: ${item.label}').join('\n'),
       );
     }
     const labels = <String, String>{
@@ -202,7 +201,7 @@ class _MarketReportPageState extends State<MarketReportPage> {
     };
     for (final entry in labels.entries) {
       final value = (fields[entry.key] ?? '').toString().trim();
-      if (value.isNotEmpty) parts.add(entry.value + ': ' + value);
+      if (value.isNotEmpty) parts.add('${entry.value}: $value');
     }
     return parts.join('\n');
   }
