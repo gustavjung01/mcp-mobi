@@ -822,13 +822,17 @@ void main() {
     expect(find.text('Cửa hàng Bỏ Qua'), findsOneWidget);
     expect(find.text('Cửa hàng Minh Phát'), findsNothing);
 
-    await tester.tap(find.byKey(const Key('route-filter-added')));
+    final addedFilter = find.byKey(const Key('route-filter-added'));
+    await tester.ensureVisible(addedFilter);
+    await tester.tap(addedFilter);
     await tester.pumpAndSettle();
 
     expect(find.text('Cửa hàng Thêm Mới'), findsOneWidget);
     expect(find.text('Cửa hàng Bỏ Qua'), findsNothing);
 
-    await tester.tap(find.byKey(const Key('route-filter-followups')));
+    final followupFilter = find.byKey(const Key('route-filter-followups'));
+    await tester.ensureVisible(followupFilter);
+    await tester.tap(followupFilter);
     await tester.pumpAndSettle();
 
     expect(find.text('Cửa hàng Thêm Mới'), findsOneWidget);
