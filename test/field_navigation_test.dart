@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mcp_field/app/navigation/app_shell.dart';
 import 'package:mcp_field/core/auth/mobile_auth_client.dart';
+import 'package:mcp_field/core/data/customer_boundary_client.dart';
 import 'package:mcp_field/core/data/field_data_client.dart';
+import 'package:mcp_field/core/data/order_data_client.dart';
 import 'package:mcp_field/core/location/field_location.dart';
 import 'package:mcp_field/features/outlets/outlet_detail_page.dart';
 
@@ -41,6 +43,9 @@ const outlet = FieldOutlet(
   address: '456 Lê Lợi',
   status: 'linked_existing',
   note: 'Khách MCP',
+  coreCustomerId: '11111111-1111-4111-8111-111111111111',
+  coreCustomerAddressId: '22222222-2222-4222-8222-222222222222',
+  coreCustomerCode: 'KH001',
 );
 
 const line = FieldDayLine(
@@ -168,6 +173,82 @@ class FakeFieldDataClient implements FieldDataClient, FieldActionClient {
     expect(sessionCustomerId, 'line-1');
     expect(latitude, 10.75);
     expect(longitude, 106.67);
+  }
+}
+
+class FakeCustomerBoundaryClient implements CustomerBoundaryClient {
+  @override
+  Future<List<CustomerVerificationItem>> loadVerifications() async {
+    return const [
+      CustomerVerificationItem(
+        routeCustomerId: 'outlet-1',
+        routeId: 'route-2',
+        routeName: 'Tuyến Quận 3',
+        customerName: 'Đại lý An Phát',
+        address: '456 Lê Lợi',
+        status: 'linked_existing',
+        coreRequestId: 'request-1',
+        coreCustomerId: '11111111-1111-4111-8111-111111111111',
+        coreCustomerAddressId: '22222222-2222-4222-8222-222222222222',
+        coreCustomerCode: 'KH001',
+      ),
+    ];
+  }
+
+  @override
+  Future<List<CompanyCustomer>> loadCompanyCustomers() async {
+    return const [
+      CompanyCustomer(
+        id: '11111111-1111-4111-8111-111111111111',
+        name: 'Đại lý An Phát',
+        status: 'active',
+        customerCode: 'KH001',
+        phone: '0909000111',
+        defaultAddressId: '22222222-2222-4222-8222-222222222222',
+        defaultAddressLine1: '456 Lê Lợi',
+      ),
+    ];
+  }
+
+  @override
+  Future<CustomerVerificationItem> submit({
+    required String routeCustomerId,
+    required String idempotencyKey,
+  }) async {
+    return (await loadVerifications()).single;
+  }
+
+  @override
+  Future<CustomerVerificationItem> sync({
+    required String routeCustomerId,
+    required String idempotencyKey,
+  }) async {
+    return (await loadVerifications()).single;
+  }
+}
+
+class FakeOrderDataClient implements OrderDataClient {
+  @override
+  Future<List<OrderCatalogItem>> searchProducts({
+    required String query,
+    String? category,
+    String? brand,
+  }) async {
+    return const [];
+  }
+
+  @override
+  Future<List<FieldOrder>> loadOrders() async => const [];
+
+  @override
+  Future<FieldOrder> createOrder({
+    required String customerId,
+    required String customerAddressId,
+    required List<OrderLineInput> lines,
+    required String idempotencyKey,
+    String? note,
+  }) {
+    throw UnimplementedError();
   }
 }
 
@@ -406,6 +487,96 @@ void main() {
     expect(reports, 1);
     expect(trials, 1);
     expect(followups, 1);
+  });
+
+  testWidgets('more opens customer onboarding workflow', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AppShell(
+          session: session,
+          fieldDataClient: FakeFieldDataClient(),
+          customerBoundaryClient: FakeCustomerBoundaryClient(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(navLabel('Thêm'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Mở hoặc liên kết mã khách'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const Key('customer-onboarding-screen')),
+      findsOneWidget,
+    );
+    expect(find.text('Đại lý An Phát'), findsOneWidget);
+    expect(find.text('Đã liên kết'), findsOneWidget);
+  });
+
+  testWidgets('linked directory outlet can open order creation', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AppShell(
+          session: session,
+          fieldDataClient: FakeFieldDataClient(),
+          customerBoundaryClient: FakeCustomerBoundaryClient(),
+          orderDataClient: FakeOrderDataClient(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(navLabel('Điểm bán'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('outlet-row-outlet-1')));
+    await tester.pumpAndSettle();
+
+    final orderButton = find.byKey(
+      const Key('outlet-directory-create-order'),
+    );
+    await tester.ensureVisible(orderButton);
+    await tester.tap(orderButton);
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('create-order-screen')), findsOneWidget);
+    expect(find.text('Đại lý An Phát'), findsOneWidget);
+  });
+
+  testWidgets('customer directory exposes linked Company customers', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AppShell(
+          session: session,
+          fieldDataClient: FakeFieldDataClient(),
+          customerBoundaryClient: FakeCustomerBoundaryClient(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(navLabel('Điểm bán'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('outlet-tab-company')));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(
+        const Key(
+          'company-customer-11111111-1111-4111-8111-111111111111',
+        ),
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('KH001'), findsOneWidget);
   });
 
   testWidgets('check-in is only available from active route context', (

@@ -11,12 +11,14 @@ class MorePage extends StatelessWidget {
     this.onReports,
     this.onProductTrials,
     this.onTasks,
+    this.onCustomerOnboarding,
     this.onLogout,
   });
 
   final VoidCallback? onReports;
   final VoidCallback? onProductTrials;
   final VoidCallback? onTasks;
+  final VoidCallback? onCustomerOnboarding;
   final Future<void> Function()? onLogout;
 
   static const _items = <_MoreItem>[
@@ -52,6 +54,7 @@ class MorePage extends StatelessWidget {
                       'Báo cáo' => onReports,
                       'Kết quả thử sản phẩm' => onProductTrials,
                       'Kế hoạch & Công việc' => onTasks,
+                      'Mở hoặc liên kết mã khách' => onCustomerOnboarding,
                       'Thiết lập' => () {
                         Navigator.of(context).push(
                           MaterialPageRoute<void>(
@@ -99,6 +102,7 @@ class _MoreTile extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       child: ListTile(
+        key: Key('more-${item.label}'),
         onTap: onTap,
         contentPadding: const EdgeInsets.symmetric(
           horizontal: AppSpacing.md,
