@@ -112,8 +112,7 @@ class _SettingsPageState extends State<SettingsPage> {
       await _updates.install(release);
       if (!mounted) return;
       setState(() {
-        _message =
-            'Đã tải và kiểm tra gói cập nhật. Android đang mở màn hình cài đặt.';
+        _message = 'Đã tải và kiểm tra gói cập nhật. Android đang mở màn hình cài đặt.';
       });
     } on AppUpdateFailure catch (failure) {
       if (!mounted) return;
@@ -269,47 +268,47 @@ class _SettingsPageState extends State<SettingsPage> {
                           width: double.infinity,
                           child: updateAvailable
                               ? FilledButton.icon(
-                                key: const Key('install-update-button'),
-                                onPressed: _installing || _checking
-                                    ? null
-                                    : _installUpdate,
-                                icon: _installing
-                                    ? const SizedBox(
-                                        width: 18,
-                                        height: 18,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          color: Colors.white,
+                                  key: const Key('install-update-button'),
+                                  onPressed: _installing || _checking
+                                      ? null
+                                      : _installUpdate,
+                                  icon: _installing
+                                      ? const SizedBox(
+                                          width: 18,
+                                          height: 18,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            color: Colors.white,
+                                          ),
+                                        )
+                                      : const Icon(
+                                          Icons.download_for_offline_outlined,
                                         ),
-                                      )
-                                    : const Icon(
-                                        Icons.download_for_offline_outlined,
-                                      ),
-                                label: Text(
-                                  _installing
-                                      ? 'Đang tải bản cập nhật...'
-                                      : 'Tải và cài bản ${release!.version}',
-                                ),
-                              )
-                            : OutlinedButton.icon(
-                                key: const Key('check-update-button'),
-                                onPressed: _checking || _installing
-                                    ? null
-                                    : _checkUpdate,
-                                icon: _checking
-                                    ? const SizedBox(
-                                        width: 18,
-                                        height: 18,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                        ),
-                                      )
-                                    : const Icon(Icons.refresh_rounded),
-                                label: Text(
-                                  _checking
-                                      ? 'Đang kiểm tra...'
-                                      : 'Kiểm tra cập nhật',
-                                ),
+                                  label: Text(
+                                    _installing
+                                        ? 'Đang tải bản cập nhật...'
+                                        : 'Tải và cài bản ${release!.version}',
+                                  ),
+                                )
+                              : OutlinedButton.icon(
+                                  key: const Key('check-update-button'),
+                                  onPressed: _checking || _installing
+                                      ? null
+                                      : _checkUpdate,
+                                  icon: _checking
+                                      ? const SizedBox(
+                                          width: 18,
+                                          height: 18,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                          ),
+                                        )
+                                      : const Icon(Icons.refresh_rounded),
+                                  label: Text(
+                                    _checking
+                                        ? 'Đang kiểm tra...'
+                                        : 'Kiểm tra cập nhật',
+                                  ),
                                 ),
                         ),
                       ],
@@ -320,64 +319,64 @@ class _SettingsPageState extends State<SettingsPage> {
                   const SizedBox(height: AppSpacing.md),
                   AppCard(
                     key: const Key('update-install-guide'),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Row(
-                        children: [
-                          Icon(
-                            Icons.help_outline_rounded,
-                            color: AppColors.primary,
-                          ),
-                          SizedBox(width: AppSpacing.sm),
-                          Expanded(
-                            child: Text(
-                              'Nếu Android chặn cài đặt',
-                              style: TextStyle(
-                                color: AppColors.textPrimary,
-                                fontSize: 15,
-                                fontWeight: FontWeight.w900,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Row(
+                          children: [
+                            Icon(
+                              Icons.help_outline_rounded,
+                              color: AppColors.primary,
+                            ),
+                            SizedBox(width: AppSpacing.sm),
+                            Expanded(
+                              child: Text(
+                                'Nếu Android chặn cài đặt',
+                                style: TextStyle(
+                                  color: AppColors.textPrimary,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w900,
+                                ),
                               ),
                             ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: AppSpacing.sm),
-                      const _InstallGuideStep(
-                        number: '1',
-                        text: 'Nếu Google Play Protect hiện cảnh báo, chọn “Tiếp tục cài đặt”.',
-                      ),
-                      const SizedBox(height: AppSpacing.sm),
-                      const _InstallGuideStep(
-                        number: '2',
-                        text: 'Nếu máy yêu cầu quyền cài ứng dụng không xác định, bật “Cho phép từ nguồn này” cho MCP Field.',
-                      ),
-                      const SizedBox(height: AppSpacing.sm),
-                      const _InstallGuideStep(
-                        number: '3',
-                        text: 'Quay lại MCP Field và bấm cài bản cập nhật một lần nữa.',
-                      ),
-                    ],
+                          ],
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
+                        const _InstallGuideStep(
+                          number: '1',
+                          text: 'Nếu Google Play Protect hiện cảnh báo, chọn “Tiếp tục cài đặt”.',
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
+                        const _InstallGuideStep(
+                          number: '2',
+                          text: 'Nếu máy yêu cầu quyền cài ứng dụng không xác định, bật “Cho phép từ nguồn này” cho MCP Field.',
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
+                        const _InstallGuideStep(
+                          number: '3',
+                          text: 'Quay lại MCP Field và bấm cài bản cập nhật một lần nữa.',
+                        ),
+                      ],
+                    ),
                   ),
-                ),
                   const SizedBox(height: AppSpacing.md),
                   AppCard(
                     child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Icon(
-                        Icons.verified_user_outlined,
-                        color: AppColors.success,
-                      ),
-                      const SizedBox(width: AppSpacing.sm),
-                      Expanded(
-                        child: Text(
-                          'MCP Field kiểm tra gói cập nhật trước khi mở trình cài đặt Android.',
-                          style: Theme.of(context).textTheme.bodyMedium,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(
+                          Icons.verified_user_outlined,
+                          color: AppColors.success,
                         ),
-                      ),
-                    ],
-                  ),
+                        const SizedBox(width: AppSpacing.sm),
+                        Expanded(
+                          child: Text(
+                            'MCP Field kiểm tra gói cập nhật trước khi mở trình cài đặt Android.',
+                            style: Theme.of(context).textTheme.bodyMedium,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ],
