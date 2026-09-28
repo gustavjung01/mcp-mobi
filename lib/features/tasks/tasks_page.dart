@@ -421,7 +421,7 @@ class _TaskCard extends StatelessWidget {
                 Text(
                   overdue
                       ? 'Quá hạn · ${_dateLabel(item.dueDate)}'
-                      : 'Hạn: ${_dateLabel(item.dueDate, empty: 'Chưa đặt')}',
+                      : "Hạn: ${_dateLabel(item.dueDate, empty: 'Chưa đặt')}",
                   style: TextStyle(
                     color: overdue ? AppColors.danger : AppColors.textSecondary,
                     fontSize: 10,
