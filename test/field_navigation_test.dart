@@ -189,6 +189,27 @@ Finder navLabel(String label) {
   );
 }
 
+Future<void> revealOutletActivityAction(
+  WidgetTester tester,
+  Key key,
+) async {
+  final screen = find.byKey(const Key('outlet-detail-screen'));
+  final list = find.descendant(
+    of: screen,
+    matching: find.byType(ListView),
+  );
+  final target = find.byKey(key);
+
+  for (var attempt = 0; attempt < 6 && target.evaluate().isEmpty; attempt++) {
+    await tester.drag(list, const Offset(0, -320));
+    await tester.pumpAndSettle();
+  }
+
+  expect(target, findsOneWidget);
+  await tester.ensureVisible(target);
+  await tester.pumpAndSettle();
+}
+
 Future<void> revealAddCustomerSubmit(WidgetTester tester) async {
   final screen = find.byKey(const Key('route-add-customer-screen'));
   final list = find.descendant(
@@ -369,19 +390,17 @@ void main() {
       ),
     );
 
-    final reportButton = find.byKey(const Key('outlet-create-report'));
-    await tester.ensureVisible(reportButton);
-    await tester.tap(reportButton);
-    final trialButton = find.byKey(
-      const Key('outlet-create-product-trial'),
-    );
-    await tester.ensureVisible(trialButton);
-    await tester.tap(trialButton);
-    final followupButton = find.byKey(
-      const Key('outlet-create-followup'),
-    );
-    await tester.ensureVisible(followupButton);
-    await tester.tap(followupButton);
+    const reportKey = Key('outlet-create-report');
+    await revealOutletActivityAction(tester, reportKey);
+    await tester.tap(find.byKey(reportKey));
+
+    const trialKey = Key('outlet-create-product-trial');
+    await revealOutletActivityAction(tester, trialKey);
+    await tester.tap(find.byKey(trialKey));
+
+    const followupKey = Key('outlet-create-followup');
+    await revealOutletActivityAction(tester, followupKey);
+    await tester.tap(find.byKey(followupKey));
     await tester.pump();
 
     expect(reports, 1);
