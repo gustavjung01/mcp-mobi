@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../app/theme/app_theme.dart';
 import '../../core/data/order_data_client.dart';
+import '../../core/sync/order_offline_store.dart';
 import '../../shared/widgets/app_card.dart';
 import '../../shared/widgets/empty_state.dart';
 import '../../shared/widgets/navy_page_header.dart';
@@ -10,41 +13,117 @@ class OrdersPage extends StatefulWidget {
   const OrdersPage({
     super.key,
     this.orderClient,
+    this.offlineStore,
     this.refreshToken = 0,
   });
 
   final OrderDataClient? orderClient;
+  final OrderOfflineStore? offlineStore;
   final int refreshToken;
 
   @override
   State<OrdersPage> createState() => _OrdersPageState();
 }
 
-class _OrdersPageState extends State<OrdersPage> {
+class _OrdersPageState extends State<OrdersPage> with WidgetsBindingObserver {
   final _searchController = TextEditingController();
   List<FieldOrder> _orders = const [];
+  List<QueuedOrderMutation> _pending = const [];
   bool _loading = false;
+  bool _syncing = false;
   String? _message;
 
   @override
   void initState() {
     super.initState();
-    _loadOrders();
+    WidgetsBinding.instance.addObserver(this);
+    unawaited(_refreshAll(syncPending: true));
   }
 
   @override
   void didUpdateWidget(covariant OrdersPage oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.orderClient != widget.orderClient ||
+        oldWidget.offlineStore != widget.offlineStore ||
         oldWidget.refreshToken != widget.refreshToken) {
-      _loadOrders();
+      unawaited(_refreshAll());
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      unawaited(_refreshAll(syncPending: true));
     }
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _searchController.dispose();
     super.dispose();
+  }
+
+  Future<void> _refreshAll({bool syncPending = false}) async {
+    if (syncPending) {
+      await _syncPending();
+    }
+    await Future.wait([_loadPending(), _loadOrders()]);
+  }
+
+  Future<void> _loadPending() async {
+    final store = widget.offlineStore;
+    if (store == null) {
+      if (mounted) setState(() => _pending = const []);
+      return;
+    }
+    try {
+      final pending = (await store.loadMutations())
+          .where((item) => item.isOutstanding)
+          .toList(growable: false);
+      if (!mounted) return;
+      setState(() {
+        _pending = pending;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _message = 'Chưa đọc được các đơn đang chờ gửi.';
+      });
+    }
+  }
+
+  Future<void> _syncPending({String? idempotencyKey}) async {
+    final store = widget.offlineStore;
+    final client = widget.orderClient;
+    if (store == null || client == null || _syncing) return;
+
+    setState(() {
+      _syncing = true;
+    });
+    try {
+      await OrderSyncService(
+        client: client,
+        store: store,
+      ).syncPending(idempotencyKey: idempotencyKey);
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _message = 'Chưa đồng bộ được đơn đang chờ. Vui lòng thử lại.';
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _syncing = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _retryQueued(String idempotencyKey) async {
+    await _syncPending(idempotencyKey: idempotencyKey);
+    await Future.wait([_loadPending(), _loadOrders()]);
   }
 
   Future<void> _loadOrders() async {
@@ -121,16 +200,16 @@ class _OrdersPageState extends State<OrdersPage> {
             subtitle: 'Đơn MCP thuộc phạm vi phụ trách',
             trailing: IconButton(
               key: const Key('orders-refresh'),
-              onPressed: _loading || widget.orderClient == null
+              onPressed: _loading || _syncing || widget.orderClient == null
                   ? null
-                  : _loadOrders,
+                  : () => _refreshAll(syncPending: true),
               color: Colors.white,
               icon: const Icon(Icons.refresh_rounded),
             ),
           ),
           Expanded(
             child: RefreshIndicator(
-              onRefresh: _loadOrders,
+              onRefresh: () => _refreshAll(syncPending: true),
               child: ListView(
                 padding: const EdgeInsets.all(AppSpacing.md),
                 children: [
@@ -154,6 +233,50 @@ class _OrdersPageState extends State<OrdersPage> {
                     ],
                   ),
                   const SizedBox(height: AppSpacing.md),
+                  if (_pending.isNotEmpty) ...[
+                    Row(
+                      children: [
+                        const Expanded(
+                          child: Text(
+                            'Chờ đồng bộ',
+                            style: TextStyle(
+                              color: AppColors.textPrimary,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ),
+                        TextButton.icon(
+                          key: const Key('orders-sync-all'),
+                          onPressed: _syncing || widget.orderClient == null
+                              ? null
+                              : () => _refreshAll(syncPending: true),
+                          icon: _syncing
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Icon(Icons.sync_rounded),
+                          label: const Text('Gửi lại tất cả'),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
+                    ..._pending.map(
+                      (mutation) => Padding(
+                        padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                        child: _QueuedOrderCard(
+                          mutation: mutation,
+                          syncing: _syncing,
+                          onRetry: () => _retryQueued(mutation.idempotencyKey),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                  ],
                   TextField(
                     key: const Key('orders-search'),
                     controller: _searchController,
@@ -191,7 +314,7 @@ class _OrdersPageState extends State<OrdersPage> {
                             'Đăng nhập vào hệ thống để tải đơn MCP của bạn.',
                       ),
                     )
-                  else if (orders.isEmpty)
+                  else if (orders.isEmpty && _pending.isEmpty)
                     const AppCard(
                       child: EmptyState(
                         icon: Icons.receipt_long_outlined,
@@ -212,6 +335,92 @@ class _OrdersPageState extends State<OrdersPage> {
                 ],
               ),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _QueuedOrderCard extends StatelessWidget {
+  const _QueuedOrderCard({
+    required this.mutation,
+    required this.syncing,
+    required this.onRetry,
+  });
+
+  final QueuedOrderMutation mutation;
+  final bool syncing;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final failed = mutation.state == OrderQueueState.failed;
+    return AppCard(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: failed ? AppColors.warningSoft : AppColors.primarySoft,
+              borderRadius: BorderRadius.circular(AppRadius.sm),
+            ),
+            alignment: Alignment.center,
+            child: Icon(
+              failed ? Icons.sync_problem_rounded : Icons.schedule_send_rounded,
+              color: failed ? AppColors.warning : AppColors.primary,
+            ),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  mutation.outletName,
+                  style: const TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  failed ? 'Gửi lỗi · Chưa tạo đơn mới' : 'Chờ gửi',
+                  style: const TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  '${mutation.lines.length} sản phẩm',
+                  style: const TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 10,
+                  ),
+                ),
+                if ((mutation.lastErrorMessage ?? '').isNotEmpty) ...[
+                  const SizedBox(height: 5),
+                  Text(
+                    mutation.lastErrorMessage!,
+                    style: const TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 10,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          TextButton(
+            key: Key('queued-order-retry-${mutation.idempotencyKey}'),
+            onPressed: syncing ? null : onRetry,
+            child: const Text('Gửi lại'),
           ),
         ],
       ),

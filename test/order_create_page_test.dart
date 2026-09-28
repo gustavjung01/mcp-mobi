@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mcp_field/core/data/field_data_client.dart';
 import 'package:mcp_field/core/data/order_data_client.dart';
+import 'package:mcp_field/core/sync/order_offline_store.dart';
 import 'package:mcp_field/features/orders/create_order_page.dart';
 
 const testOutlet = FieldOutlet(
@@ -19,6 +20,39 @@ const testOutlet = FieldOutlet(
   coreCustomerAddressId: '22222222-2222-4222-8222-222222222222',
   coreCustomerCode: 'DP00123',
 );
+
+class MemoryOrderOfflineStore implements OrderOfflineStore {
+  final drafts = <String, OrderDraft>{};
+  final mutations = <String, QueuedOrderMutation>{};
+
+  @override
+  Future<void> deleteDraft(String outletId) async {
+    drafts.remove(outletId);
+  }
+
+  @override
+  Future<List<QueuedOrderMutation>> loadMutations() async {
+    return mutations.values.toList(growable: false);
+  }
+
+  @override
+  Future<OrderDraft?> readDraft(String outletId) async => drafts[outletId];
+
+  @override
+  Future<void> removeMutation(String idempotencyKey) async {
+    mutations.remove(idempotencyKey);
+  }
+
+  @override
+  Future<void> saveDraft(OrderDraft draft) async {
+    drafts[draft.outletId] = draft;
+  }
+
+  @override
+  Future<void> saveMutation(QueuedOrderMutation mutation) async {
+    mutations[mutation.idempotencyKey] = mutation;
+  }
+}
 
 class FakeOrderClient implements OrderDataClient {
   final keys = <String>[];
@@ -103,6 +137,36 @@ void main() {
 
     expect(client.keys, hasLength(2));
     expect(client.keys[1], client.keys[0]);
+    expect(find.byKey(const Key('create-order-screen')), findsNothing);
+  });
+
+  testWidgets('retryable order failure is persisted as one pending intent', (
+    WidgetTester tester,
+  ) async {
+    final client = FakeOrderClient();
+    final store = MemoryOrderOfflineStore();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: CreateOrderPage(
+          outlet: testOutlet,
+          orderClient: client,
+          offlineStore: store,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('order-add-variant-1')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('order-submit')));
+    await tester.pumpAndSettle();
+
+    expect(client.keys, hasLength(1));
+    final queued = store.mutations.values.single;
+    expect(queued.idempotencyKey, client.keys.single);
+    expect(queued.state, OrderQueueState.failed);
+    expect(queued.retryable, isTrue);
+    expect(queued.retryCount, 1);
     expect(find.byKey(const Key('create-order-screen')), findsNothing);
   });
 }

@@ -8,6 +8,7 @@ import '../../core/installation/installation_profile.dart';
 import '../../core/location/field_location.dart';
 import '../../core/media/outlet_media_client.dart';
 import '../../core/media/outlet_photo_picker.dart';
+import '../../core/sync/order_offline_store.dart';
 import '../../features/more/more_page.dart';
 import '../../features/orders/create_order_page.dart';
 import '../../features/orders/orders_page.dart';
@@ -28,6 +29,7 @@ class AppShell extends StatefulWidget {
     this.fieldLocationProvider,
     this.outletMediaClient,
     this.outletPhotoPicker,
+    this.orderOfflineStore,
     this.onLogout,
   });
 
@@ -38,6 +40,7 @@ class AppShell extends StatefulWidget {
   final FieldLocationProvider? fieldLocationProvider;
   final OutletMediaClient? outletMediaClient;
   final OutletPhotoPicker? outletPhotoPicker;
+  final OrderOfflineStore? orderOfflineStore;
   final Future<void> Function()? onLogout;
 
   @override
@@ -48,6 +51,7 @@ class _AppShellState extends State<AppShell> {
   int _selectedIndex = 0;
   FieldDataClient? _fieldDataClient;
   OrderDataClient? _orderDataClient;
+  OrderOfflineStore? _orderOfflineStore;
   OutletMediaClient? _outletMediaClient;
   late final FieldLocationProvider _locationProvider;
   late final OutletPhotoPicker _photoPicker;
@@ -76,6 +80,8 @@ class _AppShellState extends State<AppShell> {
     super.initState();
     _fieldDataClient = widget.fieldDataClient ?? _defaultFieldDataClient();
     _orderDataClient = widget.orderDataClient ?? _defaultOrderDataClient();
+    _orderOfflineStore =
+        widget.orderOfflineStore ?? _defaultOrderOfflineStore();
     _outletMediaClient =
         widget.outletMediaClient ?? _defaultOutletMediaClient();
     _locationProvider =
@@ -106,6 +112,16 @@ class _AppShellState extends State<AppShell> {
     return HttpOrderDataClient(
       profile: profile,
       token: session.token,
+    );
+  }
+
+  OrderOfflineStore? _defaultOrderOfflineStore() {
+    final profile = widget.profile;
+    final session = widget.session;
+    if (profile == null || session == null) return null;
+    return SecureOrderOfflineStore(
+      installationKey: profile.installationKey,
+      employeeId: session.employeeId,
     );
   }
 
@@ -492,26 +508,33 @@ class _AppShellState extends State<AppShell> {
       return;
     }
 
-    final created = await Navigator.of(context).push<bool>(
-      MaterialPageRoute<bool>(
+    final outcome = await Navigator.of(context).push<OrderSubmitOutcome>(
+      MaterialPageRoute<OrderSubmitOutcome>(
         builder: (context) => CreateOrderPage(
           outlet: outlet!,
           orderClient: client,
+          offlineStore: _orderOfflineStore,
         ),
       ),
     );
-    if (created != true || !mounted) return;
+    if (outcome == null || !mounted) return;
 
     setState(() {
       _orderRefreshToken += 1;
     });
-    final route = _selectedRoute;
-    if (route != null) {
-      await _loadWorkspace(route);
+    if (outcome == OrderSubmitOutcome.created) {
+      final route = _selectedRoute;
+      if (route != null) {
+        await _loadWorkspace(route);
+      }
     }
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Đã tạo đơn hàng.')),
+      SnackBar(
+        content: Text(
+          outcome == OrderSubmitOutcome.created ? 'Đã tạo đơn hàng.' : 'Đã lưu đơn chờ gửi. Ứng dụng sẽ dùng lại đúng lần gửi này khi đồng bộ.',
+        ),
+      ),
     );
   }
 
@@ -563,6 +586,7 @@ class _AppShellState extends State<AppShell> {
       ),
       OrdersPage(
         orderClient: _orderDataClient,
+        offlineStore: _orderOfflineStore,
         refreshToken: _orderRefreshToken,
       ),
       MorePage(onLogout: widget.onLogout),
