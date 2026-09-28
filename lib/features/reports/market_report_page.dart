@@ -451,8 +451,7 @@ class _MarketReportPageState extends State<MarketReportPage> {
                     const SizedBox(height: AppSpacing.md),
                     const _SectionTitle(
                       title: 'Đối thủ',
-                      subtitle:
-                          'Chọn thương hiệu đối thủ đang hiện diện tại điểm bán.',
+                      subtitle: 'Chọn thương hiệu đối thủ đang hiện diện tại điểm bán.',
                     ),
                     const SizedBox(height: AppSpacing.sm),
                     _SettingItemsCard(

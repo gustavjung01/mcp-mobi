@@ -191,7 +191,10 @@ void main() {
     await tester.tap(find.byKey(const Key('session-report-session-1')));
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const Key('session-report-detail-screen')), findsOneWidget);
+    expect(
+      find.byKey(const Key('session-report-detail-screen')),
+      findsOneWidget,
+    );
     expect(find.text('Báo cáo điểm bán'), findsOneWidget);
     expect(find.textContaining('Đối thủ: Đối thủ A'), findsOneWidget);
     expect(find.text('Điểm bỏ qua / không mua'), findsOneWidget);

@@ -547,8 +547,7 @@ class _SessionReportDetailPage extends StatefulWidget {
       _SessionReportDetailPageState();
 }
 
-class _SessionReportDetailPageState
-    extends State<_SessionReportDetailPage> {
+class _SessionReportDetailPageState extends State<_SessionReportDetailPage> {
   SessionReportDetail? _detail;
   bool _loading = true;
   String? _message;

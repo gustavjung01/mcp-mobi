@@ -345,8 +345,7 @@ class HttpFieldHistoryClient implements FieldHistoryClient {
       'Authorization': 'Bearer $token',
       'X-Request-Id': _requestId(),
       if (hasBody) 'Content-Type': 'application/json',
-      if ((idempotencyKey ?? '').isNotEmpty)
-        'Idempotency-Key': idempotencyKey!,
+      if ((idempotencyKey ?? '').isNotEmpty) 'Idempotency-Key': idempotencyKey!,
     };
   }
 
@@ -430,16 +429,17 @@ class HttpFieldHistoryClient implements FieldHistoryClient {
     try {
       final uri = _endpoint(path, query);
       response = switch (method) {
-        'POST' => await _client
-            .post(
-              uri,
-              headers: _headers(
-                hasBody: true,
-                idempotencyKey: idempotencyKey,
-              ),
-              body: jsonEncode(body ?? const <String, Object?>{}),
-            )
-            .timeout(timeout),
+        'POST' =>
+          await _client
+              .post(
+                uri,
+                headers: _headers(
+                  hasBody: true,
+                  idempotencyKey: idempotencyKey,
+                ),
+                body: jsonEncode(body ?? const <String, Object?>{}),
+              )
+              .timeout(timeout),
         _ => await _client.get(uri, headers: _headers()).timeout(timeout),
       };
     } on TimeoutException {

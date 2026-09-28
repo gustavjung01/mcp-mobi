@@ -151,7 +151,9 @@ void main() {
           );
         }
 
-        return jsonResponse({'error': {'code': 'NOT_FOUND'}}, 404);
+        return jsonResponse({
+          'error': {'code': 'NOT_FOUND'},
+        }, 404);
       }),
     );
 
