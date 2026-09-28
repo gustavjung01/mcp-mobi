@@ -296,8 +296,8 @@ class _OutletPhotoSectionState extends State<OutletPhotoSection> {
             await _persistDraft(
               draft.copyWith(status: OutletPhotoStatus.error),
             );
-          } on OutletPhotoPendingFailure catch (pendingFailure) {
-            firstFailureMessage ??= pendingFailure.message;
+          } on OutletPhotoPendingFailure {
+            // Giữ thông báo lỗi gửi ảnh ban đầu; ảnh chờ vẫn còn trên thiết bị.
           }
         }
       }

@@ -74,7 +74,6 @@ class _OutletDetailPageState extends State<OutletDetailPage> {
   String? _historyMessage;
   late bool _checkedIn;
   late String _visitStatus;
-  String? _checkinAt;
   String? _heroPhotoUrl;
   Uint8List? _heroPhotoBytes;
 
@@ -83,7 +82,6 @@ class _OutletDetailPageState extends State<OutletDetailPage> {
     super.initState();
     _checkedIn = widget.line?.checkedIn == true;
     _visitStatus = widget.line?.status ?? 'pending';
-    _checkinAt = widget.line?.checkinAt;
   }
 
   String get _routeCustomerId =>
@@ -181,7 +179,6 @@ class _OutletDetailPageState extends State<OutletDetailPage> {
       if (!mounted || !saved) return;
       setState(() {
         _checkedIn = nextCheckedIn;
-        _checkinAt = nextCheckedIn ? DateTime.now().toIso8601String() : null;
       });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -615,7 +612,7 @@ class _OutletDetailPageState extends State<OutletDetailPage> {
                                               : '$name, $area',
                                         );
                                       } catch (error) {
-                                        if (!mounted) return;
+                                        if (!context.mounted) return;
                                         ScaffoldMessenger.of(context).showSnackBar(
                                           SnackBar(
                                             content: Text(
@@ -1287,7 +1284,9 @@ String _firstNonEmpty(List<String?> values) {
 
 String _formatDate(String? value) {
   final parsed = DateTime.tryParse((value ?? '').trim());
-  if (parsed == null) return (value ?? '').trim().isEmpty ? 'Chưa rõ ngày' : value!.trim();
+  if (parsed == null) {
+    return (value ?? '').trim().isEmpty ? 'Chưa rõ ngày' : value!.trim();
+  }
   final day = parsed.day.toString().padLeft(2, '0');
   final month = parsed.month.toString().padLeft(2, '0');
   return '$day/$month/${parsed.year}';
