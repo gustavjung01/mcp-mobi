@@ -210,8 +210,21 @@ void main() {
         } else if (request.url.path ==
             '/api/mcp-day/session-customer/checkin') {
           expect(body['sessionCustomerId'], 'line-1');
-          expect(body['checkedIn'], isTrue);
-          expect(body['geoSource'], 'mobile_gps');
+          if (body['checkedIn'] == true) {
+            expect(body['geoLat'], 10.75);
+            expect(body['geoLng'], 106.67);
+            expect(body['geoSource'], 'mobile_gps');
+          } else {
+            expect(body['checkedIn'], isFalse);
+            expect(body.containsKey('geoLat'), isFalse);
+            expect(body.containsKey('geoSource'), isFalse);
+          }
+        } else if (request.url.path ==
+            '/api/mcp-day/session-customer/status') {
+          expect(body['sessionCustomerId'], 'line-1');
+          expect(body['visitStatus'], 'skipped');
+          expect(body['statusReason'], 'no_demand');
+          expect(body['note'], 'Gọi lại tuần sau');
         } else if (request.url.path == '/api/mcp-day/session-customer/add') {
           expect(body['sessionId'], 'session-1');
           expect(body['customerName'], 'Cửa hàng Mới');
@@ -252,10 +265,23 @@ void main() {
     );
     await client.setSessionCustomerCheckIn(
       sessionCustomerId: 'line-1',
+      checkedIn: true,
       latitude: 10.75,
       longitude: 106.67,
       accuracy: 8,
       idempotencyKey: 'test-key-checkin-12345678',
+    );
+    await client.setSessionCustomerCheckIn(
+      sessionCustomerId: 'line-1',
+      checkedIn: false,
+      idempotencyKey: 'test-key-checkin-undo-12345678',
+    );
+    await client.setSessionCustomerStatus(
+      sessionCustomerId: 'line-1',
+      visitStatus: 'skipped',
+      statusReason: 'no_demand',
+      note: 'Gọi lại tuần sau',
+      idempotencyKey: 'test-key-status-12345678',
     );
     final added = await client.addSessionCustomer(
       sessionId: 'session-1',
@@ -281,9 +307,12 @@ void main() {
       [
         '/api/mcp-day/open-session',
         '/api/mcp-day/session-customer/checkin',
+        '/api/mcp-day/session-customer/checkin',
+        '/api/mcp-day/session-customer/status',
         '/api/mcp-day/session-customer/add',
         '/api/mcp-sessions/session-1',
       ],
     );
   });
+
 }

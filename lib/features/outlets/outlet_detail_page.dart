@@ -19,7 +19,8 @@ class OutletDetailPage extends StatefulWidget {
     this.sessionId,
     this.mediaClient,
     this.photoPicker,
-    this.onCheckIn,
+    this.onSetCheckIn,
+    this.onSkip,
     this.onCreateOrder,
     this.onCustomerOnboarding,
     this.onCreateReport,
@@ -34,7 +35,12 @@ class OutletDetailPage extends StatefulWidget {
   final String? sessionId;
   final OutletMediaClient? mediaClient;
   final OutletPhotoPicker? photoPicker;
-  final Future<void> Function(FieldDayLine line)? onCheckIn;
+  final Future<bool> Function(FieldDayLine line, bool checkedIn)? onSetCheckIn;
+  final Future<bool> Function(
+    FieldDayLine line,
+    String reason,
+    String note,
+  )? onSkip;
   final Future<void> Function()? onCreateOrder;
   final Future<void> Function()? onCustomerOnboarding;
   final Future<void> Function()? onCreateReport;
@@ -48,7 +54,9 @@ class OutletDetailPage extends StatefulWidget {
 class _OutletDetailPageState extends State<OutletDetailPage> {
   bool _history = false;
   bool _checkingIn = false;
+  bool _skipping = false;
   late bool _checkedIn;
+  late String _visitStatus;
   String? _checkinAt;
   String? _heroPhotoUrl;
   Uint8List? _heroPhotoBytes;
@@ -57,26 +65,36 @@ class _OutletDetailPageState extends State<OutletDetailPage> {
   void initState() {
     super.initState();
     _checkedIn = widget.line?.checkedIn == true;
+    _visitStatus = widget.line?.status ?? 'pending';
     _checkinAt = widget.line?.checkinAt;
   }
 
-  Future<void> _checkIn() async {
+  Future<void> _toggleCheckIn() async {
     final line = widget.line;
-    final action = widget.onCheckIn;
-    if (line == null || action == null || _checkedIn || _checkingIn) return;
+    final action = widget.onSetCheckIn;
+    if (line == null || action == null || _checkingIn) return;
 
+    final nextCheckedIn = !_checkedIn;
     setState(() {
       _checkingIn = true;
     });
     try {
-      await action(line);
-      if (!mounted) return;
+      final saved = await action(line, nextCheckedIn);
+      if (!mounted || !saved) return;
       setState(() {
-        _checkedIn = true;
-        _checkinAt = DateTime.now().toIso8601String();
+        _checkedIn = nextCheckedIn;
+        _checkinAt = nextCheckedIn
+            ? DateTime.now().toIso8601String()
+            : null;
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Đã check-in điểm bán.')),
+        SnackBar(
+          content: Text(
+            nextCheckedIn
+                ? 'Đã check-in điểm bán.'
+                : 'Đã hoàn tác check-in điểm bán.',
+          ),
+        ),
       );
     } on FieldDataFailure catch (failure) {
       if (!mounted) return;
@@ -86,14 +104,60 @@ class _OutletDetailPageState extends State<OutletDetailPage> {
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Không check-in được. Vui lòng thử lại.'),
+        SnackBar(
+          content: Text(
+            nextCheckedIn
+                ? 'Không check-in được. Vui lòng thử lại.'
+                : 'Không hoàn tác check-in được. Vui lòng thử lại.',
+          ),
         ),
       );
     } finally {
       if (mounted) {
         setState(() {
           _checkingIn = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _skipVisit() async {
+    final line = widget.line;
+    final action = widget.onSkip;
+    if (line == null ||
+        action == null ||
+        _skipping ||
+        _visitStatus == 'skipped') {
+      return;
+    }
+
+    final input = await showDialog<_SkipVisitInput>(
+      context: context,
+      builder: (context) => const _SkipVisitDialog(),
+    );
+    if (input == null || !mounted) return;
+
+    setState(() {
+      _skipping = true;
+    });
+    try {
+      final saved = await action(line, input.reason, input.note);
+      if (!mounted || !saved) return;
+      setState(() {
+        _visitStatus = 'skipped';
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Đã ghi nhận bỏ qua điểm bán.')),
+      );
+    } on FieldDataFailure catch (failure) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(failure.message)),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _skipping = false;
         });
       }
     }
@@ -116,12 +180,17 @@ class _OutletDetailPageState extends State<OutletDetailPage> {
     final contact = (customer?.contactName ?? '').trim();
     final note = _firstNonEmpty([line?.note, customer?.note, outlet?.note]);
     final accountId = (customer?.accountId ?? outlet?.code ?? '').trim();
-    final visited = line?.status == 'visited';
+    final visited = _visitStatus == 'visited';
+    final skipped = _visitStatus == 'skipped';
     final gps = customer?.gps ?? outlet?.gps;
     final routeCustomerId =
         (line?.routeCustomerId ?? customer?.id ?? outlet?.id ?? '').trim();
     final canCheckIn =
-        line?.sessionCustomerId != null && widget.onCheckIn != null;
+        line?.sessionCustomerId != null && widget.onSetCheckIn != null;
+    final canSkip =
+        line?.sessionCustomerId != null &&
+        widget.onSkip != null &&
+        !skipped;
     final linkedToCompany =
         (outlet?.coreCustomerId ?? '').trim().isNotEmpty &&
         (outlet?.coreCustomerAddressId ?? '').trim().isNotEmpty;
@@ -221,20 +290,28 @@ class _OutletDetailPageState extends State<OutletDetailPage> {
                         Row(
                           children: [
                             StatusPill(
-                              label: _checkedIn
+                              label: skipped
+                                  ? 'Bỏ qua'
+                                  : _checkedIn
                                   ? 'Đã check-in'
                                   : visited
                                   ? 'Đã ghé'
-                                  : 'Chưa ghé',
-                              icon: _checkedIn
+                                  : 'Chờ ghé',
+                              icon: skipped
+                                  ? Icons.skip_next_rounded
+                                  : _checkedIn
                                   ? Icons.location_on_rounded
                                   : visited
                                   ? Icons.check_circle_outline_rounded
                                   : Icons.schedule_rounded,
-                              backgroundColor: _checkedIn || visited
+                              backgroundColor: skipped
+                                  ? AppColors.warning.withValues(alpha: 0.18)
+                                  : _checkedIn || visited
                                   ? AppColors.successSoft
                                   : const Color(0x26FFFFFF),
-                              foregroundColor: _checkedIn || visited
+                              foregroundColor: skipped
+                                  ? AppColors.warning
+                                  : _checkedIn || visited
                                   ? AppColors.success
                                   : Colors.white,
                             ),
@@ -297,37 +374,85 @@ class _OutletDetailPageState extends State<OutletDetailPage> {
                 : ListView(
                     padding: const EdgeInsets.all(AppSpacing.md),
                     children: [
-                      if (line != null && !_checkedIn) ...[
-                        SizedBox(
-                          width: double.infinity,
-                          child: FilledButton.icon(
-                            key: const Key('outlet-checkin-button'),
-                            onPressed: canCheckIn && !_checkingIn
-                                ? _checkIn
-                                : null,
-                            style: FilledButton.styleFrom(
-                              backgroundColor: AppColors.success,
-                              minimumSize: const Size.fromHeight(48),
-                            ),
-                            icon: _checkingIn
-                                ? const SizedBox(
-                                    width: 18,
-                                    height: 18,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: Colors.white,
+                      if (line != null && (canCheckIn || canSkip)) ...[
+                        if (canCheckIn)
+                          SizedBox(
+                            width: double.infinity,
+                            child: _checkedIn
+                                ? OutlinedButton.icon(
+                                    key: const Key('outlet-checkin-button'),
+                                    onPressed: _checkingIn
+                                        ? null
+                                        : _toggleCheckIn,
+                                    icon: _checkingIn
+                                        ? const SizedBox(
+                                            width: 18,
+                                            height: 18,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                            ),
+                                          )
+                                        : const Icon(
+                                            Icons.undo_rounded,
+                                          ),
+                                    label: Text(
+                                      _checkingIn
+                                          ? 'Đang lưu...'
+                                          : 'Hoàn tác check-in',
                                     ),
                                   )
-                                : const Icon(Icons.location_on_rounded),
-                            label: Text(
-                              _checkingIn
-                                  ? 'Đang xác nhận vị trí...'
-                                  : canCheckIn
-                                  ? 'Check-in điểm bán'
-                                  : 'Bắt đầu tuyến để check-in',
+                                : FilledButton.icon(
+                                    key: const Key('outlet-checkin-button'),
+                                    onPressed: _checkingIn
+                                        ? null
+                                        : _toggleCheckIn,
+                                    style: FilledButton.styleFrom(
+                                      backgroundColor: AppColors.success,
+                                      minimumSize: const Size.fromHeight(48),
+                                    ),
+                                    icon: _checkingIn
+                                        ? const SizedBox(
+                                            width: 18,
+                                            height: 18,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                              color: Colors.white,
+                                            ),
+                                          )
+                                        : const Icon(
+                                            Icons.location_on_rounded,
+                                          ),
+                                    label: Text(
+                                      _checkingIn
+                                          ? 'Đang xác nhận vị trí...'
+                                          : 'Check-in điểm bán',
+                                    ),
+                                  ),
+                          ),
+                        if (canCheckIn && canSkip)
+                          const SizedBox(height: AppSpacing.sm),
+                        if (canSkip)
+                          SizedBox(
+                            width: double.infinity,
+                            child: OutlinedButton.icon(
+                              key: const Key('outlet-skip-button'),
+                              onPressed: _skipping ? null : _skipVisit,
+                              icon: _skipping
+                                  ? const SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                  : const Icon(Icons.skip_next_rounded),
+                              label: Text(
+                                _skipping
+                                    ? 'Đang lưu...'
+                                    : 'Bỏ qua / không mua',
+                              ),
                             ),
                           ),
-                        ),
                         const SizedBox(height: AppSpacing.md),
                       ],
                       AppCard(
@@ -590,6 +715,130 @@ class _OutletDetailPageState extends State<OutletDetailPage> {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _SkipVisitInput {
+  const _SkipVisitInput({
+    required this.reason,
+    required this.note,
+  });
+
+  final String reason;
+  final String note;
+}
+
+class _SkipVisitDialog extends StatefulWidget {
+  const _SkipVisitDialog();
+
+  @override
+  State<_SkipVisitDialog> createState() => _SkipVisitDialogState();
+}
+
+class _SkipVisitDialogState extends State<_SkipVisitDialog> {
+  final _noteController = TextEditingController();
+  String? _reason;
+  String? _message;
+
+  static const _reasons = <(String, String)>[
+    ('closed', 'Đóng cửa'),
+    ('busy', 'Khách bận'),
+    ('no_demand', 'Không nhu cầu'),
+    ('price', 'Chê giá'),
+    ('competitor', 'Đang dùng đối thủ'),
+    ('stock_enough', 'Còn tồn hàng'),
+    ('other', 'Khác'),
+  ];
+
+  @override
+  void dispose() {
+    _noteController.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final reason = (_reason ?? '').trim();
+    if (reason.isEmpty) {
+      setState(() {
+        _message = 'Cần chọn lý do bỏ qua điểm bán.';
+      });
+      return;
+    }
+    Navigator.of(context).pop(
+      _SkipVisitInput(
+        reason: reason,
+        note: _noteController.text.trim(),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Bỏ qua / không mua'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Chọn lý do chính theo nghiệp vụ tuyến. Có thể ghi chú thêm khi cần.',
+            ),
+            const SizedBox(height: AppSpacing.md),
+            Wrap(
+              spacing: AppSpacing.xs,
+              runSpacing: AppSpacing.xs,
+              children: _reasons.map((item) {
+                return ChoiceChip(
+                  key: Key('outlet-skip-reason-${item.$1}'),
+                  label: Text(item.$2),
+                  selected: _reason == item.$1,
+                  onSelected: (_) {
+                    setState(() {
+                      _reason = item.$1;
+                      _message = null;
+                    });
+                  },
+                );
+              }).toList(growable: false),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            TextField(
+              key: const Key('outlet-skip-note'),
+              controller: _noteController,
+              minLines: 2,
+              maxLines: 4,
+              decoration: const InputDecoration(
+                labelText: 'Ghi chú',
+                hintText: 'Ví dụ: khách còn tồn nhiều, hẹn tuần sau quay lại',
+              ),
+            ),
+            if ((_message ?? '').isNotEmpty) ...[
+              const SizedBox(height: AppSpacing.sm),
+              Text(
+                _message!,
+                style: const TextStyle(
+                  color: AppColors.danger,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Hủy'),
+        ),
+        FilledButton(
+          key: const Key('outlet-skip-submit'),
+          onPressed: _submit,
+          child: const Text('Lưu'),
+        ),
+      ],
     );
   }
 }
