@@ -144,18 +144,22 @@ class _CustomerOnboardingPageState extends State<CustomerOnboardingPage> {
 
   List<CustomerVerificationItem> get _visibleItems {
     final query = _query.trim().toLowerCase();
-    return _items.where((item) {
-      if (!_matchesFilter(item.status, _filter)) return false;
-      if (query.isEmpty) return true;
-      return [
-        item.customerName,
-        item.phone,
-        item.address,
-        item.area,
-        item.routeName,
-        item.coreCustomerCode,
-      ].whereType<String>().any((value) => value.toLowerCase().contains(query));
-    }).toList(growable: false);
+    return _items
+        .where((item) {
+          if (!_matchesFilter(item.status, _filter)) return false;
+          if (query.isEmpty) return true;
+          return [
+            item.customerName,
+            item.phone,
+            item.address,
+            item.area,
+            item.routeName,
+            item.coreCustomerCode,
+          ].whereType<String>().any(
+            (value) => value.toLowerCase().contains(query),
+          );
+        })
+        .toList(growable: false);
   }
 
   @override
@@ -246,7 +250,7 @@ class _CustomerOnboardingPageState extends State<CustomerOnboardingPage> {
                           item: item,
                           busy:
                               _busyKey?.endsWith(':${item.routeCustomerId}') ==
-                                  true,
+                              true,
                           onSubmit: () => _mutate(item, submit: true),
                           onSync: () => _mutate(item, submit: false),
                         ),
@@ -520,12 +524,19 @@ bool _matchesFilter(
   return switch (filter) {
     CustomerOnboardingFilter.all => true,
     CustomerOnboardingFilter.notSubmitted => status == 'not_submitted',
-    CustomerOnboardingFilter.processing =>
-      const {'submitted', 'under_review', 'need_more_info'}.contains(status),
-    CustomerOnboardingFilter.ready =>
-      const {'approved', 'linked_existing'}.contains(status),
-    CustomerOnboardingFilter.attention =>
-      const {'rejected', 'cancelled'}.contains(status),
+    CustomerOnboardingFilter.processing => const {
+      'submitted',
+      'under_review',
+      'need_more_info',
+    }.contains(status),
+    CustomerOnboardingFilter.ready => const {
+      'approved',
+      'linked_existing',
+    }.contains(status),
+    CustomerOnboardingFilter.attention => const {
+      'rejected',
+      'cancelled',
+    }.contains(status),
   };
 }
 

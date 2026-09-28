@@ -892,9 +892,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          outcome == OrderSubmitOutcome.created
-              ? 'Đã tạo đơn hàng.'
-              : 'Đã lưu đơn chờ gửi. Ứng dụng sẽ dùng lại đúng lần gửi này khi đồng bộ.',
+          outcome == OrderSubmitOutcome.created ? 'Đã tạo đơn hàng.' : 'Đã lưu đơn chờ gửi. Ứng dụng sẽ dùng lại đúng lần gửi này khi đồng bộ.',
         ),
       ),
     );
@@ -946,8 +944,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
         companyLoading: _loadingCompanyCustomers,
         message: _outletMessage,
         companyMessage: _companyCustomerMessage,
-        onRefresh:
-            _fieldDataClient == null && _customerBoundaryClient == null
+        onRefresh: _fieldDataClient == null && _customerBoundaryClient == null
             ? null
             : _refreshOutlets,
         onOpenOutlet: _openDirectoryOutlet,

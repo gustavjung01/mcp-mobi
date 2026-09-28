@@ -201,8 +201,7 @@ class HttpCustomerBoundaryClient implements CustomerBoundaryClient {
       'Authorization': 'Bearer $token',
       'X-Request-Id': _requestId(),
       if (hasBody) 'Content-Type': 'application/json',
-      if ((idempotencyKey ?? '').isNotEmpty)
-        'Idempotency-Key': idempotencyKey!,
+      if ((idempotencyKey ?? '').isNotEmpty) 'Idempotency-Key': idempotencyKey!,
     };
   }
 

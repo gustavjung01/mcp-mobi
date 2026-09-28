@@ -45,26 +45,32 @@ class _OutletsPageState extends State<OutletsPage> {
   @override
   Widget build(BuildContext context) {
     final query = _query.trim().toLowerCase();
-    final visibleOutlets = widget.outlets.where((outlet) {
-      if (query.isEmpty) return true;
-      return outlet.name.toLowerCase().contains(query) ||
-          outlet.code.toLowerCase().contains(query) ||
-          outlet.phone.toLowerCase().contains(query) ||
-          outlet.address.toLowerCase().contains(query) ||
-          outlet.area.toLowerCase().contains(query) ||
-          outlet.routeName.toLowerCase().contains(query);
-    }).toList(growable: false);
+    final visibleOutlets = widget.outlets
+        .where((outlet) {
+          if (query.isEmpty) return true;
+          return outlet.name.toLowerCase().contains(query) ||
+              outlet.code.toLowerCase().contains(query) ||
+              outlet.phone.toLowerCase().contains(query) ||
+              outlet.address.toLowerCase().contains(query) ||
+              outlet.area.toLowerCase().contains(query) ||
+              outlet.routeName.toLowerCase().contains(query);
+        })
+        .toList(growable: false);
 
-    final visibleCompany = widget.companyCustomers.where((customer) {
-      if (query.isEmpty) return true;
-      return [
-        customer.name,
-        customer.customerCode,
-        customer.phone,
-        customer.email,
-        customer.defaultAddressLine1,
-      ].whereType<String>().any((value) => value.toLowerCase().contains(query));
-    }).toList(growable: false);
+    final visibleCompany = widget.companyCustomers
+        .where((customer) {
+          if (query.isEmpty) return true;
+          return [
+            customer.name,
+            customer.customerCode,
+            customer.phone,
+            customer.email,
+            customer.defaultAddressLine1,
+          ].whereType<String>().any(
+            (value) => value.toLowerCase().contains(query),
+          );
+        })
+        .toList(growable: false);
 
     final loading = _tab == _CustomerDirectoryTab.outlets
         ? widget.loading
@@ -157,8 +163,7 @@ class _OutletsPageState extends State<OutletsPage> {
               child: EmptyState(
                 icon: Icons.storefront_outlined,
                 title: 'Chưa có điểm bán',
-                message:
-                    'Các điểm bán được phân công cho tài khoản sẽ hiển thị tại đây.',
+                message: 'Các điểm bán được phân công cho tài khoản sẽ hiển thị tại đây.',
               ),
             )
           else
@@ -197,8 +202,7 @@ class _OutletsPageState extends State<OutletsPage> {
               child: EmptyState(
                 icon: Icons.badge_outlined,
                 title: 'Chưa có khách Công Ty',
-                message:
-                    'Khách đã mở hoặc liên kết và thuộc phạm vi phụ trách sẽ hiển thị tại đây.',
+                message: 'Khách đã mở hoặc liên kết và thuộc phạm vi phụ trách sẽ hiển thị tại đây.',
               ),
             )
           else
@@ -306,9 +310,11 @@ class _OutletRow extends StatelessWidget {
           ),
         ),
         subtitle: Text(
-          [outlet.routeName, outlet.area, outlet.address]
-              .where((value) => value.trim().isNotEmpty)
-              .join(' · '),
+          [
+            outlet.routeName,
+            outlet.area,
+            outlet.address,
+          ].where((value) => value.trim().isNotEmpty).join(' · '),
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
         ),
@@ -362,9 +368,12 @@ class _CompanyCustomerCard extends StatelessWidget {
           const SizedBox(height: AppSpacing.sm),
           Text(
             [
-              customer.phone,
-              customer.defaultAddressLine1,
-            ].whereType<String>().where((value) => value.isNotEmpty).join(' · '),
+                  customer.phone,
+                  customer.defaultAddressLine1,
+                ]
+                .whereType<String>()
+                .where((value) => value.isNotEmpty)
+                .join(' · '),
             style: const TextStyle(
               color: AppColors.textSecondary,
               fontSize: 12,
