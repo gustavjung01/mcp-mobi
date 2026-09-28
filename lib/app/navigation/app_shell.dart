@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/auth/mobile_auth_client.dart';
+import '../../core/data/customer_boundary_client.dart';
 import '../../core/data/field_activity_client.dart';
 import '../../core/data/field_data_client.dart';
 import '../../core/data/order_data_client.dart';
@@ -12,6 +13,7 @@ import '../../core/media/outlet_photo_picker.dart';
 import '../../core/sync/field_activity_sync.dart';
 import '../../core/sync/mutation_queue.dart';
 import '../../core/sync/order_offline_store.dart';
+import '../../features/customers/customer_onboarding_page.dart';
 import '../../features/more/more_page.dart';
 import '../../features/orders/create_order_page.dart';
 import '../../features/orders/orders_page.dart';
@@ -33,6 +35,7 @@ class AppShell extends StatefulWidget {
     this.session,
     this.fieldDataClient,
     this.fieldActivityClient,
+    this.customerBoundaryClient,
     this.orderDataClient,
     this.fieldLocationProvider,
     this.outletMediaClient,
@@ -46,6 +49,7 @@ class AppShell extends StatefulWidget {
   final MobileSession? session;
   final FieldDataClient? fieldDataClient;
   final FieldActivityClient? fieldActivityClient;
+  final CustomerBoundaryClient? customerBoundaryClient;
   final OrderDataClient? orderDataClient;
   final FieldLocationProvider? fieldLocationProvider;
   final OutletMediaClient? outletMediaClient;
@@ -62,6 +66,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   int _selectedIndex = 0;
   FieldDataClient? _fieldDataClient;
   FieldActivityClient? _fieldActivityClient;
+  CustomerBoundaryClient? _customerBoundaryClient;
   MutationQueueStore? _mutationQueueStore;
   OrderDataClient? _orderDataClient;
   OrderOfflineStore? _orderOfflineStore;
@@ -72,15 +77,18 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   final Map<String, _PendingCheckIn> _pendingCheckIns = {};
   List<FieldRoute> _routes = const [];
   List<FieldOutlet> _outlets = const [];
+  List<CompanyCustomer> _companyCustomers = const [];
   FieldRoute? _selectedRoute;
   FieldRouteWorkspace? _workspace;
   bool _loadingRoutes = false;
   bool _loadingOutlets = false;
+  bool _loadingCompanyCustomers = false;
   bool _loadingWorkspace = false;
   bool _routeActionBusy = false;
   bool _fieldActivitySyncing = false;
   String? _fieldMessage;
   String? _outletMessage;
+  String? _companyCustomerMessage;
   int _workspaceLoadGeneration = 0;
   int _orderRefreshToken = 0;
 
@@ -96,6 +104,8 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     _fieldDataClient = widget.fieldDataClient ?? _defaultFieldDataClient();
     _fieldActivityClient =
         widget.fieldActivityClient ?? _defaultFieldActivityClient();
+    _customerBoundaryClient =
+        widget.customerBoundaryClient ?? _defaultCustomerBoundaryClient();
     _mutationQueueStore =
         widget.mutationQueueStore ?? _defaultMutationQueueStore();
     _orderDataClient = widget.orderDataClient ?? _defaultOrderDataClient();
@@ -111,6 +121,10 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       _loadingOutlets = true;
       _loadRoutes();
       _loadOutlets();
+    }
+    if (_customerBoundaryClient != null) {
+      _loadingCompanyCustomers = true;
+      _loadCompanyCustomers();
     }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _syncFieldActivities();
@@ -145,6 +159,16 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     final session = widget.session;
     if (profile == null || session == null) return null;
     return HttpFieldActivityClient(
+      profile: profile,
+      token: session.token,
+    );
+  }
+
+  CustomerBoundaryClient? _defaultCustomerBoundaryClient() {
+    final profile = widget.profile;
+    final session = widget.session;
+    if (profile == null || session == null) return null;
+    return HttpCustomerBoundaryClient(
       profile: profile,
       token: session.token,
     );
@@ -268,6 +292,27 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     }
   }
 
+  Future<void> _loadCompanyCustomers() async {
+    final client = _customerBoundaryClient;
+    if (client == null) return;
+
+    try {
+      final customers = await client.loadCompanyCustomers();
+      if (!mounted) return;
+      setState(() {
+        _companyCustomers = customers;
+        _loadingCompanyCustomers = false;
+        _companyCustomerMessage = null;
+      });
+    } on CustomerBoundaryFailure catch (failure) {
+      if (!mounted) return;
+      setState(() {
+        _loadingCompanyCustomers = false;
+        _companyCustomerMessage = failure.message;
+      });
+    }
+  }
+
   Future<void> _loadWorkspace(FieldRoute route) async {
     final client = _fieldDataClient;
     if (client == null) return;
@@ -314,8 +359,14 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   Future<void> _refreshOutlets() async {
     setState(() {
       _loadingOutlets = true;
+      if (_customerBoundaryClient != null) {
+        _loadingCompanyCustomers = true;
+      }
     });
-    await _loadOutlets();
+    await Future.wait([
+      _loadOutlets(),
+      if (_customerBoundaryClient != null) _loadCompanyCustomers(),
+    ]);
   }
 
   Future<void> _startRoute() async {
@@ -666,6 +717,11 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
           onCreateOrder: _orderDataClient == null
               ? null
               : () => _openCreateOrder(line),
+          onCustomerOnboarding: _customerBoundaryClient == null
+              ? null
+              : () => _openCustomerOnboarding(
+                  routeCustomerId: line.routeCustomerId,
+                ),
           onCreateReport: _fieldActivityClient == null
               ? null
               : () => _openFieldActivity(FieldActivityKind.report, line),
@@ -683,6 +739,38 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     );
   }
 
+  Future<bool> _openCustomerOnboarding({
+    String? routeCustomerId,
+  }) async {
+    final client = _customerBoundaryClient;
+    if (client == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Chưa kết nối được chức năng mở hoặc liên kết mã.'),
+        ),
+      );
+      return false;
+    }
+
+    var changed = false;
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (context) => CustomerOnboardingPage(
+          client: client,
+          focusRouteCustomerId: routeCustomerId,
+          onChanged: () async {
+            changed = true;
+            await Future.wait([
+              if (_fieldDataClient != null) _loadOutlets(),
+              _loadCompanyCustomers(),
+            ]);
+          },
+        ),
+      ),
+    );
+    return changed;
+  }
+
   void _openDirectoryOutlet(FieldOutlet outlet) {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
@@ -691,6 +779,14 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
           outlet: outlet,
           mediaClient: _outletMediaClient,
           photoPicker: _photoPicker,
+          onCreateOrder: _orderDataClient == null
+              ? null
+              : () => _openOrderForOutlet(outlet),
+          onCustomerOnboarding: _customerBoundaryClient == null
+              ? null
+              : () => _openCustomerOnboarding(
+                  routeCustomerId: outlet.id,
+                ),
         ),
       ),
     );
@@ -704,34 +800,78 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     return null;
   }
 
-  Future<void> _openCreateOrder(FieldDayLine line) async {
-    final client = _orderDataClient;
-    if (client == null) return;
+  bool _canOrderForOutlet(FieldOutlet outlet) {
+    return (outlet.coreCustomerId ?? '').trim().isNotEmpty &&
+        (outlet.coreCustomerAddressId ?? '').trim().isNotEmpty;
+  }
 
+  Future<void> _openCreateOrder(FieldDayLine line) async {
     var outlet = _outletForRouteCustomerId(line.routeCustomerId);
     if (outlet == null && _fieldDataClient != null) {
       await _loadOutlets();
       outlet = _outletForRouteCustomerId(line.routeCustomerId);
     }
     if (!mounted) return;
-
-    if (outlet == null ||
-        (outlet.coreCustomerId ?? '').isEmpty ||
-        (outlet.coreCustomerAddressId ?? '').isEmpty) {
+    if (outlet == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text(
-            'Điểm bán chưa liên kết đủ khách Công Ty và địa chỉ giao hàng để ra đơn.',
-          ),
+          content: Text('Không tìm thấy hồ sơ điểm bán để ra đơn.'),
         ),
       );
       return;
+    }
+    await _openOrderForOutlet(outlet);
+  }
+
+  Future<void> _openOrderForOutlet(FieldOutlet outlet) async {
+    final client = _orderDataClient;
+    if (client == null) return;
+
+    var current = _outletForRouteCustomerId(outlet.id) ?? outlet;
+    if (!_canOrderForOutlet(current)) {
+      final openOnboarding = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Điểm bán chưa sẵn sàng ra đơn'),
+          content: const Text(
+            'Cần mở hoặc liên kết mã khách Công Ty và có địa chỉ giao hàng trước khi tạo đơn.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Để sau'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Mở / liên kết mã'),
+            ),
+          ],
+        ),
+      );
+      if (openOnboarding != true || !mounted) return;
+
+      await _openCustomerOnboarding(routeCustomerId: current.id);
+      if (_fieldDataClient != null) {
+        await _loadOutlets();
+      }
+      if (!mounted) return;
+      current = _outletForRouteCustomerId(current.id) ?? current;
+      if (!_canOrderForOutlet(current)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Điểm bán chưa được Công Ty xác nhận đủ thông tin để ra đơn.',
+            ),
+          ),
+        );
+        return;
+      }
     }
 
     final outcome = await Navigator.of(context).push<OrderSubmitOutcome>(
       MaterialPageRoute<OrderSubmitOutcome>(
         builder: (context) => CreateOrderPage(
-          outlet: outlet!,
+          outlet: current,
           orderClient: client,
           offlineStore: _orderOfflineStore,
         ),
@@ -799,9 +939,14 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       ),
       OutletsPage(
         outlets: _outlets,
+        companyCustomers: _companyCustomers,
         loading: _loadingOutlets,
+        companyLoading: _loadingCompanyCustomers,
         message: _outletMessage,
-        onRefresh: _fieldDataClient == null ? null : _refreshOutlets,
+        companyMessage: _companyCustomerMessage,
+        onRefresh: _fieldDataClient == null && _customerBoundaryClient == null
+            ? null
+            : _refreshOutlets,
         onOpenOutlet: _openDirectoryOutlet,
       ),
       OrdersPage(
@@ -819,6 +964,9 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
         onTasks: _fieldActivityClient == null
             ? null
             : () => _openActivityHistory(FieldActivityKind.followup),
+        onCustomerOnboarding: _customerBoundaryClient == null
+            ? null
+            : () => _openCustomerOnboarding(),
         onLogout: widget.onLogout,
       ),
     ];

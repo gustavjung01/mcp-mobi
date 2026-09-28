@@ -21,6 +21,7 @@ class OutletDetailPage extends StatefulWidget {
     this.photoPicker,
     this.onCheckIn,
     this.onCreateOrder,
+    this.onCustomerOnboarding,
     this.onCreateReport,
     this.onCreateProductTrial,
     this.onCreateFollowup,
@@ -35,6 +36,7 @@ class OutletDetailPage extends StatefulWidget {
   final OutletPhotoPicker? photoPicker;
   final Future<void> Function(FieldDayLine line)? onCheckIn;
   final Future<void> Function()? onCreateOrder;
+  final Future<void> Function()? onCustomerOnboarding;
   final Future<void> Function()? onCreateReport;
   final Future<void> Function()? onCreateProductTrial;
   final Future<void> Function()? onCreateFollowup;
@@ -120,6 +122,9 @@ class _OutletDetailPageState extends State<OutletDetailPage> {
         (line?.routeCustomerId ?? customer?.id ?? outlet?.id ?? '').trim();
     final canCheckIn =
         line?.sessionCustomerId != null && widget.onCheckIn != null;
+    final linkedToCompany =
+        (outlet?.coreCustomerId ?? '').trim().isNotEmpty &&
+        (outlet?.coreCustomerAddressId ?? '').trim().isNotEmpty;
 
     return Scaffold(
       key: const Key('outlet-detail-screen'),
@@ -371,6 +376,76 @@ class _OutletDetailPageState extends State<OutletDetailPage> {
                           ],
                         ),
                       ),
+                      if (outlet != null &&
+                          widget.onCustomerOnboarding != null) ...[
+                        const SizedBox(height: AppSpacing.md),
+                        AppCard(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(
+                                    linkedToCompany
+                                        ? Icons.verified_rounded
+                                        : Icons.link_rounded,
+                                    color: linkedToCompany
+                                        ? AppColors.success
+                                        : AppColors.warning,
+                                  ),
+                                  const SizedBox(width: AppSpacing.sm),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        const Text(
+                                          'Liên kết khách Công Ty',
+                                          style: TextStyle(
+                                            color: AppColors.textPrimary,
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w900,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          linkedToCompany
+                                              ? 'Đã sẵn sàng dùng thông tin khách Công Ty.'
+                                              : 'Mở hoặc liên kết mã trước khi ra đơn.',
+                                          style: const TextStyle(
+                                            color: AppColors.textSecondary,
+                                            fontSize: 11,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: AppSpacing.sm),
+                              SizedBox(
+                                width: double.infinity,
+                                child: OutlinedButton.icon(
+                                  key: const Key(
+                                    'outlet-customer-onboarding',
+                                  ),
+                                  onPressed: widget.onCustomerOnboarding,
+                                  icon: Icon(
+                                    linkedToCompany
+                                        ? Icons.sync_rounded
+                                        : Icons.how_to_reg_outlined,
+                                  ),
+                                  label: Text(
+                                    linkedToCompany
+                                        ? 'Xem trạng thái liên kết'
+                                        : 'Mở / liên kết mã',
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                       if (routeCustomerId.isNotEmpty &&
                           widget.mediaClient != null) ...[
                         const SizedBox(height: AppSpacing.md),
@@ -462,7 +537,28 @@ class _OutletDetailPageState extends State<OutletDetailPage> {
                             ),
                           ],
                         ),
-                      ] else
+                      ] else ...[
+                        if (widget.onCreateOrder != null) ...[
+                          const Text(
+                            'Bán hàng',
+                            style: TextStyle(
+                              color: AppColors.textPrimary,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.sm),
+                          SizedBox(
+                            width: double.infinity,
+                            child: FilledButton.icon(
+                              key: const Key('outlet-directory-create-order'),
+                              onPressed: widget.onCreateOrder,
+                              icon: const Icon(Icons.receipt_long_outlined),
+                              label: const Text('Ra đơn hàng'),
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.md),
+                        ],
                         AppCard(
                           child: Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -474,13 +570,14 @@ class _OutletDetailPageState extends State<OutletDetailPage> {
                               const SizedBox(width: AppSpacing.sm),
                               Expanded(
                                 child: Text(
-                                  'Đây là hồ sơ tra cứu. Check-in và tác nghiệp chỉ thực hiện khi mở điểm bán từ Đi tuyến.',
+                                  'Check-in, báo cáo, thử sản phẩm và công việc theo dõi thực hiện khi mở điểm bán từ Đi tuyến.',
                                   style: Theme.of(context).textTheme.bodyMedium,
                                 ),
                               ),
                             ],
                           ),
                         ),
+                      ],
                       const SizedBox(height: AppSpacing.md),
                       AppCard(
                         child: _InfoRow(
