@@ -4,6 +4,7 @@ import '../../core/auth/mobile_auth_client.dart';
 import '../../core/data/customer_boundary_client.dart';
 import '../../core/data/field_activity_client.dart';
 import '../../core/data/field_data_client.dart';
+import '../../core/data/field_history_client.dart';
 import '../../core/data/order_data_client.dart';
 import '../../core/idempotency/canonical_idempotency.dart';
 import '../../core/installation/installation_profile.dart';
@@ -38,6 +39,7 @@ class AppShell extends StatefulWidget {
     this.session,
     this.fieldDataClient,
     this.fieldActivityClient,
+    this.fieldHistoryClient,
     this.customerBoundaryClient,
     this.orderDataClient,
     this.fieldLocationProvider,
@@ -53,6 +55,7 @@ class AppShell extends StatefulWidget {
   final MobileSession? session;
   final FieldDataClient? fieldDataClient;
   final FieldActivityClient? fieldActivityClient;
+  final FieldHistoryClient? fieldHistoryClient;
   final CustomerBoundaryClient? customerBoundaryClient;
   final OrderDataClient? orderDataClient;
   final FieldLocationProvider? fieldLocationProvider;
@@ -71,6 +74,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   int _selectedIndex = 0;
   FieldDataClient? _fieldDataClient;
   FieldActivityClient? _fieldActivityClient;
+  FieldHistoryClient? _fieldHistoryClient;
   CustomerBoundaryClient? _customerBoundaryClient;
   MutationQueueStore? _mutationQueueStore;
   RouteSelectionStore? _routeSelectionStore;
@@ -111,6 +115,8 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     _fieldDataClient = widget.fieldDataClient ?? _defaultFieldDataClient();
     _fieldActivityClient =
         widget.fieldActivityClient ?? _defaultFieldActivityClient();
+    _fieldHistoryClient =
+        widget.fieldHistoryClient ?? _defaultFieldHistoryClient();
     _customerBoundaryClient =
         widget.customerBoundaryClient ?? _defaultCustomerBoundaryClient();
     _mutationQueueStore =
@@ -170,6 +176,16 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     final session = widget.session;
     if (profile == null || session == null) return null;
     return HttpFieldActivityClient(
+      profile: profile,
+      token: session.token,
+    );
+  }
+
+  FieldHistoryClient? _defaultFieldHistoryClient() {
+    final profile = widget.profile;
+    final session = widget.session;
+    if (profile == null || session == null) return null;
+    return HttpFieldHistoryClient(
       profile: profile,
       token: session.token,
     );
@@ -821,6 +837,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
             client: client,
             queue: queue,
           ),
+          historyClient: _fieldHistoryClient,
           onSynchronized: () async {
             final route = _selectedRoute;
             if (route != null) await _loadWorkspace(route);
