@@ -1,0 +1,45 @@
+# MCP Field — Release checklist
+
+## Gate code
+
+- [ ] `main` mới nhất đã được đối chiếu trước merge.
+- [ ] PR CI xanh: format, analyze, test, Android debug, Android release APK/AAB validation, iOS release compile.
+- [ ] Không có WebView hoặc direct DB access.
+- [ ] Không có secret, keystore, database credential hoặc internal token trong source.
+- [ ] Canonical Idempotency-Key vẫn được reuse cho cùng một mutation khi retry.
+
+## Regression nghiệp vụ
+
+- [ ] Chọn hệ thống, đăng nhập, khôi phục phiên.
+- [ ] Mở app khi mạng gián đoạn và hiển thị trạng thái dễ hiểu.
+- [ ] Hôm nay và 5 mục điều hướng chính.
+- [ ] Bắt đầu/tiếp tục/kết thúc phiên đi tuyến.
+- [ ] Điểm bán độc lập với Đi tuyến.
+- [ ] Check-in: cho phép vị trí, từ chối quyền, GPS chậm/tắt.
+- [ ] Ảnh điểm bán: chọn/chụp, preview, upload, lỗi upload, retry.
+- [ ] Ra đơn, lưu nháp, gửi đơn, retry cùng intent không tạo đơn trùng.
+- [ ] Báo cáo, thử sản phẩm, công việc theo dõi.
+- [ ] Mutation chờ vẫn còn sau restart và đồng bộ lại khi có mạng.
+- [ ] Hết phiên đăng nhập và thiếu quyền đều dùng ngôn ngữ người dùng.
+
+## Android phát hành
+
+- [ ] Có đủ 4 biến `MCP_ANDROID_*` cho production signing.
+- [ ] `MCP_CI_RELEASE_VALIDATION` không được bật khi đóng gói thật.
+- [ ] `KM_RELEASE_VERSION` khớp `release-config.json`.
+- [ ] Build script tạo cả APK và AAB.
+- [ ] APK + `latest.json` được upload cùng version.
+- [ ] `verify-release-publication.ps1` PASS sau upload.
+- [ ] Cài thử APK mới trên thiết bị Android thật và kiểm tra cập nhật từ bản trước.
+
+## iOS
+
+- [ ] CI `flutter build ios --release --no-codesign` PASS.
+- [ ] Bundle identifier là `com.hungphat.mcpfield`.
+- [ ] Camera, ảnh và vị trí có usage description.
+- [ ] Apple signing/provisioning được cấu hình ngoài repo trước khi archive phân phối.
+- [ ] Thiết lập trên iOS không hiển thị luồng tải/cài APK Android.
+
+## Production boundary
+
+Repo mobile không tự deploy backend/DB. Nếu regression chỉ ra lỗi contract MCP API, mở task backend riêng, audit NPP-Platform và deploy theo boundary riêng.

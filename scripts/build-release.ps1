@@ -16,6 +16,9 @@ if ([string]::IsNullOrWhiteSpace($version)) {
 if ($version -notmatch '^\d+\.\d+\.\d+$') {
     throw "MCP Field release version must use major.minor.patch."
 }
+if ($env:MCP_CI_RELEASE_VALIDATION -eq "true") {
+    throw "MCP_CI_RELEASE_VALIDATION is only for CI validation and must not be used for a distributable release."
+}
 
 function Remove-OuterQuotes([string]$Value) {
     $normalized = $Value.Trim()
@@ -36,6 +39,25 @@ function Remove-OuterQuotes([string]$Value) {
 $Flutter = Remove-OuterQuotes $Flutter
 $ApiBaseUrl = (Remove-OuterQuotes $ApiBaseUrl).TrimEnd("/")
 $UpdateBaseUrl = (Remove-OuterQuotes $UpdateBaseUrl).TrimEnd("/")
+
+$requiredSigningVariables = @(
+    "MCP_ANDROID_KEYSTORE",
+    "MCP_ANDROID_KEYSTORE_PASSWORD",
+    "MCP_ANDROID_KEY_ALIAS",
+    "MCP_ANDROID_KEY_PASSWORD"
+)
+foreach ($name in $requiredSigningVariables) {
+    $value = [Environment]::GetEnvironmentVariable($name)
+    if ([string]::IsNullOrWhiteSpace($value)) {
+        throw "$name is required for a distributable Android release."
+    }
+}
+
+$keystorePath = Remove-OuterQuotes $env:MCP_ANDROID_KEYSTORE
+if (-not (Test-Path -LiteralPath $keystorePath -PathType Leaf)) {
+    throw "MCP_ANDROID_KEYSTORE does not point to an existing keystore file."
+}
+$env:MCP_ANDROID_KEYSTORE = (Resolve-Path -LiteralPath $keystorePath).Path
 
 $apiUri = $null
 try {
@@ -99,7 +121,9 @@ if ($buildNumber -le 0 -or $buildNumber -gt 2100000000) {
 $root = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $outputDir = Join-Path $root "dist\android-release"
 $apkName = "MCP-Field-$version.apk"
+$aabName = "MCP-Field-$version.aab"
 $apkPath = Join-Path $outputDir $apkName
+$aabPath = Join-Path $outputDir $aabName
 $manifestPath = Join-Path $outputDir "latest.json"
 
 if (Test-Path -LiteralPath $outputDir) {
@@ -115,19 +139,33 @@ try {
     & $Flutter pub get
     if ($LASTEXITCODE -ne 0) { throw "flutter pub get failed." }
 
+    & $Flutter pub run flutter_launcher_icons
+    if ($LASTEXITCODE -ne 0) { throw "flutter_launcher_icons failed." }
+
+    & $Flutter pub run flutter_native_splash:create
+    if ($LASTEXITCODE -ne 0) { throw "flutter_native_splash failed." }
+
     & $Flutter build apk --release "--build-name=$version" "--build-number=$buildNumber" "--dart-define=MCP_API_BASE_URL=$ApiBaseUrl" "--dart-define=MCP_UPDATE_BASE_URL=$UpdateBaseUrl"
     if ($LASTEXITCODE -ne 0) { throw "flutter build apk --release failed." }
+
+    & $Flutter build appbundle --release "--build-name=$version" "--build-number=$buildNumber" "--dart-define=MCP_API_BASE_URL=$ApiBaseUrl" "--dart-define=MCP_UPDATE_BASE_URL=$UpdateBaseUrl"
+    if ($LASTEXITCODE -ne 0) { throw "flutter build appbundle --release failed." }
 }
 finally {
     Pop-Location
 }
 
 $sourceApk = Join-Path $root "build\app\outputs\flutter-apk\app-release.apk"
+$sourceAab = Join-Path $root "build\app\outputs\bundle\release\app-release.aab"
 if (-not (Test-Path -LiteralPath $sourceApk)) {
     throw "Release APK was not produced at $sourceApk."
 }
+if (-not (Test-Path -LiteralPath $sourceAab)) {
+    throw "Release AAB was not produced at $sourceAab."
+}
 
 Copy-Item -LiteralPath $sourceApk -Destination $apkPath -Force
+Copy-Item -LiteralPath $sourceAab -Destination $aabPath -Force
 $apk = Get-Item -LiteralPath $apkPath
 $sha256 = (Get-FileHash -LiteralPath $apkPath -Algorithm SHA256).Hash.ToLowerInvariant()
 $releaseNotes = if ([string]::IsNullOrWhiteSpace($env:KM_RELEASE_NOTES)) {
@@ -156,7 +194,8 @@ Write-Host "MCP Field release ready"
 Write-Host "Version: $version"
 Write-Host "Build number: $buildNumber"
 Write-Host "APK: $apkPath"
+Write-Host "AAB: $aabPath"
 Write-Host "Manifest: $manifestPath"
 
-Write-Host "After publishing latest.json and the APK to R2, verify the public update path:"
+Write-Host "After publishing latest.json and the APK to the public update location, verify it:"
 Write-Host "powershell -ExecutionPolicy Bypass -File scripts\verify-release-publication.ps1 -UpdateBaseUrl <public-update-url>"

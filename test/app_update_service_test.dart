@@ -9,16 +9,21 @@ class FakeUpdatePlatform implements AppUpdatePlatform {
   FakeUpdatePlatform({
     this.version = '1.0.0',
     this.installAllowed = true,
+    this.directInstallSupported = true,
   });
 
   String version;
   bool installAllowed;
+  bool directInstallSupported;
   bool openedSettings = false;
   Uri? installedUrl;
   String? installedSha256;
 
   @override
   Future<String> currentVersion() async => version;
+
+  @override
+  Future<bool> supportsDirectInstall() async => directInstallSupported;
 
   @override
   Future<bool> canInstallPackages() async => installAllowed;
@@ -69,6 +74,8 @@ void main() {
       client: client,
       platform: platform,
     );
+
+    expect(await service.supportsDirectInstall(), isTrue);
 
     final check = await service.checkForUpdate();
     expect(check.currentVersion, '1.0.0');
