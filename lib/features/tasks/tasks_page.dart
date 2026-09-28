@@ -85,8 +85,9 @@ class _TasksPageState extends State<TasksPage> {
             if (item.isOverdue(_now) || item.isDueToday(_now)) return false;
             if ((item.dueDate ?? '').isEmpty) return false;
           }
-          if (_due == 'no_date' && (item.dueDate ?? '').isNotEmpty)
+          if (_due == 'no_date' && (item.dueDate ?? '').isNotEmpty) {
             return false;
+          }
           if (search.isEmpty) return true;
           final haystack = [
             item.title,
