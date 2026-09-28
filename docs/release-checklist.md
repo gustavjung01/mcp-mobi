@@ -24,7 +24,14 @@
 
 ## Android phát hành
 
-- [ ] Có đủ 4 biến `MCP_ANDROID_*` cho production signing.
+### Gate bắt buộc về signing/version
+
+- [ ] Xác nhận bản đang phát hành tiếp nối signing identity của các bản đã phát hành đến **1.0.4**; mặc định lịch sử là `%USERPROFILE%\.android\debug.keystore`.
+- [ ] Không thay keystore/alias/signing mode trong PR nghiệp vụ, UI hoặc release-readiness. Đổi signing chỉ được làm trong migration riêng có test cài đè.
+- [ ] Không xóa fallback signing tương thích trong `scripts/build-release.ps1` nếu chưa có migration signing được phê duyệt.
+- [ ] Nếu cấu hình keystore khác identity lịch sử, có đủ 4 biến `MCP_ANDROID_*`; không ép Key Manager/app khác gánh signing riêng của MCP.
+- [ ] `release-config.json` và `pubspec.yaml` cùng phản ánh version hiện tại trước build.
+- [ ] Trước khi `git pull`, `git restore`, drop stash hoặc bỏ local changes ở hai file version, đã đối chiếu version phát hành thật; không được làm mất metadata version chỉ để làm sạch working tree.
 - [ ] `MCP_CI_RELEASE_VALIDATION` không được bật khi đóng gói thật.
 - [ ] `KM_RELEASE_VERSION` khớp `release-config.json`.
 - [ ] Build script tạo cả APK và AAB.
