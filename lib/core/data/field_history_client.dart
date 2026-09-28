@@ -17,7 +17,6 @@ class FieldHistoryFailure implements Exception {
   final bool retryable;
 }
 
-
 class FieldSessionHistoryItem {
   const FieldSessionHistoryItem({
     required this.id,
@@ -129,9 +128,7 @@ class FieldTaskItem {
   bool isDueToday(DateTime now) {
     final due = DateTime.tryParse((dueDate ?? '').trim());
     if (due == null) return false;
-    return due.year == now.year &&
-        due.month == now.month &&
-        due.day == now.day;
+    return due.year == now.year && due.month == now.month && due.day == now.day;
   }
 }
 
@@ -667,7 +664,12 @@ String normalizeSessionStatus(Object? value) {
 
 String normalizeTaskStatus(Object? value) {
   final status = _text(value).toLowerCase();
-  if (const {'doing', 'in_progress', 'in-progress', 'progress'}.contains(status)) {
+  if (const {
+    'doing',
+    'in_progress',
+    'in-progress',
+    'progress',
+  }.contains(status)) {
     return 'doing';
   }
   if (const {'done', 'completed', 'closed', 'cancelled'}.contains(status)) {

@@ -65,13 +65,15 @@ class _SessionHistoryPageState extends State<SessionHistoryPage> {
       _now.day,
     ).subtract(Duration(days: _days - 1));
 
-    return _items.where((item) {
-      if (_route != 'all' && item.routeName != _route) return false;
-      if (_status != 'all' && item.status != _status) return false;
-      final date = DateTime.tryParse((item.sessionDate ?? '').trim());
-      if (date != null && date.isBefore(cutoff)) return false;
-      return true;
-    }).toList(growable: false);
+    return _items
+        .where((item) {
+          if (_route != 'all' && item.routeName != _route) return false;
+          if (_status != 'all' && item.status != _status) return false;
+          final date = DateTime.tryParse((item.sessionDate ?? '').trim());
+          if (date != null && date.isBefore(cutoff)) return false;
+          return true;
+        })
+        .toList(growable: false);
   }
 
   @override
@@ -285,7 +287,10 @@ class _SessionCard extends StatelessWidget {
             spacing: AppSpacing.sm,
             runSpacing: AppSpacing.xs,
             children: [
-              _Metric(label: 'Đã ghé', value: '${item.visited}/${item.planned}'),
+              _Metric(
+                label: 'Đã ghé',
+                value: '${item.visited}/${item.planned}',
+              ),
               _Metric(label: 'Đơn', value: item.orders.toString()),
               _Metric(label: 'Thử SP', value: item.tests.toString()),
               _Metric(label: 'Báo cáo', value: item.reports.toString()),

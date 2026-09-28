@@ -1227,8 +1227,9 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       ),
       MorePage(
         onFixedRoutes: _fieldDataClient == null ? null : _openFixedRoutes,
-        onSessionHistory:
-            _fieldHistoryClient == null ? null : _openSessionHistory,
+        onSessionHistory: _fieldHistoryClient == null
+            ? null
+            : _openSessionHistory,
         onReports: _fieldActivityClient == null
             ? null
             : () => _openActivityHistory(FieldActivityKind.report),

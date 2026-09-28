@@ -74,27 +74,30 @@ class _TasksPageState extends State<TasksPage> {
 
   List<FieldTaskItem> get _filtered {
     final search = _search.text.trim().toLowerCase();
-    return _items.where((item) {
-      if (_status != 'all' && item.status != _status) return false;
-      if (_priority != 'all' && item.priority != _priority) return false;
-      if (_owner != 'all' && item.owner != _owner) return false;
-      if (_due == 'overdue' && !item.isOverdue(_now)) return false;
-      if (_due == 'today' && !item.isDueToday(_now)) return false;
-      if (_due == 'upcoming') {
-        if (item.isOverdue(_now) || item.isDueToday(_now)) return false;
-        if ((item.dueDate ?? '').isEmpty) return false;
-      }
-      if (_due == 'no_date' && (item.dueDate ?? '').isNotEmpty) return false;
-      if (search.isEmpty) return true;
-      final haystack = [
-        item.title,
-        item.customerName,
-        item.routeName,
-        item.owner,
-        item.note ?? '',
-      ].join(' ').toLowerCase();
-      return haystack.contains(search);
-    }).toList(growable: false);
+    return _items
+        .where((item) {
+          if (_status != 'all' && item.status != _status) return false;
+          if (_priority != 'all' && item.priority != _priority) return false;
+          if (_owner != 'all' && item.owner != _owner) return false;
+          if (_due == 'overdue' && !item.isOverdue(_now)) return false;
+          if (_due == 'today' && !item.isDueToday(_now)) return false;
+          if (_due == 'upcoming') {
+            if (item.isOverdue(_now) || item.isDueToday(_now)) return false;
+            if ((item.dueDate ?? '').isEmpty) return false;
+          }
+          if (_due == 'no_date' && (item.dueDate ?? '').isNotEmpty)
+            return false;
+          if (search.isEmpty) return true;
+          final haystack = [
+            item.title,
+            item.customerName,
+            item.routeName,
+            item.owner,
+            item.note ?? '',
+          ].join(' ').toLowerCase();
+          return haystack.contains(search);
+        })
+        .toList(growable: false);
   }
 
   void _openDetail(FieldTaskItem item) {
@@ -157,7 +160,8 @@ class _TasksPageState extends State<TasksPage> {
                           controller: _search,
                           decoration: const InputDecoration(
                             labelText: 'Tìm công việc',
-                            hintText: 'Tên việc, điểm bán, tuyến, người phụ trách',
+                            hintText:
+                                'Tên việc, điểm bán, tuyến, người phụ trách',
                             prefixIcon: Icon(Icons.search_rounded),
                           ),
                         ),
