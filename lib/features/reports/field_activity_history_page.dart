@@ -1195,5 +1195,5 @@ String _dateLabel(String? value) {
   if (parsed == null) return normalized;
   final day = parsed.day.toString().padLeft(2, '0');
   final month = parsed.month.toString().padLeft(2, '0');
-  return '${day}/${month}/${parsed.year}';
+  return '$day/$month/${parsed.year}';
 }
