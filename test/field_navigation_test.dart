@@ -461,6 +461,19 @@ Future<void> revealOutletActivityAction(
   await tester.pumpAndSettle();
 }
 
+Future<void> revealRouteLine(WidgetTester tester) async {
+  final screen = find.byKey(const Key('routes-screen'));
+  final list = find.descendant(
+    of: screen,
+    matching: find.byType(ListView),
+  );
+  final target = find.byKey(const Key('route-line-line-1'));
+
+  await tester.ensureVisible(target);
+  await tester.drag(list, const Offset(0, -120));
+  await tester.pumpAndSettle();
+}
+
 Future<void> revealAddCustomerSubmit(WidgetTester tester) async {
   final screen = find.byKey(const Key('route-add-customer-screen'));
   final list = find.descendant(
@@ -722,9 +735,8 @@ void main() {
 
     await tester.tap(navLabel('Đi tuyến'));
     await tester.pumpAndSettle();
-    final routeLine = find.byKey(const Key('route-line-line-1'));
-    await tester.ensureVisible(routeLine);
-    await tester.tap(routeLine);
+    await revealRouteLine(tester);
+    await tester.tap(find.byKey(const Key('route-line-line-1')));
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('outlet-checkin-button')), findsOneWidget);
@@ -763,9 +775,8 @@ void main() {
 
       await tester.tap(navLabel('Đi tuyến'));
       await tester.pumpAndSettle();
-      final routeLine = find.byKey(const Key('route-line-line-1'));
-      await tester.ensureVisible(routeLine);
-      await tester.tap(routeLine);
+      await revealRouteLine(tester);
+      await tester.tap(find.byKey(const Key('route-line-line-1')));
       await tester.pumpAndSettle();
 
       await tester.tap(find.byKey(const Key('outlet-skip-button')));
