@@ -10,9 +10,11 @@ import '../../core/installation/installation_profile.dart';
 import '../../core/location/field_location.dart';
 import '../../core/media/outlet_media_client.dart';
 import '../../core/media/outlet_photo_picker.dart';
+import '../../core/selection/route_selection_store.dart';
 import '../../core/sync/field_activity_sync.dart';
 import '../../core/sync/mutation_queue.dart';
 import '../../core/sync/order_offline_store.dart';
+import '../../core/sync/route_mutation_sync.dart';
 import '../../features/customers/customer_onboarding_page.dart';
 import '../../features/more/more_page.dart';
 import '../../features/orders/create_order_page.dart';
@@ -41,6 +43,7 @@ class AppShell extends StatefulWidget {
     this.outletMediaClient,
     this.outletPhotoPicker,
     this.mutationQueueStore,
+    this.routeSelectionStore,
     this.orderOfflineStore,
     this.onLogout,
   });
@@ -55,6 +58,7 @@ class AppShell extends StatefulWidget {
   final OutletMediaClient? outletMediaClient;
   final OutletPhotoPicker? outletPhotoPicker;
   final MutationQueueStore? mutationQueueStore;
+  final RouteSelectionStore? routeSelectionStore;
   final OrderOfflineStore? orderOfflineStore;
   final Future<void> Function()? onLogout;
 
@@ -68,13 +72,13 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   FieldActivityClient? _fieldActivityClient;
   CustomerBoundaryClient? _customerBoundaryClient;
   MutationQueueStore? _mutationQueueStore;
+  RouteSelectionStore? _routeSelectionStore;
   OrderDataClient? _orderDataClient;
   OrderOfflineStore? _orderOfflineStore;
   OutletMediaClient? _outletMediaClient;
   late final FieldLocationProvider _locationProvider;
   late final OutletPhotoPicker _photoPicker;
   final Map<String, String> _mutationKeys = {};
-  final Map<String, _PendingCheckIn> _pendingCheckIns = {};
   List<FieldRoute> _routes = const [];
   List<FieldOutlet> _outlets = const [];
   List<CompanyCustomer> _companyCustomers = const [];
@@ -85,7 +89,9 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   bool _loadingCompanyCustomers = false;
   bool _loadingWorkspace = false;
   bool _routeActionBusy = false;
+  bool _routeMutationSyncing = false;
   bool _fieldActivitySyncing = false;
+  bool _routeSelectionLoaded = false;
   String? _fieldMessage;
   String? _outletMessage;
   String? _companyCustomerMessage;
@@ -108,6 +114,8 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
         widget.customerBoundaryClient ?? _defaultCustomerBoundaryClient();
     _mutationQueueStore =
         widget.mutationQueueStore ?? _defaultMutationQueueStore();
+    _routeSelectionStore =
+        widget.routeSelectionStore ?? _defaultRouteSelectionStore();
     _orderDataClient = widget.orderDataClient ?? _defaultOrderDataClient();
     _orderOfflineStore =
         widget.orderOfflineStore ?? _defaultOrderOfflineStore();
@@ -127,6 +135,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       _loadCompanyCustomers();
     }
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      _syncRouteMutations();
       _syncFieldActivities();
     });
   }
@@ -134,6 +143,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
+      _syncRouteMutations();
       _syncFieldActivities();
     }
   }
@@ -179,6 +189,16 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     final session = widget.session;
     if (profile == null || session == null) return null;
     return SecureMutationQueueStore(
+      installationKey: profile.installationKey,
+      employeeId: session.employeeId,
+    );
+  }
+
+  RouteSelectionStore? _defaultRouteSelectionStore() {
+    final profile = widget.profile;
+    final session = widget.session;
+    if (profile == null || session == null) return null;
+    return SecureRouteSelectionStore(
       installationKey: profile.installationKey,
       employeeId: session.employeeId,
     );
@@ -237,9 +257,16 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       final routes = await client.loadRoutes();
       if (!mounted) return;
 
+      String? restoredRouteId;
+      if (!_routeSelectionLoaded) {
+        _routeSelectionLoaded = true;
+        restoredRouteId = await _routeSelectionStore?.load();
+        if (!mounted) return;
+      }
+
       FieldRoute? selectedRoute;
-      final currentId = _selectedRoute?.id;
-      if (currentId != null) {
+      final currentId = _selectedRoute?.id ?? restoredRouteId;
+      if ((currentId ?? '').isNotEmpty) {
         for (final route in routes) {
           if (route.id == currentId) {
             selectedRoute = route;
@@ -249,6 +276,15 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       }
       if (selectedRoute == null && routes.length == 1) {
         selectedRoute = routes.single;
+      }
+      if (selectedRoute == null &&
+          (currentId ?? '').isNotEmpty &&
+          routes.length != 1) {
+        try {
+          await _routeSelectionStore?.clear();
+        } catch (_) {
+          // Tuyến cũ không còn trong phạm vi; không chặn tải dữ liệu mới.
+        }
       }
 
       setState(() {
@@ -309,6 +345,21 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       setState(() {
         _loadingCompanyCustomers = false;
         _companyCustomerMessage = failure.message;
+      });
+    }
+  }
+
+  Future<void> _selectRoute(FieldRoute route) async {
+    String? saveWarning;
+    try {
+      await _routeSelectionStore?.save(route.id);
+    } catch (_) {
+      saveWarning = 'Đã chọn tuyến nhưng chưa lưu được lựa chọn trên thiết bị.';
+    }
+    await _loadWorkspace(route);
+    if (saveWarning != null && mounted) {
+      setState(() {
+        _fieldMessage = saveWarning;
       });
     }
   }
@@ -466,28 +517,33 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     }
   }
 
-  Future<void> _checkIn(FieldDayLine line) async {
+  RouteMutationSubmissionService? get _routeMutationSubmissionService {
     final actions = _fieldActions;
+    final queue = _mutationQueueStore;
+    if (actions == null || queue == null) return null;
+    return RouteMutationSubmissionService(
+      client: actions,
+      queue: queue,
+    );
+  }
+
+  Future<bool> _setCheckIn(
+    FieldDayLine line,
+    bool checkedIn,
+  ) async {
+    final service = _routeMutationSubmissionService;
     final route = _selectedRoute;
-    final sessionCustomerId = line.sessionCustomerId;
-    if (actions == null || route == null || sessionCustomerId == null) {
+    if (service == null || route == null) {
       throw const FieldDataFailure(
         code: 'CHECKIN_UNAVAILABLE',
         message: 'Bắt đầu tuyến trước khi check-in điểm bán.',
       );
     }
 
-    var pending = _pendingCheckIns[sessionCustomerId];
-    if (pending == null) {
+    FieldLocation? location;
+    if (checkedIn) {
       try {
-        final location = await _locationProvider.current();
-        pending = _PendingCheckIn(
-          key: CanonicalIdempotencyKey.create(
-            'session-customer.checkin.set',
-          ),
-          location: location,
-        );
-        _pendingCheckIns[sessionCustomerId] = pending;
+        location = await _locationProvider.current();
       } on FieldLocationFailure catch (failure) {
         throw FieldDataFailure(
           code: 'LOCATION_UNAVAILABLE',
@@ -496,22 +552,63 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       }
     }
 
-    await actions.setSessionCustomerCheckIn(
-      sessionCustomerId: sessionCustomerId,
-      latitude: pending.location.latitude,
-      longitude: pending.location.longitude,
-      accuracy: pending.location.accuracy,
-      idempotencyKey: pending.key,
+    final result = await service.setCheckIn(
+      line: line,
+      checkedIn: checkedIn,
+      location: location,
     );
-    _pendingCheckIns.remove(sessionCustomerId);
-    await _loadWorkspace(route);
+    if (result.status == RouteMutationSubmitStatus.completed) {
+      await _loadWorkspace(route);
+    } else if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            checkedIn ? 'Đã lưu check-in chờ gửi. Ứng dụng sẽ tự đồng bộ lại.' : 'Đã lưu hoàn tác check-in chờ gửi. Ứng dụng sẽ tự đồng bộ lại.',
+          ),
+        ),
+      );
+    }
+    return true;
+  }
+
+  Future<bool> _skipRouteOutlet(
+    FieldDayLine line,
+    String reason,
+    String note,
+  ) async {
+    final service = _routeMutationSubmissionService;
+    final route = _selectedRoute;
+    if (service == null || route == null) {
+      throw const FieldDataFailure(
+        code: 'SKIP_UNAVAILABLE',
+        message: 'Bắt đầu tuyến trước khi ghi nhận bỏ qua.',
+      );
+    }
+
+    final result = await service.skip(
+      line: line,
+      reason: reason,
+      note: note,
+    );
+    if (result.status == RouteMutationSubmitStatus.completed) {
+      await _loadWorkspace(route);
+    } else if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Đã lưu lý do bỏ qua chờ gửi. Ứng dụng sẽ tự đồng bộ lại.',
+          ),
+        ),
+      );
+    }
+    return true;
   }
 
   Future<void> _openAddRouteCustomer() async {
     final route = _selectedRoute;
     final day = _workspace?.day;
-    final actions = _fieldActions;
-    if (route == null || day?.sessionOpened != true || actions == null) return;
+    final service = _routeMutationSubmissionService;
+    if (route == null || day?.sessionOpened != true || service == null) return;
 
     final status = day!.run.status.trim().toLowerCase();
     if (const {'done', 'completed', 'cancelled', 'closed'}.contains(status)) {
@@ -522,17 +619,28 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       return;
     }
 
-    final added = await Navigator.of(context).push<bool>(
-      MaterialPageRoute<bool>(
+    final outcome = await Navigator.of(context).push<RouteMutationSubmitStatus>(
+      MaterialPageRoute<RouteMutationSubmitStatus>(
         builder: (context) => AddRouteCustomerPage(
           routeName: route.name,
           sessionId: day.run.id,
-          actionClient: actions,
+          submissionService: service,
           locationProvider: _locationProvider,
         ),
       ),
     );
-    if (added != true || !mounted) return;
+    if (outcome == null || !mounted) return;
+
+    if (outcome == RouteMutationSubmitStatus.queued) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Đã lưu điểm bán chờ gửi. Ứng dụng sẽ tự đồng bộ lại.',
+          ),
+        ),
+      );
+      return;
+    }
 
     setState(() {
       _loadingWorkspace = true;
@@ -542,6 +650,31 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       _loadWorkspace(route),
       _loadOutlets(),
     ]);
+  }
+
+  Future<void> _syncRouteMutations() async {
+    final actions = _fieldActions;
+    final queue = _mutationQueueStore;
+    if (actions == null || queue == null || _routeMutationSyncing) return;
+
+    _routeMutationSyncing = true;
+    try {
+      final result = await RouteMutationSyncService(
+        client: actions,
+        queue: queue,
+      ).syncPending();
+      if (result.sent > 0 && mounted) {
+        final route = _selectedRoute;
+        if (route != null) {
+          await Future.wait([
+            _loadWorkspace(route),
+            if (_fieldDataClient != null) _loadOutlets(),
+          ]);
+        }
+      }
+    } finally {
+      _routeMutationSyncing = false;
+    }
   }
 
   Future<void> _syncFieldActivities() async {
@@ -713,7 +846,12 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
               : null,
           mediaClient: _outletMediaClient,
           photoPicker: _photoPicker,
-          onCheckIn: _fieldActions == null ? null : _checkIn,
+          onSetCheckIn: _routeMutationSubmissionService == null
+              ? null
+              : _setCheckIn,
+          onSkip: _routeMutationSubmissionService == null
+              ? null
+              : _skipRouteOutlet,
           onCreateOrder: _orderDataClient == null
               ? null
               : () => _openCreateOrder(line),
@@ -930,12 +1068,14 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
         loading: loading,
         message: _fieldMessage,
         routeActionBusy: _routeActionBusy,
-        onSelectRoute: _loadWorkspace,
+        onSelectRoute: _selectRoute,
         onRefresh: _fieldDataClient == null ? null : _refreshFieldData,
         onOpenOutlet: (line) => _openRouteOutlet(_customerForLine(line), line),
         onStartRoute: _fieldActions == null ? null : _startRoute,
         onFinishRoute: _fieldActions == null ? null : _finishRoute,
-        onAddCustomer: _fieldActions == null ? null : _openAddRouteCustomer,
+        onAddCustomer: _routeMutationSubmissionService == null
+            ? null
+            : _openAddRouteCustomer,
       ),
       OutletsPage(
         outlets: _outlets,
@@ -1015,16 +1155,6 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       ),
     );
   }
-}
-
-class _PendingCheckIn {
-  const _PendingCheckIn({
-    required this.key,
-    required this.location,
-  });
-
-  final String key;
-  final FieldLocation location;
 }
 
 String _dateOnly(DateTime value) {

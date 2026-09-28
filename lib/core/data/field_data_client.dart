@@ -234,6 +234,7 @@ class FieldDayLine {
     this.routeCustomerId,
     this.phone,
     this.address,
+    this.statusReason,
     this.checkinAt,
     this.checkinLat,
     this.checkinLng,
@@ -250,6 +251,7 @@ class FieldDayLine {
   final String area;
   final String source;
   final String status;
+  final String? statusReason;
   final String note;
   final bool hasOrder;
   final bool hasTest;
@@ -273,6 +275,9 @@ class FieldDayLine {
       area: _text(json['area'], fallback: 'Chưa có khu vực'),
       source: _text(json['source'], fallback: 'planned'),
       status: _text(json['status'], fallback: 'pending'),
+      statusReason: _nullableText(
+        json['statusReason'] ?? json['status_reason'],
+      ),
       note: _text(json['note']),
       hasOrder: _boolean(json['hasOrder']),
       hasTest: _boolean(json['hasTest']),
@@ -358,9 +363,18 @@ abstract interface class FieldActionClient {
 
   Future<void> setSessionCustomerCheckIn({
     required String sessionCustomerId,
-    required double latitude,
-    required double longitude,
-    required double accuracy,
+    required bool checkedIn,
+    double? latitude,
+    double? longitude,
+    double? accuracy,
+    required String idempotencyKey,
+  });
+
+  Future<void> setSessionCustomerStatus({
+    required String sessionCustomerId,
+    required String visitStatus,
+    String? statusReason,
+    String? note,
     required String idempotencyKey,
   });
 
@@ -582,21 +596,60 @@ class HttpFieldDataClient implements FieldDataClient, FieldActionClient {
   @override
   Future<void> setSessionCustomerCheckIn({
     required String sessionCustomerId,
-    required double latitude,
-    required double longitude,
-    required double accuracy,
+    required bool checkedIn,
+    double? latitude,
+    double? longitude,
+    double? accuracy,
     required String idempotencyKey,
   }) async {
+    if (checkedIn &&
+        (latitude == null || longitude == null || accuracy == null)) {
+      throw const FieldDataFailure(
+        code: 'LOCATION_REQUIRED',
+        message: 'Cần lấy vị trí hiện tại để check-in điểm bán.',
+      );
+    }
+
     await _request(
       'POST',
       '/api/mcp-day/session-customer/checkin',
       body: {
         'sessionCustomerId': sessionCustomerId,
-        'checkedIn': true,
-        'geoLat': latitude,
-        'geoLng': longitude,
-        'geoAccuracy': accuracy,
-        'geoSource': 'mobile_gps',
+        'checkedIn': checkedIn,
+        if (checkedIn) 'geoLat': latitude,
+        if (checkedIn) 'geoLng': longitude,
+        if (checkedIn) 'geoAccuracy': accuracy,
+        if (checkedIn) 'geoSource': 'mobile_gps',
+      },
+      idempotencyKey: idempotencyKey,
+    );
+  }
+
+  @override
+  Future<void> setSessionCustomerStatus({
+    required String sessionCustomerId,
+    required String visitStatus,
+    String? statusReason,
+    String? note,
+    required String idempotencyKey,
+  }) async {
+    final normalizedStatus = visitStatus.trim().toLowerCase();
+    final normalizedReason = (statusReason ?? '').trim();
+    if (normalizedStatus == 'skipped' && normalizedReason.isEmpty) {
+      throw const FieldDataFailure(
+        code: 'STATUS_REASON_REQUIRED',
+        message: 'Cần nhập lý do bỏ qua điểm bán.',
+      );
+    }
+
+    await _request(
+      'POST',
+      '/api/mcp-day/session-customer/status',
+      body: {
+        'sessionCustomerId': sessionCustomerId,
+        'visitStatus': normalizedStatus,
+        if (normalizedReason.isNotEmpty) 'statusReason': normalizedReason,
+        if ((note ?? '').trim().isNotEmpty) 'note': note!.trim(),
       },
       idempotencyKey: idempotencyKey,
     );

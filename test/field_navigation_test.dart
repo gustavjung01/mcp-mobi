@@ -6,12 +6,26 @@ import 'package:mcp_field/core/data/customer_boundary_client.dart';
 import 'package:mcp_field/core/data/field_data_client.dart';
 import 'package:mcp_field/core/data/order_data_client.dart';
 import 'package:mcp_field/core/location/field_location.dart';
+import 'package:mcp_field/core/selection/route_selection_store.dart';
+import 'package:mcp_field/core/sync/mutation_queue.dart';
 import 'package:mcp_field/features/outlets/outlet_detail_page.dart';
+import 'package:mcp_field/features/routes/routes_page.dart';
 
 const route = FieldRoute(
   id: 'route-1',
   name: 'Tuyến Quận 1',
   area: 'Quận 1',
+  salesOwner: 'Nguyễn Văn A',
+  plannedCustomers: 1,
+  visitedCustomers: 0,
+  orderCount: 0,
+  status: 'active',
+);
+
+const routeTwo = FieldRoute(
+  id: 'route-2',
+  name: 'Tuyến Quận 3',
+  area: 'Quận 3',
   salesOwner: 'Nguyễn Văn A',
   plannedCustomers: 1,
   visitedCustomers: 0,
@@ -87,6 +101,79 @@ const workspace = FieldRouteWorkspace(
   day: day,
 );
 
+const unopenedDay = FieldDayData(
+  sessionOpened: false,
+  run: FieldDayRun(
+    id: '',
+    routeId: 'route-1',
+    routeName: 'Tuyến Quận 1',
+    date: '2026-09-27',
+    owner: 'Nguyễn Văn A',
+    status: 'cancelled',
+    openedAt: '',
+  ),
+  lines: [],
+);
+
+const unopenedWorkspace = FieldRouteWorkspace(
+  route: route,
+  customers: [customer],
+  day: unopenedDay,
+);
+
+const skippedLine = FieldDayLine(
+  id: 'line-skipped',
+  sessionCustomerId: 'line-skipped',
+  routeCustomerId: 'customer-skipped',
+  sortOrder: 2,
+  accountName: 'Cửa hàng Bỏ Qua',
+  area: 'Quận 1',
+  source: 'planned',
+  status: 'skipped',
+  statusReason: 'no_demand',
+  note: '',
+  hasOrder: false,
+  hasTest: false,
+  hasReport: false,
+  followupCount: 0,
+  checkedIn: false,
+);
+
+const addedLine = FieldDayLine(
+  id: 'line-added',
+  sessionCustomerId: 'line-added',
+  routeCustomerId: 'customer-added',
+  sortOrder: 3,
+  accountName: 'Cửa hàng Thêm Mới',
+  area: 'Quận 1',
+  source: 'added',
+  status: 'pending',
+  note: '',
+  hasOrder: false,
+  hasTest: false,
+  hasReport: false,
+  followupCount: 1,
+  checkedIn: false,
+);
+
+const filterWorkspace = FieldRouteWorkspace(
+  route: route,
+  customers: [customer],
+  day: FieldDayData(
+    sessionOpened: true,
+    run: FieldDayRun(
+      id: 'session-1',
+      routeId: 'route-1',
+      routeName: 'Tuyến Quận 1',
+      date: '2026-09-27',
+      owner: 'Nguyễn Văn A',
+      status: 'opened',
+      openedAt: '08:00',
+    ),
+    lines: [line, skippedLine, addedLine],
+  ),
+);
+
 const session = MobileSession(
   token: 'nppusr.test-token',
   employeeId: '11111111-1111-4111-8111-111111111111',
@@ -96,14 +183,23 @@ const session = MobileSession(
 );
 
 class FakeFieldDataClient implements FieldDataClient, FieldActionClient {
+  FakeFieldDataClient({
+    this.routes = const [route],
+    this.workspaceValue = workspace,
+  });
+
+  final List<FieldRoute> routes;
+  final FieldRouteWorkspace workspaceValue;
   bool checkInCalled = false;
   bool addCustomerCalled = false;
-  bool failFirstAddCustomer = false;
   String? addCustomerKey;
+  String? lastLoadedRouteId;
   final List<String> addCustomerKeys = [];
+  final List<bool> checkInValues = [];
+  final List<String> skipReasons = [];
 
   @override
-  Future<List<FieldRoute>> loadRoutes() async => const [route];
+  Future<List<FieldRoute>> loadRoutes() async => routes;
 
   @override
   Future<List<FieldOutlet>> loadOutlets() async => const [outlet];
@@ -113,7 +209,8 @@ class FakeFieldDataClient implements FieldDataClient, FieldActionClient {
     required FieldRoute route,
     required DateTime date,
   }) async {
-    return workspace;
+    lastLoadedRouteId = route.id;
+    return workspaceValue;
   }
 
   @override
@@ -148,13 +245,6 @@ class FakeFieldDataClient implements FieldDataClient, FieldActionClient {
     addCustomerKeys.add(idempotencyKey);
     expect(sessionId, 'session-1');
     expect(customerName, 'Cửa hàng Mới');
-    if (failFirstAddCustomer && addCustomerKeys.length == 1) {
-      throw const FieldDataFailure(
-        code: 'NETWORK_UNAVAILABLE',
-        message: 'Mạng tạm thời gián đoạn. Vui lòng thử lại.',
-        retryable: true,
-      );
-    }
     return const FieldAddedCustomer(
       routeCustomerId: 'customer-new',
       sessionCustomerId: 'line-new',
@@ -164,15 +254,77 @@ class FakeFieldDataClient implements FieldDataClient, FieldActionClient {
   @override
   Future<void> setSessionCustomerCheckIn({
     required String sessionCustomerId,
-    required double latitude,
-    required double longitude,
-    required double accuracy,
+    required bool checkedIn,
+    double? latitude,
+    double? longitude,
+    double? accuracy,
     required String idempotencyKey,
   }) async {
     checkInCalled = true;
+    checkInValues.add(checkedIn);
     expect(sessionCustomerId, 'line-1');
-    expect(latitude, 10.75);
-    expect(longitude, 106.67);
+    if (checkedIn) {
+      expect(latitude, 10.75);
+      expect(longitude, 106.67);
+    } else {
+      expect(latitude, isNull);
+      expect(longitude, isNull);
+    }
+  }
+
+  @override
+  Future<void> setSessionCustomerStatus({
+    required String sessionCustomerId,
+    required String visitStatus,
+    String? statusReason,
+    String? note,
+    required String idempotencyKey,
+  }) async {
+    expect(sessionCustomerId, 'line-1');
+    expect(visitStatus, 'skipped');
+    skipReasons.add(statusReason ?? '');
+  }
+}
+
+class MemoryMutationQueueStore implements MutationQueueStore {
+  final Map<String, QueuedMutation> _items = {};
+
+  @override
+  Future<List<QueuedMutation>> load({Set<String>? operations}) async {
+    final values = _items.values.toList(growable: false);
+    if (operations == null || operations.isEmpty) return values;
+    return values
+        .where((item) => operations.contains(item.operation))
+        .toList(growable: false);
+  }
+
+  @override
+  Future<void> remove(String idempotencyKey) async {
+    _items.remove(idempotencyKey);
+  }
+
+  @override
+  Future<void> save(QueuedMutation mutation) async {
+    _items[mutation.idempotencyKey] = mutation;
+  }
+}
+
+class MemoryRouteSelectionStore implements RouteSelectionStore {
+  MemoryRouteSelectionStore([this.routeId]);
+
+  String? routeId;
+
+  @override
+  Future<void> clear() async {
+    routeId = null;
+  }
+
+  @override
+  Future<String?> load() async => routeId;
+
+  @override
+  Future<void> save(String routeId) async {
+    this.routeId = routeId;
   }
 }
 
@@ -349,6 +501,7 @@ void main() {
           session: session,
           fieldDataClient: FakeFieldDataClient(),
           fieldLocationProvider: FakeLocationProvider(),
+          mutationQueueStore: MemoryMutationQueueStore(),
         ),
       ),
     );
@@ -373,6 +526,7 @@ void main() {
           session: session,
           fieldDataClient: client,
           fieldLocationProvider: FakeLocationProvider(),
+          mutationQueueStore: MemoryMutationQueueStore(),
         ),
       ),
     );
@@ -398,51 +552,6 @@ void main() {
 
     expect(client.addCustomerCalled, isTrue);
     expect(client.addCustomerKey, startsWith('session-customer.add-'));
-    expect(find.byKey(const Key('routes-screen')), findsOneWidget);
-  });
-
-  testWidgets('retrying the same add-customer intent reuses its key', (
-    WidgetTester tester,
-  ) async {
-    final client = FakeFieldDataClient()..failFirstAddCustomer = true;
-    await tester.pumpWidget(
-      MaterialApp(
-        home: AppShell(
-          session: session,
-          fieldDataClient: client,
-          fieldLocationProvider: FakeLocationProvider(),
-        ),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    await tester.tap(navLabel('Đi tuyến'));
-    await tester.pumpAndSettle();
-
-    final addButton = find.byKey(const Key('route-add-customer-button'));
-    await tester.ensureVisible(addButton);
-    await tester.tap(addButton);
-    await tester.pumpAndSettle();
-
-    await tester.enterText(
-      find.byKey(const Key('route-add-customer-name')),
-      'Cửa hàng Mới',
-    );
-    await revealAddCustomerSubmit(tester);
-    final submit = find.byKey(const Key('route-add-customer-submit'));
-    await tester.tap(submit);
-    await tester.pumpAndSettle();
-
-    expect(
-      find.text('Mạng tạm thời gián đoạn. Vui lòng thử lại.'),
-      findsOneWidget,
-    );
-    await revealAddCustomerSubmit(tester);
-    await tester.tap(submit);
-    await tester.pumpAndSettle();
-
-    expect(client.addCustomerKeys, hasLength(2));
-    expect(client.addCustomerKeys[1], client.addCustomerKeys[0]);
     expect(find.byKey(const Key('routes-screen')), findsOneWidget);
   });
 
@@ -587,6 +696,7 @@ void main() {
           session: session,
           fieldDataClient: client,
           fieldLocationProvider: FakeLocationProvider(),
+          mutationQueueStore: MemoryMutationQueueStore(),
         ),
       ),
     );
@@ -602,6 +712,130 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(client.checkInCalled, isTrue);
+    expect(client.checkInValues, [true]);
     expect(find.text('Đã check-in'), findsWidgets);
+    expect(find.text('Hoàn tác check-in'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('outlet-checkin-button')));
+    await tester.pumpAndSettle();
+
+    expect(client.checkInValues, [true, false]);
+    expect(find.text('Check-in điểm bán'), findsOneWidget);
+  });
+
+  testWidgets(
+    'route outlet records skip reason through original MCP contract',
+    (
+      WidgetTester tester,
+    ) async {
+      final client = FakeFieldDataClient();
+      await tester.pumpWidget(
+        MaterialApp(
+          home: AppShell(
+            session: session,
+            fieldDataClient: client,
+            fieldLocationProvider: FakeLocationProvider(),
+            mutationQueueStore: MemoryMutationQueueStore(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(navLabel('Đi tuyến'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('route-line-line-1')));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('outlet-skip-button')));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const Key('outlet-skip-reason-no_demand')),
+      );
+      await tester.tap(find.byKey(const Key('outlet-skip-submit')));
+      await tester.pumpAndSettle();
+
+      expect(client.skipReasons, ['no_demand']);
+      expect(find.text('Bỏ qua'), findsWidgets);
+    },
+  );
+
+  testWidgets('fixed route customers are visible before opening the day run', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AppShell(
+          session: session,
+          fieldDataClient: FakeFieldDataClient(
+            workspaceValue: unopenedWorkspace,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(navLabel('Đi tuyến'));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('route-start-button')), findsOneWidget);
+    expect(find.byKey(const Key('route-preview-customer-1')), findsOneWidget);
+    expect(find.text('Điểm bán cố định của tuyến'), findsOneWidget);
+  });
+
+  testWidgets('selected route is restored after app restart', (
+    WidgetTester tester,
+  ) async {
+    final client = FakeFieldDataClient(routes: const [route, routeTwo]);
+    final selection = MemoryRouteSelectionStore(routeTwo.id);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AppShell(
+          session: session,
+          fieldDataClient: client,
+          routeSelectionStore: selection,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(client.lastLoadedRouteId, routeTwo.id);
+  });
+
+  testWidgets('route session filters separate visit states', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: RoutesPage(
+          routes: [route],
+          selectedRoute: route,
+          workspace: filterWorkspace,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('route-filter-skipped')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Cửa hàng Bỏ Qua'), findsOneWidget);
+    expect(find.text('Cửa hàng Minh Phát'), findsNothing);
+
+    final addedFilter = find.byKey(const Key('route-filter-added'));
+    await tester.ensureVisible(addedFilter);
+    await tester.tap(addedFilter);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Cửa hàng Thêm Mới'), findsOneWidget);
+    expect(find.text('Cửa hàng Bỏ Qua'), findsNothing);
+
+    final followupFilter = find.byKey(const Key('route-filter-followups'));
+    await tester.ensureVisible(followupFilter);
+    await tester.tap(followupFilter);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Cửa hàng Thêm Mới'), findsOneWidget);
+    expect(find.text('Cửa hàng Minh Phát'), findsNothing);
   });
 }

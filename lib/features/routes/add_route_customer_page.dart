@@ -4,6 +4,7 @@ import '../../app/theme/app_theme.dart';
 import '../../core/data/field_data_client.dart';
 import '../../core/idempotency/canonical_idempotency.dart';
 import '../../core/location/field_location.dart';
+import '../../core/sync/route_mutation_sync.dart';
 import '../../shared/widgets/app_card.dart';
 import '../../shared/widgets/navy_page_header.dart';
 
@@ -12,13 +13,13 @@ class AddRouteCustomerPage extends StatefulWidget {
     super.key,
     required this.routeName,
     required this.sessionId,
-    required this.actionClient,
+    required this.submissionService,
     required this.locationProvider,
   });
 
   final String routeName;
   final String sessionId;
-  final FieldActionClient actionClient;
+  final RouteMutationSubmissionService submissionService;
   final FieldLocationProvider locationProvider;
 
   @override
@@ -103,20 +104,18 @@ class _AddRouteCustomerPageState extends State<AddRouteCustomerPage> {
     });
 
     try {
-      await widget.actionClient.addSessionCustomer(
+      final result = await widget.submissionService.addCustomer(
         sessionId: widget.sessionId,
         customerName: customerName,
         phone: _phoneController.text,
         area: _areaController.text,
         address: _addressController.text,
         note: _noteController.text,
-        latitude: _location?.latitude,
-        longitude: _location?.longitude,
-        accuracy: _location?.accuracy,
+        location: _location,
         idempotencyKey: idempotencyKey,
       );
       if (!mounted) return;
-      Navigator.of(context).pop(true);
+      Navigator.of(context).pop(result.status);
     } on FieldDataFailure catch (failure) {
       if (!mounted) return;
       setState(() {

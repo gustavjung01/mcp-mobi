@@ -42,6 +42,7 @@ class RoutesPage extends StatefulWidget {
 
 class _RoutesPageState extends State<RoutesPage> {
   String _query = '';
+  String _filter = 'all';
 
   Future<void> _showRoutePicker() async {
     if (widget.routes.isEmpty || widget.onSelectRoute == null) return;
@@ -87,9 +88,10 @@ class _RoutesPageState extends State<RoutesPage> {
     final route = widget.selectedRoute;
     final day = widget.workspace?.day;
     final lines = day?.lines ?? const <FieldDayLine>[];
+    final query = _query.trim().toLowerCase();
     final visibleLines = lines
         .where((line) {
-          final query = _query.trim().toLowerCase();
+          if (!_matchesSessionFilter(line, _filter)) return false;
           if (query.isEmpty) return true;
           return line.accountName.toLowerCase().contains(query) ||
               line.area.toLowerCase().contains(query) ||
@@ -218,14 +220,15 @@ class _RoutesPageState extends State<RoutesPage> {
           ),
           const SizedBox(height: AppSpacing.md),
           if (day?.sessionOpened != true)
-            AppCard(
-              child: EmptyState(
-                icon: Icons.route_outlined,
-                title: 'Chưa bắt đầu tuyến hôm nay',
-                message: total > 0
-                    ? 'Tuyến có $total điểm bán. Bắt đầu tuyến để tạo danh sách ghé hôm nay.'
-                    : 'Tuyến chưa có điểm bán để thực hiện.',
-              ),
+            _FixedRoutePreview(
+              customers:
+                  widget.workspace?.customers ?? const <FieldRouteCustomer>[],
+              query: _query,
+              onQueryChanged: (value) {
+                setState(() {
+                  _query = value;
+                });
+              },
             )
           else ...[
             Row(
@@ -264,6 +267,16 @@ class _RoutesPageState extends State<RoutesPage> {
                     label: const Text('Thêm khách'),
                   ),
               ],
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            _SessionFilterBar(
+              lines: lines,
+              selected: _filter,
+              onSelected: (value) {
+                setState(() {
+                  _filter = value;
+                });
+              },
             ),
             const SizedBox(height: AppSpacing.sm),
             TextField(
@@ -329,6 +342,162 @@ class _RoutesPageState extends State<RoutesPage> {
                   ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _FixedRoutePreview extends StatelessWidget {
+  const _FixedRoutePreview({
+    required this.customers,
+    required this.query,
+    required this.onQueryChanged,
+  });
+
+  final List<FieldRouteCustomer> customers;
+  final String query;
+  final ValueChanged<String> onQueryChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final normalized = query.trim().toLowerCase();
+    final visible = customers
+        .where((customer) {
+          if (normalized.isEmpty) return true;
+          return customer.accountName.toLowerCase().contains(normalized) ||
+              customer.area.toLowerCase().contains(normalized) ||
+              customer.accountId.toLowerCase().contains(normalized);
+        })
+        .toList(growable: false);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Điểm bán cố định của tuyến',
+          style: TextStyle(
+            color: AppColors.primary,
+            fontSize: 14,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        const SizedBox(height: 3),
+        Text(
+          '${customers.length} điểm sẽ được đưa vào phiên khi bắt đầu tuyến.',
+          style: const TextStyle(
+            color: AppColors.textSecondary,
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        TextField(
+          key: const Key('route-preview-search'),
+          onChanged: onQueryChanged,
+          decoration: const InputDecoration(
+            hintText: 'Tìm điểm bán cố định...',
+            prefixIcon: Icon(Icons.search_rounded),
+          ),
+        ),
+        const SizedBox(height: AppSpacing.md),
+        if (customers.isEmpty)
+          const AppCard(
+            child: EmptyState(
+              icon: Icons.route_outlined,
+              title: 'Tuyến chưa có điểm bán',
+              message: 'Danh sách cố định của tuyến hiện đang trống.',
+            ),
+          )
+        else if (visible.isEmpty)
+          const AppCard(
+            child: EmptyState(
+              icon: Icons.storefront_outlined,
+              title: 'Không có điểm bán phù hợp',
+              message: 'Thử đổi từ khóa tìm kiếm.',
+            ),
+          )
+        else
+          ...visible.map(
+            (customer) => Padding(
+              padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+              child: AppCard(
+                padding: EdgeInsets.zero,
+                child: ListTile(
+                  key: Key('route-preview-${customer.id}'),
+                  leading: CircleAvatar(
+                    backgroundColor: AppColors.primarySoft,
+                    foregroundColor: AppColors.primary,
+                    child: Text(
+                      customer.sortOrder > 0
+                          ? customer.sortOrder.toString()
+                          : '•',
+                    ),
+                  ),
+                  title: Text(
+                    customer.accountName,
+                    style: const TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                  subtitle: Text(
+                    customer.area,
+                    style: const TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 12,
+                    ),
+                  ),
+                  trailing: const Icon(
+                    Icons.schedule_rounded,
+                    color: AppColors.primary,
+                  ),
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _SessionFilterBar extends StatelessWidget {
+  const _SessionFilterBar({
+    required this.lines,
+    required this.selected,
+    required this.onSelected,
+  });
+
+  final List<FieldDayLine> lines;
+  final String selected;
+  final ValueChanged<String> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    const filters = <(String, String)>[
+      ('all', 'Tất cả'),
+      ('pending', 'Chờ ghé'),
+      ('visited', 'Đã ghé'),
+      ('skipped', 'Bỏ qua'),
+      ('added', 'Thêm mới'),
+      ('followups', 'Có việc'),
+    ];
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: filters
+            .map((item) {
+              final count = lines
+                  .where((line) => _matchesSessionFilter(line, item.$1))
+                  .length;
+              return Padding(
+                padding: const EdgeInsets.only(right: AppSpacing.xs),
+                child: ChoiceChip(
+                  key: Key('route-filter-${item.$1}'),
+                  label: Text('${item.$2}  $count'),
+                  selected: selected == item.$1,
+                  onSelected: (_) => onSelected(item.$1),
+                ),
+              );
+            })
+            .toList(growable: false),
       ),
     );
   }
@@ -471,6 +640,17 @@ class _VisitLineCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final visited = line.status == 'visited';
+    final skipped = line.status == 'skipped';
+    final statusColor = skipped
+        ? AppColors.warning
+        : visited
+        ? AppColors.success
+        : AppColors.primary;
+    final statusSoft = skipped
+        ? AppColors.warning.withValues(alpha: 0.12)
+        : visited
+        ? AppColors.successSoft
+        : AppColors.primarySoft;
     return AppCard(
       padding: EdgeInsets.zero,
       child: InkWell(
@@ -486,16 +666,14 @@ class _VisitLineCard extends StatelessWidget {
                 width: 34,
                 height: 34,
                 decoration: BoxDecoration(
-                  color: visited
-                      ? AppColors.successSoft
-                      : AppColors.primarySoft,
+                  color: statusSoft,
                   shape: BoxShape.circle,
                 ),
                 alignment: Alignment.center,
                 child: Text(
                   line.sortOrder > 0 ? line.sortOrder.toString() : '•',
                   style: TextStyle(
-                    color: visited ? AppColors.success : AppColors.primary,
+                    color: statusColor,
                     fontSize: 12,
                     fontWeight: FontWeight.w900,
                   ),
@@ -530,13 +708,17 @@ class _VisitLineCard extends StatelessWidget {
                 width: 36,
                 height: 36,
                 decoration: BoxDecoration(
-                  color: visited ? AppColors.successSoft : AppColors.primary,
+                  color: statusSoft,
                   borderRadius: BorderRadius.circular(AppRadius.sm),
                 ),
                 alignment: Alignment.center,
                 child: Icon(
-                  visited ? Icons.check_rounded : Icons.navigation_rounded,
-                  color: visited ? AppColors.success : Colors.white,
+                  skipped
+                      ? Icons.skip_next_rounded
+                      : visited
+                      ? Icons.check_rounded
+                      : Icons.navigation_rounded,
+                  color: statusColor,
                   size: 20,
                 ),
               ),
@@ -593,11 +775,44 @@ String _statusLabel(FieldDayData? day) {
   return 'Đang thực hiện';
 }
 
+bool _matchesSessionFilter(FieldDayLine line, String filter) {
+  return switch (filter) {
+    'pending' => line.status == 'pending',
+    'visited' => line.status == 'visited',
+    'skipped' => line.status == 'skipped',
+    'added' => line.source == 'added',
+    'followups' => line.followupCount > 0,
+    _ => true,
+  };
+}
+
 String _lineSubtitle(FieldDayLine line) {
   final address = (line.address ?? '').trim();
   final place = address.isNotEmpty ? address : line.area;
+  if (line.status == 'skipped') {
+    final reason = _skipReasonLabel(line.statusReason);
+    return reason.isEmpty
+        ? '$place · Bỏ qua / không mua'
+        : '$place · Bỏ qua / không mua · $reason';
+  }
   if (line.checkedIn) return '$place · Đã check-in';
-  return '$place · ${line.status == 'visited' ? 'Đã ghé' : 'Chưa ghé'}';
+  final status = line.status == 'visited' ? 'Đã ghé' : 'Chờ ghé';
+  final source = line.source == 'added' ? ' · Thêm mới' : '';
+  final followup = line.followupCount > 0 ? ' · Có việc' : '';
+  return '$place · $status$source$followup';
+}
+
+String _skipReasonLabel(String? value) {
+  return switch ((value ?? '').trim()) {
+    'closed' => 'Đóng cửa',
+    'busy' => 'Khách bận',
+    'no_demand' => 'Không nhu cầu',
+    'price' => 'Chê giá',
+    'competitor' => 'Đang dùng đối thủ',
+    'stock_enough' => 'Còn tồn hàng',
+    'other' => 'Khác',
+    _ => (value ?? '').trim(),
+  };
 }
 
 String _formatVietnameseDate(DateTime value) {
