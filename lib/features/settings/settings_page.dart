@@ -22,6 +22,7 @@ class _SettingsPageState extends State<SettingsPage> {
   String _currentVersion = '...';
   AppUpdateCheck? _check;
   String? _message;
+  bool? _directInstallSupported;
   bool _checking = false;
   bool _installing = false;
 
@@ -33,22 +34,31 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Future<void> _loadCurrentVersion() async {
+    String version = 'Không xác định';
+    bool directInstallSupported = false;
+
     try {
-      final version = await _updates.currentVersion();
-      if (!mounted) return;
-      setState(() {
-        _currentVersion = version.isEmpty ? 'Không xác định' : version;
-      });
+      final current = await _updates.currentVersion();
+      version = current.isEmpty ? 'Không xác định' : current;
     } on AppUpdateFailure {
-      if (!mounted) return;
-      setState(() {
-        _currentVersion = 'Không xác định';
-      });
+      version = 'Không xác định';
     }
+
+    try {
+      directInstallSupported = await _updates.supportsDirectInstall();
+    } on AppUpdateFailure {
+      directInstallSupported = false;
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _currentVersion = version;
+      _directInstallSupported = directInstallSupported;
+    });
   }
 
   Future<void> _checkUpdate() async {
-    if (_checking || _installing) return;
+    if (_directInstallSupported != true || _checking || _installing) return;
     setState(() {
       _checking = true;
       _message = null;
@@ -80,7 +90,9 @@ class _SettingsPageState extends State<SettingsPage> {
 
   Future<void> _installUpdate() async {
     final release = _check?.release;
-    if (release == null || _installing) return;
+    if (_directInstallSupported != true || release == null || _installing) {
+      return;
+    }
 
     setState(() {
       _installing = true;
@@ -100,7 +112,8 @@ class _SettingsPageState extends State<SettingsPage> {
       await _updates.install(release);
       if (!mounted) return;
       setState(() {
-        _message = 'Đã tải và kiểm tra file. Android đang mở màn hình cài đặt.';
+        _message =
+            'Đã tải và kiểm tra gói cập nhật. Android đang mở màn hình cài đặt.';
       });
     } on AppUpdateFailure catch (failure) {
       if (!mounted) return;
@@ -120,6 +133,7 @@ class _SettingsPageState extends State<SettingsPage> {
   Widget build(BuildContext context) {
     final release = _check?.release;
     final updateAvailable = _check?.updateAvailable == true;
+    final directInstallSupported = _directInstallSupported == true;
 
     return Scaffold(
       key: const Key('settings-screen'),
@@ -172,7 +186,7 @@ class _SettingsPageState extends State<SettingsPage> {
                                 ),
                                 SizedBox(height: 3),
                                 Text(
-                                  'Tải bản mới chính thức của MCP Field',
+                                  'Quản lý phiên bản MCP Field',
                                   style: TextStyle(
                                     color: AppColors.textSecondary,
                                     fontSize: 11,
@@ -188,7 +202,19 @@ class _SettingsPageState extends State<SettingsPage> {
                         label: 'Bản đang dùng',
                         value: _currentVersion,
                       ),
-                      if (release != null) ...[
+                      if (_directInstallSupported == false) ...[
+                        const Divider(height: 24),
+                        const Text(
+                          'Bản iPhone/iPad được cập nhật qua kênh phát hành iOS của Công Ty.',
+                          key: Key('ios-update-guidance'),
+                          style: TextStyle(
+                            color: AppColors.textSecondary,
+                            fontSize: 12,
+                            height: 1.4,
+                          ),
+                        ),
+                      ],
+                      if (directInstallSupported && release != null) ...[
                         const Divider(height: 24),
                         _SettingRow(
                           label: 'Bản phát hành',
@@ -233,11 +259,16 @@ class _SettingsPageState extends State<SettingsPage> {
                           ),
                         ),
                       ],
-                      const SizedBox(height: AppSpacing.md),
-                      SizedBox(
-                        width: double.infinity,
-                        child: updateAvailable
-                            ? FilledButton.icon(
+                      if (_directInstallSupported == null) ...[
+                        const SizedBox(height: AppSpacing.md),
+                        const LinearProgressIndicator(minHeight: 2),
+                      ],
+                      if (directInstallSupported) ...[
+                        const SizedBox(height: AppSpacing.md),
+                        SizedBox(
+                          width: double.infinity,
+                          child: updateAvailable
+                              ? FilledButton.icon(
                                 key: const Key('install-update-button'),
                                 onPressed: _installing || _checking
                                     ? null
@@ -279,14 +310,16 @@ class _SettingsPageState extends State<SettingsPage> {
                                       ? 'Đang kiểm tra...'
                                       : 'Kiểm tra cập nhật',
                                 ),
-                              ),
-                      ),
+                                ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
-                const SizedBox(height: AppSpacing.md),
-                AppCard(
-                  key: const Key('update-install-guide'),
+                if (directInstallSupported) ...[
+                  const SizedBox(height: AppSpacing.md),
+                  AppCard(
+                    key: const Key('update-install-guide'),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -327,9 +360,9 @@ class _SettingsPageState extends State<SettingsPage> {
                     ],
                   ),
                 ),
-                const SizedBox(height: AppSpacing.md),
-                AppCard(
-                  child: Row(
+                  const SizedBox(height: AppSpacing.md),
+                  AppCard(
+                    child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Icon(
@@ -339,13 +372,14 @@ class _SettingsPageState extends State<SettingsPage> {
                       const SizedBox(width: AppSpacing.sm),
                       Expanded(
                         child: Text(
-                          'MCP Field kiểm tra file cập nhật trước khi mở trình cài đặt Android.',
+                          'MCP Field kiểm tra gói cập nhật trước khi mở trình cài đặt Android.',
                           style: Theme.of(context).textTheme.bodyMedium,
                         ),
                       ),
                     ],
                   ),
-                ),
+                  ),
+                ],
               ],
             ),
           ),

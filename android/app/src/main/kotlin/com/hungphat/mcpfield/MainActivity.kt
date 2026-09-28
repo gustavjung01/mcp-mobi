@@ -34,6 +34,10 @@ class MainActivity : FlutterActivity() {
                     result.success(info.versionName ?: "")
                 }
 
+                "supportsDirectInstall" -> {
+                    result.success(true)
+                }
+
                 "canInstallPackages" -> {
                     result.success(canInstallPackages())
                 }
@@ -97,7 +101,7 @@ class MainActivity : FlutterActivity() {
         if (!expectedSha256.matches(Regex("^[0-9a-f]{64}$"))) {
             result.error(
                 "HASH_INVALID",
-                "Mã kiểm tra file cập nhật chưa hợp lệ.",
+                "Thông tin kiểm tra gói cập nhật chưa hợp lệ.",
                 null,
             )
             return
@@ -115,7 +119,7 @@ class MainActivity : FlutterActivity() {
             try {
                 val updateDir = File(cacheDir, "updates")
                 if (!updateDir.exists() && !updateDir.mkdirs()) {
-                    throw IllegalStateException("Không tạo được thư mục cập nhật.")
+                    throw IllegalStateException("Không chuẩn bị được nơi lưu bản cập nhật.")
                 }
                 val temporary = File(updateDir, "mcp-field-update.apk.part")
                 val target = File(updateDir, "mcp-field-update.apk")
@@ -132,9 +136,7 @@ class MainActivity : FlutterActivity() {
 
                 if (connection.responseCode !in 200..299) {
                     connection.disconnect()
-                    throw IllegalStateException(
-                        "Máy chủ cập nhật trả mã ${connection.responseCode}.",
-                    )
+                    throw IllegalStateException("Không tải được bản cập nhật.")
                 }
 
                 val digest = MessageDigest.getInstance("SHA-256")
@@ -161,7 +163,7 @@ class MainActivity : FlutterActivity() {
                     runOnUiThread {
                         result.error(
                             "HASH_MISMATCH",
-                            "File cập nhật không khớp kiểm tra an toàn.",
+                            "Gói cập nhật không vượt qua bước kiểm tra an toàn.",
                             null,
                         )
                     }
@@ -194,7 +196,7 @@ class MainActivity : FlutterActivity() {
                     } catch (error: Exception) {
                         result.error(
                             "INSTALLER_OPEN_FAILED",
-                            error.message ?: "Không mở được trình cài đặt Android.",
+                            "Không mở được bước cài đặt bản cập nhật.",
                             null,
                         )
                     }
@@ -203,7 +205,7 @@ class MainActivity : FlutterActivity() {
                 runOnUiThread {
                     result.error(
                         "DOWNLOAD_FAILED",
-                        error.message ?: "Không tải được file cập nhật.",
+                        "Không tải được bản cập nhật.",
                         null,
                     )
                 }

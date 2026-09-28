@@ -88,6 +88,8 @@ class AppUpdateCheck {
 abstract interface class AppUpdatePlatform {
   Future<String> currentVersion();
 
+  Future<bool> supportsDirectInstall();
+
   Future<bool> canInstallPackages();
 
   Future<void> openInstallPermissionSettings();
@@ -110,6 +112,16 @@ class MethodChannelAppUpdatePlatform implements AppUpdatePlatform {
     try {
       final version = await _channel.invokeMethod<String>('currentVersion');
       return (version ?? '').trim();
+    } on PlatformException catch (error) {
+      throw _platformFailure(error);
+    }
+  }
+
+  @override
+  Future<bool> supportsDirectInstall() async {
+    try {
+      return await _channel.invokeMethod<bool>('supportsDirectInstall') ??
+          false;
     } on PlatformException catch (error) {
       throw _platformFailure(error);
     }
@@ -173,6 +185,8 @@ class AppUpdateService {
 
   Future<String> currentVersion() => platform.currentVersion();
 
+  Future<bool> supportsDirectInstall() => platform.supportsDirectInstall();
+
   Future<AppUpdateCheck> checkForUpdate() async {
     if (!configured) {
       throw const AppUpdateFailure(
@@ -219,7 +233,7 @@ class AppUpdateService {
     } on http.ClientException {
       throw const AppUpdateFailure(
         code: 'UPDATE_NETWORK',
-        message: 'Không kết nối được máy chủ cập nhật.',
+        message: 'Không kết nối được hệ thống cập nhật.',
         retryable: true,
       );
     }
@@ -302,18 +316,24 @@ AppUpdateFailure _platformFailure(PlatformException error) {
     case 'DOWNLOAD_FAILED':
       return const AppUpdateFailure(
         code: 'DOWNLOAD_FAILED',
-        message: 'Không tải được file cập nhật.',
+        message: 'Không tải được gói cập nhật.',
         retryable: true,
       );
     case 'HASH_MISMATCH':
       return const AppUpdateFailure(
         code: 'HASH_MISMATCH',
-        message: 'File cập nhật không khớp kiểm tra an toàn.',
+        message: 'Gói cập nhật không vượt qua bước kiểm tra an toàn.',
       );
     case 'UPDATE_URL_INVALID':
       return const AppUpdateFailure(
         code: 'UPDATE_URL_INVALID',
         message: 'Địa chỉ tải bản cập nhật chưa hợp lệ.',
+      );
+    case 'UPDATE_NOT_SUPPORTED':
+      return const AppUpdateFailure(
+        code: 'UPDATE_NOT_SUPPORTED',
+        message:
+            'Bản iPhone/iPad được cập nhật qua kênh phát hành iOS của Công Ty.',
       );
   }
   final message = (error.message ?? '').trim();

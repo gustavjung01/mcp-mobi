@@ -7,7 +7,7 @@ on:
       - main
 
 jobs:
-  flutter:
+  android:
     runs-on: ubuntu-latest
 
     steps:
@@ -32,6 +32,11 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
+      - name: Prepare native branding
+        run: |
+          dart run flutter_launcher_icons
+          dart run flutter_native_splash:create
+
       - name: Check formatting
         run: |
           dart format lib test
@@ -47,4 +52,38 @@ jobs:
         run: flutter build apk --debug
 
       - name: Compile release APK (CI validation only, not distributable)
+        env:
+          MCP_CI_RELEASE_VALIDATION: 'true'
         run: flutter build apk --release
+
+      - name: Compile release AAB (CI validation only, not distributable)
+        env:
+          MCP_CI_RELEASE_VALIDATION: 'true'
+        run: flutter build appbundle --release
+
+  ios:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Flutter 3.47.2
+        shell: bash
+        run: |
+          git clone --depth 1 --branch 3.47.2 https://github.com/flutter/flutter.git "$HOME/flutter"
+          echo "$HOME/flutter/bin" >> "$GITHUB_PATH"
+
+      - name: Verify Flutter
+        run: flutter --version
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Prepare native branding
+        run: |
+          dart run flutter_launcher_icons
+          dart run flutter_native_splash:create
+
+      - name: Compile iOS release without signing
+        run: flutter build ios --release --no-codesign

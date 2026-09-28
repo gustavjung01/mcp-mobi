@@ -8,12 +8,20 @@ import 'package:mcp_field/core/update/app_update_service.dart';
 import 'package:mcp_field/features/settings/settings_page.dart';
 
 class SettingsFakePlatform implements AppUpdatePlatform {
+  SettingsFakePlatform({
+    this.directInstallSupported = true,
+  });
+
+  bool directInstallSupported;
   bool installAllowed = false;
   bool openedSettings = false;
   int installs = 0;
 
   @override
   Future<String> currentVersion() async => '1.0.0';
+
+  @override
+  Future<bool> supportsDirectInstall() async => directInstallSupported;
 
   @override
   Future<bool> canInstallPackages() async => installAllowed;
@@ -90,9 +98,41 @@ void main() {
     expect(platform.installs, 1);
     expect(
       find.text(
-        'Đã tải và kiểm tra file. Android đang mở màn hình cài đặt.',
+        'Đã tải và kiểm tra gói cập nhật. Android đang mở màn hình cài đặt.',
       ),
       findsOneWidget,
     );
+  });
+
+  testWidgets('iOS settings hides the Android installer flow', (
+    WidgetTester tester,
+  ) async {
+    final platform = SettingsFakePlatform(
+      directInstallSupported: false,
+    );
+    final service = AppUpdateService(
+      baseUrl: 'https://updates.example.vn/mcp-filed',
+      platform: platform,
+      client: MockClient((request) async => http.Response('', 500)),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SettingsPage(updateService: service),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('1.0.0'), findsOneWidget);
+    expect(find.byKey(const Key('ios-update-guidance')), findsOneWidget);
+    expect(
+      find.text(
+        'Bản iPhone/iPad được cập nhật qua kênh phát hành iOS của Công Ty.',
+      ),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('check-update-button')), findsNothing);
+    expect(find.byKey(const Key('install-update-button')), findsNothing);
+    expect(find.byKey(const Key('update-install-guide')), findsNothing);
   });
 }

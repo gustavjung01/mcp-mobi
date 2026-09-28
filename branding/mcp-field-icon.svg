@@ -1,0 +1,25 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="g" x1="80" y1="58" x2="430" y2="456" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#7c3aed"/>
+      <stop offset="0.52" stop-color="#2563eb"/>
+      <stop offset="1" stop-color="#06b6d4"/>
+    </linearGradient>
+    <linearGradient id="h" x1="132" y1="84" x2="330" y2="330" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#fff" stop-opacity=".78"/>
+      <stop offset="1" stop-color="#fff" stop-opacity=".08"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="118" fill="#eef2ff"/>
+  <rect x="60" y="56" width="392" height="392" rx="98" fill="url(#g)"/>
+  <path d="M96 128c58-54 164-62 274-22-106 4-195 48-254 130-8-35-15-71-20-108Z" fill="#fff" opacity=".26"/>
+  <rect x="120" y="144" width="272" height="232" rx="42" fill="#0f172a" opacity=".22"/>
+  <rect x="126" y="132" width="260" height="232" rx="40" fill="#fff" opacity=".96"/>
+  <rect x="148" y="154" width="216" height="188" rx="30" fill="#f8fafc"/>
+  <path d="M182 228c0-22 18-40 40-40h70c22 0 40 18 40 40h-38c0-8-6-14-14-14h-46c-8 0-14 6-14 14v56c0 8 6 14 14 14h46c8 0 14-6 14-14h38c0 22-18 40-40 40h-70c-22 0-40-18-40-40v-56Z" fill="#1d4ed8"/>
+  <path d="M246 256h98" stroke="#06b6d4" stroke-width="28" stroke-linecap="round"/>
+  <circle cx="346" cy="256" r="23" fill="#7c3aed"/>
+  <circle cx="346" cy="256" r="8" fill="#fff"/>
+  <rect x="60" y="56" width="392" height="392" rx="98" fill="url(#h)"/>
+  <path d="M152 400c64 28 151 28 212-6" stroke="#fff" stroke-width="18" stroke-linecap="round" opacity=".28"/>
+</svg>
