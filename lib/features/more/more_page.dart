@@ -53,12 +53,12 @@ class MorePage extends StatelessWidget {
                       'Kết quả thử sản phẩm' => onProductTrials,
                       'Kế hoạch & Công việc' => onTasks,
                       'Thiết lập' => () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute<void>(
-                              builder: (_) => const SettingsPage(),
-                            ),
-                          );
-                        },
+                        Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => const SettingsPage(),
+                          ),
+                        );
+                      },
                       _ => null,
                     },
                   ),

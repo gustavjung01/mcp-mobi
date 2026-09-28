@@ -290,9 +290,7 @@ class _FollowupPageState extends State<FollowupPage> {
                     color: AppColors.primary,
                   ),
                   title: Text(
-                    _dueDate == null
-                        ? 'Chọn ngày hẹn'
-                        : _dateOnly(_dueDate!),
+                    _dueDate == null ? 'Chọn ngày hẹn' : _dateOnly(_dueDate!),
                   ),
                   trailing: const Icon(Icons.chevron_right_rounded),
                   onTap: _saving ? null : _pickDate,

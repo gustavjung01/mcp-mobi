@@ -129,38 +129,40 @@ void main() {
     expect(restored.note, 'Giao buổi sáng');
   });
 
-  test('secure order store writes mutations through the shared queue', () async {
-    final queue = MemoryMutationQueueStore();
-    final store = SecureOrderOfflineStore(
-      installationKey: 'https://mcp.example.vn',
-      employeeId: 'employee-1',
-      mutationQueueStore: queue,
-    );
-    const key =
-        'mcp.sales-order.create-123e4567-e89b-42d3-a456-426614174000';
-    await store.saveMutation(
-      QueuedOrderMutation(
-        idempotencyKey: key,
-        outletId: 'outlet-1',
-        outletName: 'Cửa hàng Minh Phát',
-        customerId: 'customer-1',
-        customerAddressId: 'address-1',
-        note: '',
-        lines: const [
-          OrderLineInput(variantId: 'variant-1', quantity: 1),
-        ],
-        createdAt: DateTime.utc(2026, 9, 28, 5),
-      ),
-    );
+  test(
+    'secure order store writes mutations through the shared queue',
+    () async {
+      final queue = MemoryMutationQueueStore();
+      final store = SecureOrderOfflineStore(
+        installationKey: 'https://mcp.example.vn',
+        employeeId: 'employee-1',
+        mutationQueueStore: queue,
+      );
+      const key = 'mcp.sales-order.create-123e4567-e89b-42d3-a456-426614174000';
+      await store.saveMutation(
+        QueuedOrderMutation(
+          idempotencyKey: key,
+          outletId: 'outlet-1',
+          outletName: 'Cửa hàng Minh Phát',
+          customerId: 'customer-1',
+          customerAddressId: 'address-1',
+          note: '',
+          lines: const [
+            OrderLineInput(variantId: 'variant-1', quantity: 1),
+          ],
+          createdAt: DateTime.utc(2026, 9, 28, 5),
+        ),
+      );
 
-    expect(queue.rows[key], isNotNull);
-    expect(queue.rows[key]!.operation, orderMutationOperation);
-    expect(queue.rows[key]!.entityType, 'order');
+      expect(queue.rows[key], isNotNull);
+      expect(queue.rows[key]!.operation, orderMutationOperation);
+      expect(queue.rows[key]!.entityType, 'order');
 
-    final restored = await store.loadMutations();
-    expect(restored.single.idempotencyKey, key);
-    expect(restored.single.lines.single.variantId, 'variant-1');
-  });
+      final restored = await store.loadMutations();
+      expect(restored.single.idempotencyKey, key);
+      expect(restored.single.lines.single.variantId, 'variant-1');
+    },
+  );
 
   test('sync retry reuses the exact queued idempotency key', () async {
     final store = MemoryOrderOfflineStore();

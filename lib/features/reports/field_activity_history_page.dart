@@ -30,8 +30,7 @@ class FieldActivityHistoryPage extends StatefulWidget {
       _FieldActivityHistoryPageState();
 }
 
-class _FieldActivityHistoryPageState
-    extends State<FieldActivityHistoryPage> {
+class _FieldActivityHistoryPageState extends State<FieldActivityHistoryPage> {
   List<QueuedMutation> _mutations = const [];
   bool _loading = true;
   bool _syncing = false;
@@ -110,13 +109,15 @@ class _FieldActivityHistoryPageState
   }
 
   List<FieldDayLine> get _serverLines {
-    return widget.lines.where((line) {
-      return switch (widget.kind) {
-        FieldActivityKind.report => line.hasReport,
-        FieldActivityKind.productTrial => line.hasTest,
-        FieldActivityKind.followup => line.followupCount > 0,
-      };
-    }).toList(growable: false);
+    return widget.lines
+        .where((line) {
+          return switch (widget.kind) {
+            FieldActivityKind.report => line.hasReport,
+            FieldActivityKind.productTrial => line.hasTest,
+            FieldActivityKind.followup => line.followupCount > 0,
+          };
+        })
+        .toList(growable: false);
   }
 
   @override
@@ -176,8 +177,7 @@ class _FieldActivityHistoryPageState
                       child: EmptyState(
                         icon: _icon(widget.kind),
                         title: 'Chưa có dữ liệu',
-                        message:
-                            'Nội dung tạo trong phiên đi tuyến sẽ hiển thị tại đây.',
+                        message: 'Nội dung tạo trong phiên đi tuyến sẽ hiển thị tại đây.',
                       ),
                     )
                   else ...[

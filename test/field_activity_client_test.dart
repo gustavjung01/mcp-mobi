@@ -123,8 +123,7 @@ void main() {
         'sessionCustomerId': 'session-customer-1',
         'title': 'Gọi lại',
       },
-      idempotencyKey:
-          'session-customer.followup.create-323e4567-e89b-42d3-a456-426614174000',
+      idempotencyKey: 'session-customer.followup.create-323e4567-e89b-42d3-a456-426614174000',
     );
 
     expect(report.referenceId, 'report-1');

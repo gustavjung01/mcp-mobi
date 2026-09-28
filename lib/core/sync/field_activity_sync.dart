@@ -117,9 +117,8 @@ class FieldActivitySyncService {
   final FieldActivityClient client;
   final MutationQueueStore queue;
 
-  static Set<String> get operations => FieldActivityKind.values
-      .map((kind) => kind.operation)
-      .toSet();
+  static Set<String> get operations =>
+      FieldActivityKind.values.map((kind) => kind.operation).toSet();
 
   Future<FieldActivitySyncResult> syncPending({
     String? idempotencyKey,
@@ -130,8 +129,7 @@ class FieldActivitySyncService {
 
     for (final mutation in mutations) {
       if (!mutation.isOutstanding) continue;
-      if (idempotencyKey != null &&
-          mutation.idempotencyKey != idempotencyKey) {
+      if (idempotencyKey != null && mutation.idempotencyKey != idempotencyKey) {
         continue;
       }
       if (idempotencyKey == null &&

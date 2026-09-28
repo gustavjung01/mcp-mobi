@@ -186,9 +186,7 @@ class _MarketReportPageState extends State<MarketReportPage> {
     final parts = <String>[];
     if (selected.isNotEmpty) {
       parts.add(
-        selected
-            .map((item) => item.groupTitle + ': ' + item.label)
-            .join('\n'),
+        selected.map((item) => item.groupTitle + ': ' + item.label).join('\n'),
       );
     }
     const labels = <String, String>{
