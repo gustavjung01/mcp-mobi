@@ -53,8 +53,15 @@ class LocalDataStore {
   LocalDataStore({
     DatabaseFactory? factory,
     String? databasePath,
-  })  : _factory = factory ?? databaseFactory,
-        _databasePath = databasePath;
+  }) : this._(
+         factory ?? databaseFactory,
+         databasePath,
+       );
+
+  LocalDataStore._(
+    this._factory,
+    this._databasePath,
+  );
 
   static final LocalDataStore shared = LocalDataStore();
 
@@ -497,7 +504,7 @@ CREATE TABLE catalog_items (
       where: where.join(' AND '),
       whereArgs: args,
       orderBy: 'name COLLATE NOCASE ASC, sku COLLATE NOCASE ASC',
-      limit: limit.clamp(1, 500) as int,
+      limit: limit.clamp(1, 500),
     );
     return rows
         .map((row) => _decodeRecord(row['record_json'], 'LOCAL_CATALOG_CORRUPT'))

@@ -26,10 +26,11 @@ class LocalCatalogOrderDataClient implements OrderDataClient {
     if (source is! CompleteOrderCatalogClient) {
       return Future<void>.value();
     }
+    final catalogSource = source as CompleteOrderCatalogClient;
 
     late Future<void> future;
     future = () async {
-      final items = await source.loadCompleteCatalog();
+      final items = await catalogSource.loadCompleteCatalog();
       await database.replaceCatalog(
         scope: scope,
         records: items.map((item) => item.toJson()).toList(growable: false),
