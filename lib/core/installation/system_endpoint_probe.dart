@@ -133,14 +133,14 @@ class HttpSystemEndpointProbe implements SystemEndpointProbe {
     if (response.statusCode >= 500) {
       throw const SystemEndpointFailure(
         code: 'SYSTEM_ENDPOINT_API_UNAVAILABLE',
-        message: 'Máy chủ đang hoạt động nhưng API MCP Field chưa sẵn sàng. Vui lòng thử lại.',
+        message: 'Hệ thống đang hoạt động nhưng dịch vụ MCP Field chưa sẵn sàng. Vui lòng thử lại.',
         retryable: true,
       );
     }
     if (response.statusCode != 401) {
       throw const SystemEndpointFailure(
         code: 'SYSTEM_ENDPOINT_API_INVALID',
-        message: 'Địa chỉ này không trả về API đăng nhập MCP Field hợp lệ.',
+        message: 'Địa chỉ này chưa kết nối đúng dịch vụ đăng nhập MCP Field.',
       );
     }
 
@@ -150,7 +150,7 @@ class HttpSystemEndpointProbe implements SystemEndpointProbe {
     } on FormatException {
       throw const SystemEndpointFailure(
         code: 'SYSTEM_ENDPOINT_API_INVALID',
-        message: 'Địa chỉ này không trả về API đăng nhập MCP Field hợp lệ.',
+        message: 'Địa chỉ này chưa kết nối đúng dịch vụ đăng nhập MCP Field.',
       );
     }
     final payload = _object(decoded);
@@ -159,7 +159,7 @@ class HttpSystemEndpointProbe implements SystemEndpointProbe {
     if (code != 'unauthorized') {
       throw const SystemEndpointFailure(
         code: 'SYSTEM_ENDPOINT_API_INVALID',
-        message: 'Địa chỉ này không trả về API đăng nhập MCP Field hợp lệ.',
+        message: 'Địa chỉ này chưa kết nối đúng dịch vụ đăng nhập MCP Field.',
       );
     }
   }

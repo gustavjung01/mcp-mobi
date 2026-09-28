@@ -381,6 +381,14 @@ abstract interface class FieldActionClient {
     required String idempotencyKey,
   });
 
+  Future<void> updateRouteCustomerLocation({
+    required String routeCustomerId,
+    required double latitude,
+    required double longitude,
+    required double accuracy,
+    required String idempotencyKey,
+  });
+
   Future<FieldAddedCustomer> addSessionCustomer({
     required String sessionId,
     required String customerName,
@@ -653,6 +661,44 @@ class HttpFieldDataClient implements FieldDataClient, FieldActionClient {
         'visitStatus': normalizedStatus,
         if (normalizedReason.isNotEmpty) 'statusReason': normalizedReason,
         if ((note ?? '').trim().isNotEmpty) 'note': note!.trim(),
+      },
+      idempotencyKey: idempotencyKey,
+    );
+  }
+
+  @override
+  Future<void> updateRouteCustomerLocation({
+    required String routeCustomerId,
+    required double latitude,
+    required double longitude,
+    required double accuracy,
+    required String idempotencyKey,
+  }) async {
+    if (routeCustomerId.trim().isEmpty) {
+      throw const FieldDataFailure(
+        code: 'ROUTE_CUSTOMER_REQUIRED',
+        message: 'Chưa xác định được điểm bán cần cập nhật vị trí.',
+      );
+    }
+    if (latitude < -90 ||
+        latitude > 90 ||
+        longitude < -180 ||
+        longitude > 180 ||
+        accuracy < 0) {
+      throw const FieldDataFailure(
+        code: 'LOCATION_INVALID',
+        message: 'Vị trí hiện tại chưa hợp lệ. Vui lòng lấy lại vị trí.',
+      );
+    }
+
+    await _request(
+      'PATCH',
+      '/api/route-customers/${Uri.encodeComponent(routeCustomerId.trim())}',
+      body: {
+        'geoLat': latitude,
+        'geoLng': longitude,
+        'geoAccuracy': accuracy,
+        'geoSource': 'mobile_gps',
       },
       idempotencyKey: idempotencyKey,
     );

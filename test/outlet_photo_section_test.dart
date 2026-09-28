@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as image_lib;
 import 'package:mcp_field/core/media/outlet_media_client.dart';
 import 'package:mcp_field/core/data/field_data_client.dart';
+import 'package:mcp_field/core/media/outlet_photo_pending_store.dart';
 import 'package:mcp_field/core/media/outlet_photo_picker.dart';
 import 'package:mcp_field/features/outlets/outlet_detail_page.dart';
 import 'package:mcp_field/features/outlets/outlet_photo_section.dart';
@@ -49,6 +50,31 @@ class FakeOutletMediaClient implements OutletMediaClient {
   Future<void> deleteMedia({
     required String mediaId,
   }) async {}
+}
+
+class MemoryOutletPhotoPendingStore implements OutletPhotoPendingStore {
+  final Map<String, PendingOutletPhoto> items = {};
+
+  @override
+  Future<List<PendingOutletPhoto>> load({String? routeCustomerId}) async {
+    final requested = (routeCustomerId ?? '').trim();
+    return items.values
+        .where(
+          (item) =>
+              requested.isEmpty || item.routeCustomerId == requested,
+        )
+        .toList(growable: false);
+  }
+
+  @override
+  Future<void> remove(String clientUploadId) async {
+    items.remove(clientUploadId);
+  }
+
+  @override
+  Future<void> save(PendingOutletPhoto item) async {
+    items[item.draft.clientUploadId] = item;
+  }
 }
 
 class FakeOutletPhotoPicker implements OutletPhotoPicker {
@@ -116,6 +142,52 @@ void main() {
 
     expect(find.byKey(const Key('outlet-hero-photo-preview')), findsOneWidget);
     expect(find.byKey(const Key('outlet-hero-blue-overlay')), findsNothing);
+  });
+
+  testWidgets('pending outlet photo survives restart and keeps upload identity', (
+    WidgetTester tester,
+  ) async {
+    final media = FakeOutletMediaClient()..failFirstUpload = false;
+    final pending = MemoryOutletPhotoPendingStore();
+
+    Widget app() => MaterialApp(
+      home: Scaffold(
+        body: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: OutletPhotoSection(
+              routeCustomerId: 'rc-1',
+              customerName: 'Cửa hàng Minh Phát',
+              sessionId: 'session-1',
+              mediaClient: media,
+              photoPicker: FakeOutletPhotoPicker(),
+              pendingStore: pending,
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.pumpWidget(app());
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('outlet-photo-camera')));
+    await tester.pumpAndSettle();
+
+    expect(pending.items.keys, contains('same-upload-id'));
+    expect(find.byKey(const Key('outlet-photo-drafts')), findsOneWidget);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpAndSettle();
+    await tester.pumpWidget(app());
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('outlet-photo-drafts')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('outlet-photo-save')));
+    await tester.pumpAndSettle();
+
+    expect(media.uploadIds, ['same-upload-id']);
+    expect(pending.items, isEmpty);
+    expect(find.byKey(const Key('outlet-photo-drafts')), findsNothing);
   });
 
   testWidgets('failed outlet photo retry keeps the same upload identity', (

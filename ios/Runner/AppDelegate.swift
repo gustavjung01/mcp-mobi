@@ -45,5 +45,84 @@ import UIKit
         result(FlutterMethodNotImplemented)
       }
     }
+
+    let navigationChannel = FlutterMethodChannel(
+      name: "com.hungphat.mcpfield/navigation",
+      binaryMessenger: engineBridge.applicationRegistrar.messenger()
+    )
+
+    navigationChannel.setMethodCallHandler { call, result in
+      guard call.method == "openMap" else {
+        result(FlutterMethodNotImplemented)
+        return
+      }
+      guard
+        let arguments = call.arguments as? [String: Any],
+        let rawUrl = arguments["url"] as? String,
+        let url = URL(string: rawUrl),
+        url.scheme?.lowercased() == "https"
+      else {
+        result(
+          FlutterError(
+            code: "MAP_URL_INVALID",
+            message: "Vị trí bản đồ chưa hợp lệ.",
+            details: nil
+          )
+        )
+        return
+      }
+
+      UIApplication.shared.open(url, options: [:]) { opened in
+        if opened {
+          result(nil)
+        } else {
+          result(
+            FlutterError(
+              code: "MAP_OPEN_FAILED",
+              message: "Không mở được bản đồ trên thiết bị này.",
+              details: nil
+            )
+          )
+        }
+      }
+    }
+
+    let storageChannel = FlutterMethodChannel(
+      name: "com.hungphat.mcpfield/storage",
+      binaryMessenger: engineBridge.applicationRegistrar.messenger()
+    )
+
+    storageChannel.setMethodCallHandler { call, result in
+      guard call.method == "pendingMediaDirectory" else {
+        result(FlutterMethodNotImplemented)
+        return
+      }
+
+      do {
+        let base = try FileManager.default.url(
+          for: .applicationSupportDirectory,
+          in: .userDomainMask,
+          appropriateFor: nil,
+          create: true
+        )
+        let directory = base.appendingPathComponent(
+          "mcp-pending-media",
+          isDirectory: true
+        )
+        try FileManager.default.createDirectory(
+          at: directory,
+          withIntermediateDirectories: true
+        )
+        result(directory.path)
+      } catch {
+        result(
+          FlutterError(
+            code: "MEDIA_STORAGE_UNAVAILABLE",
+            message: "Không chuẩn bị được nơi lưu ảnh chờ gửi.",
+            details: nil
+          )
+        )
+      }
+    }
   }
 }

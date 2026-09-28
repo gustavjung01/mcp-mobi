@@ -19,6 +19,8 @@ import java.util.concurrent.Executors
 
 class MainActivity : FlutterActivity() {
     private val updateChannel = "com.hungphat.mcpfield/app_update"
+    private val navigationChannel = "com.hungphat.mcpfield/navigation"
+    private val storageChannel = "com.hungphat.mcpfield/storage"
     private val updateExecutor = Executors.newSingleThreadExecutor()
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -59,6 +61,61 @@ class MainActivity : FlutterActivity() {
                 else -> result.notImplemented()
             }
         }
+
+        MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            navigationChannel,
+        ).setMethodCallHandler { call, result ->
+            if (call.method != "openMap") {
+                result.notImplemented()
+                return@setMethodCallHandler
+            }
+
+            val url = call.argument<String>("url")?.trim().orEmpty()
+            val uri = runCatching { Uri.parse(url) }.getOrNull()
+            if (uri == null || !uri.scheme.equals("https", ignoreCase = true)) {
+                result.error(
+                    "MAP_URL_INVALID",
+                    "Vị trí bản đồ chưa hợp lệ.",
+                    null,
+                )
+                return@setMethodCallHandler
+            }
+
+            try {
+                startActivity(Intent(Intent.ACTION_VIEW, uri))
+                result.success(null)
+            } catch (error: Exception) {
+                result.error(
+                    "MAP_OPEN_FAILED",
+                    "Không mở được bản đồ trên thiết bị này.",
+                    null,
+                )
+            }
+        }
+
+        MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            storageChannel,
+        ).setMethodCallHandler { call, result ->
+            when (call.method) {
+                "pendingMediaDirectory" -> {
+                    val directory = File(filesDir, "mcp-pending-media")
+                    if (!directory.exists() && !directory.mkdirs()) {
+                        result.error(
+                            "MEDIA_STORAGE_UNAVAILABLE",
+                            "Không chuẩn bị được nơi lưu ảnh chờ gửi.",
+                            null,
+                        )
+                    } else {
+                        result.success(directory.absolutePath)
+                    }
+                }
+
+                else -> result.notImplemented()
+            }
+        }
+
     }
 
     override fun onDestroy() {

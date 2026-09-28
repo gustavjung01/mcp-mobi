@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mcp_field/core/data/customer_boundary_client.dart';
+import 'package:mcp_field/core/sync/customer_boundary_sync.dart';
+import 'package:mcp_field/core/sync/mutation_queue.dart';
 import 'package:mcp_field/features/customers/customer_onboarding_page.dart';
 
 class FakeCustomerBoundaryClient implements CustomerBoundaryClient {
@@ -52,15 +54,46 @@ class FakeCustomerBoundaryClient implements CustomerBoundaryClient {
   }
 }
 
+class MemoryMutationQueueStore implements MutationQueueStore {
+  final Map<String, QueuedMutation> items = {};
+
+  @override
+  Future<List<QueuedMutation>> load({Set<String>? operations}) async {
+    final values = items.values.toList(growable: false);
+    if (operations == null || operations.isEmpty) return values;
+    return values
+        .where((item) => operations.contains(item.operation))
+        .toList(growable: false);
+  }
+
+  @override
+  Future<void> remove(String idempotencyKey) async {
+    items.remove(idempotencyKey);
+  }
+
+  @override
+  Future<void> save(QueuedMutation mutation) async {
+    items[mutation.idempotencyKey] = mutation;
+  }
+}
+
 void main() {
-  testWidgets('retrying the same onboarding intent reuses canonical key', (
+  testWidgets('queued onboarding intent survives and reuses canonical key', (
     WidgetTester tester,
   ) async {
     final client = FakeCustomerBoundaryClient();
+    final queue = MemoryMutationQueueStore();
+    final service = CustomerBoundarySubmissionService(
+      client: client,
+      queue: queue,
+    );
 
     await tester.pumpWidget(
       MaterialApp(
-        home: CustomerOnboardingPage(client: client),
+        home: CustomerOnboardingPage(
+          client: client,
+          submissionService: service,
+        ),
       ),
     );
     await tester.pumpAndSettle();
@@ -73,22 +106,24 @@ void main() {
     await tester.tap(submit);
     await tester.pumpAndSettle();
 
-    expect(find.text('Mạng đang gián đoạn.'), findsOneWidget);
+    expect(
+      find.text('Đã lưu thao tác chờ gửi. Ứng dụng sẽ tự đồng bộ lại.'),
+      findsOneWidget,
+    );
     expect(client.submitKeys, hasLength(1));
     expect(
       client.submitKeys.single,
       matches(RegExp(r'^[A-Za-z0-9._-]+$')),
     );
 
-    await tester.tap(submit);
-    await tester.pumpAndSettle();
+    final firstKey = client.submitKeys.single;
+    final result = await CustomerBoundarySyncService(
+      client: client,
+      queue: queue,
+    ).syncPending();
 
-    expect(client.submitKeys, hasLength(2));
-    expect(client.submitKeys[1], client.submitKeys[0]);
-    expect(find.text('Đã gửi Công Ty'), findsOneWidget);
-    expect(
-      find.byKey(const Key('customer-sync-route-customer-1')),
-      findsOneWidget,
-    );
+    expect(result.sent, 1);
+    expect(result.remaining, 0);
+    expect(client.submitKeys, [firstKey, firstKey]);
   });
 }

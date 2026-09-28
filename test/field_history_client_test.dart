@@ -176,6 +176,36 @@ void main() {
           );
         }
 
+        if (request.url.path == '/api/local-read/mcp-outlet-history') {
+          expect(
+            request.url.queryParameters['routeCustomerId'],
+            'route-customer-1',
+          );
+          return jsonResponse(
+            {
+              'data': {
+                'routeCustomerId': 'route-customer-1',
+                'items': [
+                  {
+                    'session_customer_id': 'sc-2',
+                    'session_id': 'session-2',
+                    'route_customer_id': 'route-customer-1',
+                    'customer_name': 'Điểm bán B',
+                    'route_name': 'Tuyến 1',
+                    'session_date': '2026-09-28',
+                    'visit_status': 'visited',
+                    'checkin_at': '2026-09-28T02:00:00.000Z',
+                    'order_id': 'order-2',
+                    'report_id': 'report-2',
+                    'followup_count': 1,
+                  },
+                ],
+              },
+            },
+            200,
+          );
+        }
+
         if (request.url.path == '/api/market-checks/data') {
           return jsonResponse(
             {
@@ -240,6 +270,12 @@ void main() {
     expect(detail.tests.single.status, 'opportunity');
     expect(detail.customers.single.visitStatus, 'skipped');
 
+    final outletHistory = await client.loadOutletHistory('route-customer-1');
+    expect(outletHistory.single.sessionId, 'session-2');
+    expect(outletHistory.single.hasOrder, isTrue);
+    expect(outletHistory.single.hasReport, isTrue);
+    expect(outletHistory.single.followupCount, 1);
+
     final checks = await client.loadFieldChecks();
     expect(checks.single.status, 'opportunity');
 
@@ -258,6 +294,7 @@ void main() {
         'GET /api/local-read/mcp-followups',
         'GET /api/local-read/mcp-session-reports',
         'GET /api/local-read/mcp-session-report',
+        'GET /api/local-read/mcp-outlet-history',
         'GET /api/market-checks/data',
         'POST /api/field-checks/result',
       ],

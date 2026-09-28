@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../app/theme/app_theme.dart';
 import '../../core/media/outlet_media_client.dart';
+import '../../core/media/outlet_photo_pending_store.dart';
 import '../../core/media/outlet_photo_picker.dart';
 import '../../shared/widgets/app_card.dart';
 
@@ -15,6 +16,7 @@ class OutletPhotoSection extends StatefulWidget {
     required this.mediaClient,
     required this.photoPicker,
     this.sessionId,
+    this.pendingStore,
     this.onProfileChanged,
     this.onDraftPreviewChanged,
   });
@@ -24,6 +26,7 @@ class OutletPhotoSection extends StatefulWidget {
   final String? sessionId;
   final OutletMediaClient mediaClient;
   final OutletPhotoPicker photoPicker;
+  final OutletPhotoPendingStore? pendingStore;
   final ValueChanged<OutletMediaProfile>? onProfileChanged;
   final ValueChanged<Uint8List?>? onDraftPreviewChanged;
 
@@ -35,6 +38,7 @@ class _OutletPhotoSectionState extends State<OutletPhotoSection> {
   OutletMediaProfile? _profile;
   List<OutletPhotoDraft> _drafts = const [];
   bool _loading = true;
+  bool _restoring = false;
   bool _picking = false;
   bool _saving = false;
   String? _deletingId;
@@ -48,7 +52,11 @@ class _OutletPhotoSectionState extends State<OutletPhotoSection> {
           .toInt();
 
   bool get _busy =>
-      _loading || _picking || _saving || (_deletingId ?? '').isNotEmpty;
+      _loading ||
+      _restoring ||
+      _picking ||
+      _saving ||
+      (_deletingId ?? '').isNotEmpty;
 
   void _publishDraftPreview() {
     widget.onDraftPreviewChanged?.call(
@@ -60,6 +68,7 @@ class _OutletPhotoSectionState extends State<OutletPhotoSection> {
   void initState() {
     super.initState();
     _loadProfile();
+    _restorePending();
   }
 
   @override
@@ -70,7 +79,54 @@ class _OutletPhotoSectionState extends State<OutletPhotoSection> {
       _drafts = const [];
       _profile = null;
       _loadProfile();
+      _restorePending();
     }
+  }
+
+  Future<void> _restorePending() async {
+    final store = widget.pendingStore;
+    if (store == null) return;
+    setState(() {
+      _restoring = true;
+      _message = null;
+    });
+    try {
+      final pending = await store.load(
+        routeCustomerId: widget.routeCustomerId,
+      );
+      if (!mounted) return;
+      setState(() {
+        _drafts = pending
+            .map((item) => item.draft)
+            .take(_limit)
+            .toList(growable: false);
+      });
+      _publishDraftPreview();
+    } on OutletPhotoPendingFailure catch (failure) {
+      if (!mounted) return;
+      setState(() {
+        _message = failure.message;
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _restoring = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _persistDraft(OutletPhotoDraft draft) async {
+    final store = widget.pendingStore;
+    if (store == null) return;
+    await store.save(
+      PendingOutletPhoto(
+        routeCustomerId: widget.routeCustomerId,
+        customerName: widget.customerName,
+        sessionId: widget.sessionId,
+        draft: draft,
+      ),
+    );
   }
 
   Future<void> _loadProfile() async {
@@ -111,11 +167,18 @@ class _OutletPhotoSectionState extends State<OutletPhotoSection> {
     try {
       final draft = await widget.photoPicker.pickCamera();
       if (!mounted || draft == null) return;
+      await _persistDraft(draft);
+      if (!mounted) return;
       setState(() {
         _drafts = [..._drafts, draft].take(_limit).toList(growable: false);
       });
       _publishDraftPreview();
     } on OutletPhotoPickerFailure catch (failure) {
+      if (!mounted) return;
+      setState(() {
+        _message = failure.message;
+      });
+    } on OutletPhotoPendingFailure catch (failure) {
       if (!mounted) return;
       setState(() {
         _message = failure.message;
@@ -140,14 +203,20 @@ class _OutletPhotoSectionState extends State<OutletPhotoSection> {
         maxCount: _remaining,
       );
       if (!mounted || additions.isEmpty) return;
-      setState(() {
-        _drafts = [
-          ..._drafts,
-          ...additions,
-        ].take(_limit).toList(growable: false);
-      });
+      for (final draft in additions) {
+        await _persistDraft(draft);
+        if (!mounted) return;
+        setState(() {
+          _drafts = [..._drafts, draft].take(_limit).toList(growable: false);
+        });
+      }
       _publishDraftPreview();
     } on OutletPhotoPickerFailure catch (failure) {
+      if (!mounted) return;
+      setState(() {
+        _message = failure.message;
+      });
+    } on OutletPhotoPendingFailure catch (failure) {
       if (!mounted) return;
       setState(() {
         _message = failure.message;
@@ -161,15 +230,24 @@ class _OutletPhotoSectionState extends State<OutletPhotoSection> {
     }
   }
 
-  void _removeDraft(String clientUploadId) {
+  Future<void> _removeDraft(String clientUploadId) async {
     if (_busy) return;
-    setState(() {
-      _drafts = _drafts
-          .where((item) => item.clientUploadId != clientUploadId)
-          .toList(growable: false);
-      _message = null;
-    });
-    _publishDraftPreview();
+    try {
+      await widget.pendingStore?.remove(clientUploadId);
+      if (!mounted) return;
+      setState(() {
+        _drafts = _drafts
+            .where((item) => item.clientUploadId != clientUploadId)
+            .toList(growable: false);
+        _message = null;
+      });
+      _publishDraftPreview();
+    } on OutletPhotoPendingFailure catch (failure) {
+      if (!mounted) return;
+      setState(() {
+        _message = failure.message;
+      });
+    }
   }
 
   Future<void> _saveDrafts() async {
@@ -205,10 +283,22 @@ class _OutletPhotoSectionState extends State<OutletPhotoSection> {
             width: draft.width,
             height: draft.height,
           );
+          try {
+            await widget.pendingStore?.remove(draft.clientUploadId);
+          } on OutletPhotoPendingFailure catch (failure) {
+            firstFailureMessage ??= failure.message;
+          }
           succeeded.add(draft.clientUploadId);
         } on OutletMediaFailure catch (failure) {
           failed.add(draft.clientUploadId);
           firstFailureMessage ??= failure.message;
+          try {
+            await _persistDraft(
+              draft.copyWith(status: OutletPhotoStatus.error),
+            );
+          } on OutletPhotoPendingFailure {
+            // Giữ thông báo lỗi gửi ảnh ban đầu; ảnh chờ vẫn còn trên thiết bị.
+          }
         }
       }
 

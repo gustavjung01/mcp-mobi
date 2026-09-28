@@ -27,6 +27,162 @@ class RouteMutationSubmissionService {
   final FieldActionClient client;
   final MutationQueueStore queue;
 
+  Future<RouteMutationSubmitResult> openSession({
+    required String routeId,
+    required DateTime date,
+    required String owner,
+    required String routeName,
+  }) async {
+    final normalizedRouteId = routeId.trim();
+    if (normalizedRouteId.isEmpty) {
+      throw const FieldDataFailure(
+        code: 'ROUTE_REQUIRED',
+        message: 'Chưa xác định được tuyến cần bắt đầu.',
+      );
+    }
+
+    final existing = await _findOutstanding(
+      operation: 'route-session.open',
+      matches: (payload) {
+        if (_text(payload['routeId']) != normalizedRouteId) return false;
+        final queuedDate = DateTime.tryParse(_text(payload['date']));
+        if (queuedDate == null) return false;
+        return queuedDate.year == date.year &&
+            queuedDate.month == date.month &&
+            queuedDate.day == date.day;
+      },
+    );
+    final mutation = existing ??
+        QueuedMutation(
+          idempotencyKey: CanonicalIdempotencyKey.create('route-session.open'),
+          operation: 'route-session.open',
+          entityType: 'route_session',
+          entityLabel:
+              routeName.trim().isEmpty ? 'Tuyến làm việc' : routeName.trim(),
+          payload: <String, Object?>{
+            'routeId': normalizedRouteId,
+            'date': date.toIso8601String(),
+            'owner': owner.trim(),
+          },
+          createdAt: DateTime.now().toUtc(),
+        );
+    if (existing == null) await _saveInitial(mutation);
+
+    final queuedDate =
+        DateTime.tryParse(_text(mutation.payload['date'])) ?? date;
+    final queuedOwner = _text(mutation.payload['owner']).isEmpty
+        ? owner
+        : _text(mutation.payload['owner']);
+    try {
+      await client.openRouteSession(
+        routeId: normalizedRouteId,
+        date: queuedDate,
+        owner: queuedOwner,
+        idempotencyKey: mutation.idempotencyKey,
+      );
+      await _acknowledgeBestEffort(mutation, normalizedRouteId);
+      return const RouteMutationSubmitResult(
+        status: RouteMutationSubmitStatus.completed,
+      );
+    } on FieldDataFailure catch (failure) {
+      return _handleFailure(mutation, failure);
+    }
+  }
+
+  Future<RouteMutationSubmitResult> finishSession({
+    required String sessionId,
+    required String routeName,
+  }) async {
+    final normalizedSessionId = sessionId.trim();
+    if (normalizedSessionId.isEmpty) {
+      throw const FieldDataFailure(
+        code: 'SESSION_REQUIRED',
+        message: 'Chưa xác định được phiên cần kết thúc.',
+      );
+    }
+
+    final existing = await _findOutstanding(
+      operation: 'route-session.update',
+      matches: (payload) =>
+          _text(payload['sessionId']) == normalizedSessionId &&
+          _text(payload['status']) == 'done',
+    );
+    final mutation = existing ??
+        QueuedMutation(
+          idempotencyKey:
+              CanonicalIdempotencyKey.create('route-session.update'),
+          operation: 'route-session.update',
+          entityType: 'route_session',
+          entityLabel:
+              routeName.trim().isEmpty ? 'Tuyến làm việc' : routeName.trim(),
+          payload: <String, Object?>{
+            'sessionId': normalizedSessionId,
+            'status': 'done',
+          },
+          createdAt: DateTime.now().toUtc(),
+        );
+    if (existing == null) await _saveInitial(mutation);
+
+    try {
+      await client.finishRouteSession(
+        sessionId: normalizedSessionId,
+        idempotencyKey: mutation.idempotencyKey,
+      );
+      await _acknowledgeBestEffort(mutation, normalizedSessionId);
+      return const RouteMutationSubmitResult(
+        status: RouteMutationSubmitStatus.completed,
+      );
+    } on FieldDataFailure catch (failure) {
+      return _handleFailure(mutation, failure);
+    }
+  }
+
+  Future<RouteMutationSubmitResult> updateLocation({
+    required String routeCustomerId,
+    required String customerName,
+    required FieldLocation location,
+  }) async {
+    final normalizedId = routeCustomerId.trim();
+    if (normalizedId.isEmpty) {
+      throw const FieldDataFailure(
+        code: 'ROUTE_CUSTOMER_REQUIRED',
+        message: 'Chưa xác định được điểm bán cần cập nhật vị trí.',
+      );
+    }
+
+    final key = CanonicalIdempotencyKey.create('route-customer.update');
+    final mutation = QueuedMutation(
+      idempotencyKey: key,
+      operation: 'route-customer.update',
+      entityType: 'route_customer',
+      entityLabel: customerName.trim().isEmpty ? 'Điểm bán' : customerName.trim(),
+      payload: <String, Object?>{
+        'routeCustomerId': normalizedId,
+        'geoLat': location.latitude,
+        'geoLng': location.longitude,
+        'geoAccuracy': location.accuracy,
+      },
+      createdAt: DateTime.now().toUtc(),
+    );
+    await _saveInitial(mutation);
+
+    try {
+      await client.updateRouteCustomerLocation(
+        routeCustomerId: normalizedId,
+        latitude: location.latitude,
+        longitude: location.longitude,
+        accuracy: location.accuracy,
+        idempotencyKey: key,
+      );
+      await _acknowledgeBestEffort(mutation, normalizedId);
+      return const RouteMutationSubmitResult(
+        status: RouteMutationSubmitStatus.completed,
+      );
+    } on FieldDataFailure catch (failure) {
+      return _handleFailure(mutation, failure);
+    }
+  }
+
   Future<RouteMutationSubmitResult> setCheckIn({
     required FieldDayLine line,
     required bool checkedIn,
@@ -203,6 +359,25 @@ class RouteMutationSubmissionService {
     }
   }
 
+  Future<QueuedMutation?> _findOutstanding({
+    required String operation,
+    required bool Function(Map<String, Object?> payload) matches,
+  }) async {
+    try {
+      final rows = await queue.load(operations: {operation});
+      for (final row in rows) {
+        if (!row.isOutstanding) continue;
+        if (matches(row.payload)) return row;
+      }
+      return null;
+    } catch (_) {
+      throw const FieldDataFailure(
+        code: 'LOCAL_QUEUE_UNAVAILABLE',
+        message: 'Không đọc được thao tác chờ gửi trên thiết bị.',
+      );
+    }
+  }
+
   Future<void> _saveInitial(QueuedMutation mutation) async {
     try {
       await queue.save(mutation);
@@ -280,6 +455,9 @@ class RouteMutationSyncService {
   final MutationQueueStore queue;
 
   static const operations = <String>{
+    'route-session.open',
+    'route-session.update',
+    'route-customer.update',
     'session-customer.checkin.set',
     'session-customer.status.update',
     'session-customer.add',
@@ -325,6 +503,43 @@ class RouteMutationSyncService {
   Future<String?> _replay(QueuedMutation mutation) async {
     final payload = mutation.payload;
     switch (mutation.operation) {
+      case 'route-session.open':
+        final routeId = _requiredText(payload['routeId'], 'ROUTE_REQUIRED');
+        final dateValue = _requiredText(payload['date'], 'SESSION_DATE_REQUIRED');
+        final date = DateTime.tryParse(dateValue);
+        if (date == null) {
+          throw const FieldDataFailure(
+            code: 'SESSION_DATE_INVALID',
+            message: 'Ngày bắt đầu tuyến chờ gửi chưa hợp lệ.',
+          );
+        }
+        await client.openRouteSession(
+          routeId: routeId,
+          date: date,
+          owner: _text(payload['owner']),
+          idempotencyKey: mutation.idempotencyKey,
+        );
+        return routeId;
+      case 'route-session.update':
+        final sessionId = _requiredText(payload['sessionId'], 'SESSION_REQUIRED');
+        await client.finishRouteSession(
+          sessionId: sessionId,
+          idempotencyKey: mutation.idempotencyKey,
+        );
+        return sessionId;
+      case 'route-customer.update':
+        final routeCustomerId = _requiredText(
+          payload['routeCustomerId'],
+          'ROUTE_CUSTOMER_REQUIRED',
+        );
+        await client.updateRouteCustomerLocation(
+          routeCustomerId: routeCustomerId,
+          latitude: _requiredDouble(payload['geoLat']),
+          longitude: _requiredDouble(payload['geoLng']),
+          accuracy: _requiredDouble(payload['geoAccuracy']),
+          idempotencyKey: mutation.idempotencyKey,
+        );
+        return routeCustomerId;
       case 'session-customer.checkin.set':
         final sessionCustomerId = _requiredText(
           payload['sessionCustomerId'],

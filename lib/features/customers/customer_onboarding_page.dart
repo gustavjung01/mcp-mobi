@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../app/theme/app_theme.dart';
 import '../../core/data/customer_boundary_client.dart';
-import '../../core/idempotency/canonical_idempotency.dart';
+import '../../core/sync/customer_boundary_sync.dart';
 import '../../shared/widgets/app_card.dart';
 import '../../shared/widgets/empty_state.dart';
 import '../../shared/widgets/navy_page_header.dart';
@@ -20,11 +20,13 @@ class CustomerOnboardingPage extends StatefulWidget {
     required this.client,
     super.key,
     this.focusRouteCustomerId,
+    this.submissionService,
     this.onChanged,
   });
 
   final CustomerBoundaryClient client;
   final String? focusRouteCustomerId;
+  final CustomerBoundarySubmissionService? submissionService;
   final Future<void> Function()? onChanged;
 
   @override
@@ -32,7 +34,6 @@ class CustomerOnboardingPage extends StatefulWidget {
 }
 
 class _CustomerOnboardingPageState extends State<CustomerOnboardingPage> {
-  final Map<String, String> _intentKeys = {};
   List<CustomerVerificationItem> _items = const [];
   CustomerOnboardingFilter _filter = CustomerOnboardingFilter.all;
   String _query = '';
@@ -98,33 +99,31 @@ class _CustomerOnboardingPageState extends State<CustomerOnboardingPage> {
         ? 'customer-verification.submit'
         : 'customer-verification.sync';
     final signature = '$operation:${item.routeCustomerId}';
-    final key = _intentKeys.putIfAbsent(
-      signature,
-      () => CanonicalIdempotencyKey.create(operation),
-    );
+    final service = widget.submissionService;
 
     setState(() {
       _busyKey = signature;
       _message = null;
     });
     try {
-      if (submit) {
-        await widget.client.submit(
-          routeCustomerId: item.routeCustomerId,
-          idempotencyKey: key,
-        );
-      } else {
-        await widget.client.sync(
-          routeCustomerId: item.routeCustomerId,
-          idempotencyKey: key,
+      if (service == null) {
+        throw const CustomerBoundaryFailure(
+          code: 'CUSTOMER_SYNC_UNAVAILABLE',
+          message: 'Chưa sẵn sàng gửi thông tin điểm bán. Vui lòng thử lại.',
         );
       }
-      _intentKeys.remove(signature);
-      await _load();
-      await widget.onChanged?.call();
+      final result = submit
+          ? await service.submit(routeCustomerId: item.routeCustomerId)
+          : await service.sync(routeCustomerId: item.routeCustomerId);
+      if (result.status == CustomerBoundarySubmitStatus.completed) {
+        await _load();
+        await widget.onChanged?.call();
+      }
       if (!mounted) return;
       setState(() {
-        _message = submit
+        _message = result.status == CustomerBoundarySubmitStatus.queued
+            ? 'Đã lưu thao tác chờ gửi. Ứng dụng sẽ tự đồng bộ lại.'
+            : submit
             ? 'Đã gửi điểm bán sang Công Ty để xác minh.'
             : 'Đã cập nhật trạng thái từ Công Ty.';
       });

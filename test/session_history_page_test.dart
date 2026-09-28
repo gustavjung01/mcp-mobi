@@ -35,6 +35,10 @@ class FakeHistoryClient implements FieldHistoryClient {
   }
 
   @override
+  Future<List<OutletHistoryItem>> loadOutletHistory(String routeCustomerId) async =>
+      const [];
+
+  @override
   Future<List<FieldTaskItem>> loadTasks() async => const [];
 
   @override

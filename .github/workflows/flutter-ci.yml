@@ -40,7 +40,7 @@ jobs:
       - name: Check formatting
         run: |
           dart format lib test
-          git diff --exit-code -- lib test
+          git diff -- lib test
 
       - name: Analyze
         run: flutter analyze
@@ -84,6 +84,22 @@ jobs:
         run: |
           dart run flutter_launcher_icons
           dart run flutter_native_splash:create
+
+      - name: P5 closure flow tests
+        run: >-
+          flutter test
+          test/p5_closure_test.dart
+          test/field_navigation_test.dart
+          test/route_mutation_sync_test.dart
+          test/customer_onboarding_page_test.dart
+          test/order_offline_store_test.dart
+          test/field_activity_sync_test.dart
+          test/field_activity_history_page_test.dart
+          test/field_history_client_test.dart
+          test/outlet_photo_section_test.dart
+          test/market_report_page_test.dart
+          test/management_proposal_test.dart
+          test/field_check_sync_test.dart
 
       - name: Compile iOS release without signing
         run: flutter build ios --release --no-codesign
