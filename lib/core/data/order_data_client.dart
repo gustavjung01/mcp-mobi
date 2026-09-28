@@ -65,7 +65,7 @@ class OrderCatalogItem {
 
   String get purchaseUnitLabel {
     final unit = (sellUnit ?? '').trim().toLowerCase();
-    if (RegExp(r'(^|\\s)(thùng|thung|case|carton)(\\s|$)').hasMatch(unit)) {
+    if (RegExp(r'(^|\s)(thùng|thung|case|carton)(\s|$)').hasMatch(unit)) {
       return 'Thùng';
     }
     return 'Lẻ';
@@ -73,7 +73,8 @@ class OrderCatalogItem {
 
   String get purchaseUnitDetail {
     final rawVariant = (variantName ?? '').trim();
-    final variant = const {'mặc định', 'mac dinh'}.contains(rawVariant.toLowerCase())
+    final variant =
+        const {'mặc định', 'mac dinh'}.contains(rawVariant.toLowerCase())
         ? ''
         : rawVariant;
     final pack = (packUnit ?? '').trim().isNotEmpty && packQuantity != null
@@ -255,14 +256,17 @@ class FieldOrder {
   }
 
   factory FieldOrder.fromJson(Map<String, dynamic> json) {
-    final versions = _objects(json['versions'])
-        .map(FieldOrderVersion.fromJson)
-        .toList(growable: true)
-      ..sort(
-        (left, right) =>
-            _integer(left.versionNumber).compareTo(_integer(right.versionNumber)),
-      );
-    final currentVersionNumber = _nullableText(json['currentVersionNumber']) ??
+    final versions =
+        _objects(json['versions'])
+            .map(FieldOrderVersion.fromJson)
+            .toList(growable: true)
+          ..sort(
+            (left, right) =>
+                _integer(left.versionNumber)
+                    .compareTo(_integer(right.versionNumber)),
+          );
+    final currentVersionNumber =
+        _nullableText(json['currentVersionNumber']) ??
         (versions.isEmpty ? null : versions.last.versionNumber);
     FieldOrderVersion? current;
     if (currentVersionNumber != null) {

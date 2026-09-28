@@ -1044,8 +1044,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     if (client == null) return;
 
     final addressId = (customer.defaultAddressId ?? '').trim();
-    if (customer.status.trim().toLowerCase() != 'active' ||
-        addressId.isEmpty) {
+    if (customer.status.trim().toLowerCase() != 'active' || addressId.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
@@ -1065,9 +1064,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       phone: customer.phone ?? '',
       area: '',
       address:
-          customer.defaultAddressLine1 ??
-          customer.defaultAddressLabel ??
-          '',
+          customer.defaultAddressLine1 ?? customer.defaultAddressLabel ?? '',
       status: 'linked_existing',
       note: '',
       coreCustomerId: customer.id,
@@ -1092,9 +1089,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          outcome == OrderSubmitOutcome.created
-              ? 'Đã tạo đơn hàng.'
-              : 'Đã lưu đơn chờ gửi. Ứng dụng sẽ dùng lại đúng lần gửi này khi đồng bộ.',
+          outcome == OrderSubmitOutcome.created ? 'Đã tạo đơn hàng.' : 'Đã lưu đơn chờ gửi. Ứng dụng sẽ dùng lại đúng lần gửi này khi đồng bộ.',
         ),
       ),
     );

@@ -429,8 +429,7 @@ class _OrdersPageState extends State<OrdersPage> with WidgetsBindingObserver {
                         ),
                       ),
                     ],
-                    onChanged: (value) =>
-                        setState(() => _status = value ?? ''),
+                    onChanged: (value) => setState(() => _status = value ?? ''),
                   ),
                   if ((_message ?? '').isNotEmpty) ...[
                     const SizedBox(height: AppSpacing.sm),
@@ -450,7 +449,8 @@ class _OrdersPageState extends State<OrdersPage> with WidgetsBindingObserver {
                       child: EmptyState(
                         icon: Icons.receipt_long_outlined,
                         title: 'Không có đơn phù hợp',
-                        message: 'Thử đổi khoảng ngày, trạng thái hoặc từ khóa.',
+                        message:
+                            'Thử đổi khoảng ngày, trạng thái hoặc từ khóa.',
                       ),
                     ),
                   ] else ...[
@@ -602,10 +602,10 @@ class _OrderCustomerPickerState extends State<_OrderCustomerPicker> {
                           ),
                           subtitle: Text(
                             [
-                              customer.customerCode,
-                              customer.defaultAddressLine1 ??
-                                  customer.defaultAddressLabel,
-                            ]
+                                  customer.customerCode,
+                                  customer.defaultAddressLine1 ??
+                                      customer.defaultAddressLabel,
+                                ]
                                 .whereType<String>()
                                 .where((value) => value.trim().isNotEmpty)
                                 .join(' · '),
@@ -1146,7 +1146,10 @@ String _dateTimeLabel(String? value) {
 
 String _quantity(double value) {
   if (value == value.truncateToDouble()) return value.toInt().toString();
-  return value.toStringAsFixed(2).replaceFirst(RegExp(r'0+$'), '').replaceFirst(RegExp(r'\\.$'), '');
+  return value
+      .toStringAsFixed(2)
+      .replaceFirst(RegExp(r'0+$'), '')
+      .replaceFirst(RegExp(r'\\.$'), '');
 }
 
 String _money(double? value) {
