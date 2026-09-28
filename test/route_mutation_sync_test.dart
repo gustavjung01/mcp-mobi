@@ -49,6 +49,9 @@ class MemoryMutationQueueStore implements MutationQueueStore {
 class FakeFieldActionClient implements FieldActionClient {
   bool offline = true;
   final Map<String, List<String>> keys = {
+    'route-session.open': <String>[],
+    'route-session.update': <String>[],
+    'route-customer.update': <String>[],
     'session-customer.checkin.set': <String>[],
     'session-customer.status.update': <String>[],
     'session-customer.add': <String>[],
@@ -71,13 +74,32 @@ class FakeFieldActionClient implements FieldActionClient {
     required DateTime date,
     required String owner,
     required String idempotencyKey,
-  }) async {}
+  }) async {
+    await _record('route-session.open', idempotencyKey);
+  }
 
   @override
   Future<void> finishRouteSession({
     required String sessionId,
     required String idempotencyKey,
-  }) async {}
+  }) async {
+    await _record('route-session.update', idempotencyKey);
+  }
+
+  @override
+  Future<void> updateRouteCustomerLocation({
+    required String routeCustomerId,
+    required double latitude,
+    required double longitude,
+    required double accuracy,
+    required String idempotencyKey,
+  }) async {
+    expect(routeCustomerId, 'route-customer-1');
+    expect(latitude, 10.75);
+    expect(longitude, 106.67);
+    expect(accuracy, 8);
+    await _record('route-customer.update', idempotencyKey);
+  }
 
   @override
   Future<void> setSessionCustomerCheckIn({
@@ -145,6 +167,25 @@ void main() {
         queue: queue,
       );
 
+      final opened = await service.openSession(
+        routeId: 'route-1',
+        date: DateTime(2026, 9, 28),
+        owner: 'Nhân viên A',
+        routeName: 'Tuyến 1',
+      );
+      final finished = await service.finishSession(
+        sessionId: 'session-1',
+        routeName: 'Tuyến 1',
+      );
+      final located = await service.updateLocation(
+        routeCustomerId: 'route-customer-1',
+        customerName: 'Cửa hàng Minh Phát',
+        location: const FieldLocation(
+          latitude: 10.75,
+          longitude: 106.67,
+          accuracy: 8,
+        ),
+      );
       final checkin = await service.setCheckIn(
         line: _line,
         checkedIn: true,
@@ -178,6 +219,9 @@ void main() {
         idempotencyKey: addKey,
       );
 
+      expect(opened.status, RouteMutationSubmitStatus.queued);
+      expect(finished.status, RouteMutationSubmitStatus.queued);
+      expect(located.status, RouteMutationSubmitStatus.queued);
       expect(checkin.status, RouteMutationSubmitStatus.queued);
       expect(skipped.status, RouteMutationSubmitStatus.queued);
       expect(added.status, RouteMutationSubmitStatus.queued);
@@ -185,7 +229,7 @@ void main() {
       final queued = await queue.load(
         operations: RouteMutationSyncService.operations,
       );
-      expect(queued, hasLength(3));
+      expect(queued, hasLength(6));
       for (final mutation in queued) {
         expect(
           CanonicalIdempotencyKey.isValid(mutation.idempotencyKey),
@@ -207,7 +251,7 @@ void main() {
         queue: queue,
       ).syncPending();
 
-      expect(result.sent, 3);
+      expect(result.sent, 6);
       expect(result.failed, 0);
       expect(result.remaining, 0);
 
@@ -219,4 +263,49 @@ void main() {
       }
     },
   );
+
+  test('repeating the same route session intent reuses queued key', () async {
+    final queue = MemoryMutationQueueStore();
+    final client = FakeFieldActionClient();
+    final service = RouteMutationSubmissionService(
+      client: client,
+      queue: queue,
+    );
+
+    final firstOpen = await service.openSession(
+      routeId: 'route-1',
+      date: DateTime(2026, 9, 28, 8),
+      owner: 'Nhân viên A',
+      routeName: 'Tuyến 1',
+    );
+    final openKey = client.keys['route-session.open']!.single;
+    final secondOpen = await service.openSession(
+      routeId: 'route-1',
+      date: DateTime(2026, 9, 28, 9),
+      owner: 'Nhân viên A',
+      routeName: 'Tuyến 1',
+    );
+
+    final firstFinish = await service.finishSession(
+      sessionId: 'session-1',
+      routeName: 'Tuyến 1',
+    );
+    final finishKey = client.keys['route-session.update']!.single;
+    final secondFinish = await service.finishSession(
+      sessionId: 'session-1',
+      routeName: 'Tuyến 1',
+    );
+
+    expect(firstOpen.status, RouteMutationSubmitStatus.queued);
+    expect(secondOpen.status, RouteMutationSubmitStatus.queued);
+    expect(firstFinish.status, RouteMutationSubmitStatus.queued);
+    expect(secondFinish.status, RouteMutationSubmitStatus.queued);
+    expect(client.keys['route-session.open'], [openKey, openKey]);
+    expect(client.keys['route-session.update'], [finishKey, finishKey]);
+
+    final queued = await queue.load(
+      operations: const {'route-session.open', 'route-session.update'},
+    );
+    expect(queued, hasLength(2));
+  });
 }

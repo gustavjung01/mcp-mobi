@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 
 import '../../app/theme/app_theme.dart';
 import '../../core/data/field_data_client.dart';
+import '../../core/data/field_history_client.dart';
 import '../../core/media/outlet_media_client.dart';
+import '../../core/media/outlet_photo_pending_store.dart';
 import '../../core/media/outlet_photo_picker.dart';
 import '../../shared/widgets/app_card.dart';
 import 'outlet_photo_section.dart';
@@ -19,6 +21,10 @@ class OutletDetailPage extends StatefulWidget {
     this.sessionId,
     this.mediaClient,
     this.photoPicker,
+    this.photoPendingStore,
+    this.historyClient,
+    this.onOpenMap,
+    this.onUpdateLocation,
     this.onSetCheckIn,
     this.onSkip,
     this.onCreateOrder,
@@ -35,6 +41,11 @@ class OutletDetailPage extends StatefulWidget {
   final String? sessionId;
   final OutletMediaClient? mediaClient;
   final OutletPhotoPicker? photoPicker;
+  final OutletPhotoPendingStore? photoPendingStore;
+  final FieldHistoryClient? historyClient;
+  final Future<void> Function(FieldGps? gps, String query)? onOpenMap;
+  final Future<bool> Function(String routeCustomerId, String customerName)?
+  onUpdateLocation;
   final Future<bool> Function(FieldDayLine line, bool checkedIn)? onSetCheckIn;
   final Future<bool> Function(
     FieldDayLine line,
@@ -54,8 +65,13 @@ class OutletDetailPage extends StatefulWidget {
 
 class _OutletDetailPageState extends State<OutletDetailPage> {
   bool _history = false;
+  bool _historyLoading = false;
+  bool _historyLoaded = false;
   bool _checkingIn = false;
   bool _skipping = false;
+  bool _updatingLocation = false;
+  List<OutletHistoryItem> _historyItems = const [];
+  String? _historyMessage;
   late bool _checkedIn;
   late String _visitStatus;
   String? _checkinAt;
@@ -68,6 +84,87 @@ class _OutletDetailPageState extends State<OutletDetailPage> {
     _checkedIn = widget.line?.checkedIn == true;
     _visitStatus = widget.line?.status ?? 'pending';
     _checkinAt = widget.line?.checkinAt;
+  }
+
+  String get _routeCustomerId =>
+      (widget.line?.routeCustomerId ??
+              widget.customer?.id ??
+              widget.outlet?.id ??
+              '')
+          .trim();
+
+  String get _outletName =>
+      (widget.line?.accountName ??
+              widget.customer?.accountName ??
+              widget.outlet?.name ??
+              'Điểm bán')
+          .trim();
+
+  Future<void> _showHistory() async {
+    if (!_history) setState(() => _history = true);
+    if (_historyLoaded || _historyLoading) return;
+    final client = widget.historyClient;
+    final routeCustomerId = _routeCustomerId;
+    if (client == null || routeCustomerId.isEmpty) {
+      setState(() {
+        _historyLoaded = true;
+        _historyItems = const [];
+        _historyMessage = 'Chưa có dữ liệu lịch sử cho điểm bán này.';
+      });
+      return;
+    }
+
+    setState(() {
+      _historyLoading = true;
+      _historyMessage = null;
+    });
+    try {
+      final items = await client.loadOutletHistory(routeCustomerId);
+      if (!mounted) return;
+      setState(() {
+        _historyItems = items;
+        _historyLoaded = true;
+      });
+    } on FieldHistoryFailure catch (failure) {
+      if (!mounted) return;
+      setState(() {
+        _historyMessage = failure.message;
+      });
+    } finally {
+      if (mounted) setState(() => _historyLoading = false);
+    }
+  }
+
+  Future<void> _updateLocation() async {
+    final action = widget.onUpdateLocation;
+    final routeCustomerId = _routeCustomerId;
+    if (action == null || routeCustomerId.isEmpty || _updatingLocation) return;
+    setState(() => _updatingLocation = true);
+    try {
+      final completed = await action(routeCustomerId, _outletName);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            completed
+                ? 'Đã cập nhật vị trí điểm bán.'
+                : 'Đã lưu vị trí chờ gửi. Ứng dụng sẽ tự đồng bộ lại.',
+          ),
+        ),
+      );
+    } on FieldDataFailure catch (failure) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(failure.message)),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Không cập nhật được vị trí. Vui lòng thử lại.')),
+      );
+    } finally {
+      if (mounted) setState(() => _updatingLocation = false);
+    }
   }
 
   Future<void> _toggleCheckIn() async {
@@ -355,7 +452,7 @@ class _OutletDetailPageState extends State<OutletDetailPage> {
                   child: _TabButton(
                     label: 'Lịch sử',
                     selected: _history,
-                    onTap: () => setState(() => _history = true),
+                    onTap: _showHistory,
                   ),
                 ),
               ],
@@ -364,9 +461,9 @@ class _OutletDetailPageState extends State<OutletDetailPage> {
           Expanded(
             child: _history
                 ? _HistoryBody(
-                    line: line,
-                    checkedIn: _checkedIn,
-                    checkinAt: _checkinAt,
+                    loading: _historyLoading,
+                    items: _historyItems,
+                    message: _historyMessage,
                   )
                 : ListView(
                     padding: const EdgeInsets.all(AppSpacing.md),
@@ -498,6 +595,75 @@ class _OutletDetailPageState extends State<OutletDetailPage> {
                           ],
                         ),
                       ),
+                      if (widget.onOpenMap != null ||
+                          (routeCustomerId.isNotEmpty &&
+                              widget.onUpdateLocation != null)) ...[
+                        const SizedBox(height: AppSpacing.md),
+                        AppCard(
+                          child: Row(
+                            children: [
+                              if (widget.onOpenMap != null)
+                                Expanded(
+                                  child: OutlinedButton.icon(
+                                    key: const Key('outlet-open-map'),
+                                    onPressed: () async {
+                                      try {
+                                        await widget.onOpenMap!(
+                                          gps,
+                                          address.isNotEmpty
+                                              ? address
+                                              : '$name, $area',
+                                        );
+                                      } catch (error) {
+                                        if (!mounted) return;
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(
+                                            content: Text(
+                                              error is Exception
+                                                  ? error.toString().replaceFirst('Exception: ', '')
+                                                  : 'Không mở được bản đồ.',
+                                            ),
+                                          ),
+                                        );
+                                      }
+                                    },
+                                    icon: const Icon(Icons.directions_outlined),
+                                    label: const Text('Di chuyển'),
+                                  ),
+                                ),
+                              if (widget.onOpenMap != null &&
+                                  routeCustomerId.isNotEmpty &&
+                                  widget.onUpdateLocation != null)
+                                const SizedBox(width: AppSpacing.sm),
+                              if (routeCustomerId.isNotEmpty &&
+                                  widget.onUpdateLocation != null)
+                                Expanded(
+                                  child: FilledButton.icon(
+                                    key: const Key('outlet-update-location'),
+                                    onPressed: _updatingLocation
+                                        ? null
+                                        : _updateLocation,
+                                    icon: _updatingLocation
+                                        ? const SizedBox(
+                                            width: 18,
+                                            height: 18,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                              color: Colors.white,
+                                            ),
+                                          )
+                                        : const Icon(Icons.my_location_rounded),
+                                    label: Text(
+                                      _updatingLocation
+                                          ? 'Đang lấy vị trí...'
+                                          : 'Cập nhật vị trí',
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ],
                       if (outlet != null &&
                           widget.onCustomerOnboarding != null) ...[
                         const SizedBox(height: AppSpacing.md),
@@ -578,6 +744,7 @@ class _OutletDetailPageState extends State<OutletDetailPage> {
                           mediaClient: widget.mediaClient!,
                           photoPicker:
                               widget.photoPicker ?? DeviceOutletPhotoPicker(),
+                          pendingStore: widget.photoPendingStore,
                           onProfileChanged: (profile) {
                             final hero = profile.media.isEmpty
                                 ? null
@@ -883,18 +1050,22 @@ class _TabButton extends StatelessWidget {
 
 class _HistoryBody extends StatelessWidget {
   const _HistoryBody({
-    required this.line,
-    required this.checkedIn,
-    required this.checkinAt,
+    required this.loading,
+    required this.items,
+    required this.message,
   });
 
-  final FieldDayLine? line;
-  final bool checkedIn;
-  final String? checkinAt;
+  final bool loading;
+  final List<OutletHistoryItem> items;
+  final String? message;
 
   @override
   Widget build(BuildContext context) {
-    if (line == null) {
+    if (loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (items.isEmpty) {
       return ListView(
         padding: const EdgeInsets.all(AppSpacing.md),
         children: [
@@ -909,7 +1080,9 @@ class _HistoryBody extends StatelessWidget {
                 const SizedBox(width: AppSpacing.sm),
                 Expanded(
                   child: Text(
-                    'Lịch sử tác nghiệp sẽ hiển thị khi điểm bán có dữ liệu phiên đi tuyến.',
+                    (message ?? '').trim().isNotEmpty
+                        ? message!
+                        : 'Điểm bán chưa có lịch sử phiên đi tuyến.',
                     style: Theme.of(context).textTheme.bodyMedium,
                   ),
                 ),
@@ -920,57 +1093,74 @@ class _HistoryBody extends StatelessWidget {
       );
     }
 
-    return ListView(
+    return ListView.separated(
       padding: const EdgeInsets.all(AppSpacing.md),
-      children: [
-        AppCard(
+      itemCount: items.length,
+      separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.sm),
+      itemBuilder: (context, index) {
+        final item = items[index];
+        final activity = <String>[
+          if (item.hasOrder) 'Đơn hàng',
+          if (item.hasReport) 'Báo cáo',
+          if (item.hasTest) 'Thử sản phẩm',
+          if (item.followupCount > 0) '${item.followupCount} việc theo dõi',
+        ];
+        return AppCard(
+          key: Key('outlet-history-${item.sessionCustomerId}'),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Hôm nay',
-                style: TextStyle(
-                  color: AppColors.textPrimary,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w900,
-                ),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      _formatDate(item.sessionDate),
+                      style: const TextStyle(
+                        color: AppColors.textPrimary,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                  Text(
+                    _visitLabel(item.visitStatus),
+                    style: const TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: AppSpacing.md),
-              _InfoRow(
-                label: 'Trạng thái',
-                value: line?.status == 'visited' ? 'Đã ghé' : 'Chưa hoàn tất',
-              ),
+              const SizedBox(height: AppSpacing.sm),
+              _InfoRow(label: 'Tuyến', value: item.routeName),
               const Divider(height: 22),
               _InfoRow(
                 label: 'Check-in',
-                value: checkedIn ? _formatDateTime(checkinAt) : 'Chưa check-in',
+                value: item.checkedIn
+                    ? _formatDateTime(item.checkinAt)
+                    : 'Chưa check-in',
               ),
               const Divider(height: 22),
               _InfoRow(
-                label: 'Đơn hàng',
-                value: line?.hasOrder == true ? 'Đã ghi nhận' : 'Chưa có',
+                label: 'Tác nghiệp',
+                value: activity.isEmpty ? 'Chưa có' : activity.join(' · '),
               ),
-              const Divider(height: 22),
-              _InfoRow(
-                label: 'Báo cáo',
-                value: line?.hasReport == true ? 'Đã ghi nhận' : 'Chưa có',
-              ),
-              const Divider(height: 22),
-              _InfoRow(
-                label: 'Thử sản phẩm',
-                value: line?.hasTest == true ? 'Đã ghi nhận' : 'Chưa có',
-              ),
-              const Divider(height: 22),
-              _InfoRow(
-                label: 'Việc theo dõi',
-                value: (line?.followupCount ?? 0) > 0
-                    ? '${line!.followupCount} việc'
-                    : 'Chưa có',
-              ),
+              if ((item.statusReason ?? '').trim().isNotEmpty) ...[
+                const Divider(height: 22),
+                _InfoRow(
+                  label: 'Lý do',
+                  value: _statusReasonLabel(item.statusReason!),
+                ),
+              ],
+              if ((item.note ?? '').trim().isNotEmpty) ...[
+                const Divider(height: 22),
+                _InfoRow(label: 'Ghi chú', value: item.note!),
+              ],
             ],
           ),
-        ),
-      ],
+        );
+      },
     );
   }
 }
@@ -1093,6 +1283,37 @@ String _firstNonEmpty(List<String?> values) {
     if (normalized.isNotEmpty) return normalized;
   }
   return '';
+}
+
+String _formatDate(String? value) {
+  final parsed = DateTime.tryParse((value ?? '').trim());
+  if (parsed == null) return (value ?? '').trim().isEmpty ? 'Chưa rõ ngày' : value!.trim();
+  final day = parsed.day.toString().padLeft(2, '0');
+  final month = parsed.month.toString().padLeft(2, '0');
+  return '$day/$month/${parsed.year}';
+}
+
+String _visitLabel(String value) {
+  switch (value.trim().toLowerCase()) {
+    case 'visited':
+      return 'Đã ghé';
+    case 'skipped':
+      return 'Bỏ qua';
+    default:
+      return 'Chưa hoàn tất';
+  }
+}
+
+String _statusReasonLabel(String value) {
+  return switch (value.trim().toLowerCase()) {
+    'closed' => 'Đóng cửa',
+    'busy' => 'Khách bận',
+    'no_demand' => 'Không nhu cầu',
+    'price' => 'Chê giá',
+    'competitor' => 'Đang dùng đối thủ',
+    'stock_enough' => 'Còn tồn hàng',
+    _ => value,
+  };
 }
 
 String _formatDateTime(String? value) {

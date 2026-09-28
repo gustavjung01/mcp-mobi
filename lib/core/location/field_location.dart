@@ -19,6 +19,9 @@ class FieldLocationFailure implements Exception {
   const FieldLocationFailure(this.message);
 
   final String message;
+
+  @override
+  String toString() => message;
 }
 
 abstract interface class FieldLocationProvider {
@@ -77,7 +80,7 @@ class DeviceFieldLocationProvider implements FieldLocationProvider {
       rethrow;
     } on TimeoutException {
       throw const FieldLocationFailure(
-        'Không lấy được vị trí sau 12 giây. Nếu đang dùng máy ảo Android Studio, hãy chọn một điểm trong Location và bấm Set Location rồi thử lại.',
+        'Không lấy được vị trí trong thời gian cho phép. Hãy kiểm tra dịch vụ Vị trí và thử lại.',
       );
     } on PlatformException catch (error) {
       final code = error.code.toLowerCase();
@@ -108,7 +111,7 @@ class DeviceFieldLocationProvider implements FieldLocationProvider {
         );
       }
       throw const FieldLocationFailure(
-        'Điện thoại chưa trả được tọa độ. Nếu đang dùng máy ảo, hãy đặt vị trí trong Android Studio rồi thử lại.',
+        'Không lấy được vị trí hiện tại. Hãy kiểm tra dịch vụ Vị trí và thử lại.',
       );
     }
   }

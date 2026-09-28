@@ -4,8 +4,8 @@ import '../../app/theme/app_theme.dart';
 import '../../core/data/field_activity_client.dart';
 import '../../core/data/field_data_client.dart';
 import '../../core/data/field_history_client.dart';
-import '../../core/idempotency/canonical_idempotency.dart';
 import '../../core/sync/field_activity_sync.dart';
+import '../../core/sync/field_check_sync.dart';
 import '../../core/sync/mutation_queue.dart';
 import '../../shared/widgets/app_card.dart';
 import '../../shared/widgets/empty_state.dart';
@@ -38,7 +38,6 @@ class _FieldActivityHistoryPageState extends State<FieldActivityHistoryPage> {
   List<QueuedMutation> _mutations = const [];
   List<SessionReportSummary> _reports = const [];
   List<FieldCheckItem> _checks = const [];
-  final Map<String, String> _fieldCheckKeys = {};
   bool _loading = true;
   bool _syncing = false;
   String? _message;
@@ -52,7 +51,11 @@ class _FieldActivityHistoryPageState extends State<FieldActivityHistoryPage> {
   Future<void> _loadDeviceState() async {
     try {
       final rows = await widget.queue.load(
-        operations: {widget.kind.operation},
+        operations: {
+          widget.kind.operation,
+          if (widget.kind == FieldActivityKind.productTrial)
+            FieldCheckSyncService.operation,
+        },
       );
       if (!mounted) return;
       _mutations = rows.reversed.toList(growable: false);
@@ -89,7 +92,16 @@ class _FieldActivityHistoryPageState extends State<FieldActivityHistoryPage> {
     if (sync) {
       try {
         final result = await widget.syncService.syncPending();
-        if (result.sent > 0) {
+        var synchronized = result.sent > 0;
+        if (widget.kind == FieldActivityKind.productTrial &&
+            widget.historyClient != null) {
+          final checkResult = await FieldCheckSyncService(
+            client: widget.historyClient!,
+            queue: widget.queue,
+          ).syncPending();
+          synchronized = synchronized || checkResult.sent > 0;
+        }
+        if (synchronized) {
           await widget.onSynchronized?.call();
         }
       } finally {
@@ -112,10 +124,21 @@ class _FieldActivityHistoryPageState extends State<FieldActivityHistoryPage> {
       _message = null;
     });
     try {
-      final result = await widget.syncService.syncPending(
-        idempotencyKey: mutation.idempotencyKey,
-      );
-      if (result.sent > 0) {
+      var sent = 0;
+      if (mutation.operation == FieldCheckSyncService.operation &&
+          widget.historyClient != null) {
+        final result = await FieldCheckSyncService(
+          client: widget.historyClient!,
+          queue: widget.queue,
+        ).syncPending(idempotencyKey: mutation.idempotencyKey);
+        sent = result.sent;
+      } else {
+        final result = await widget.syncService.syncPending(
+          idempotencyKey: mutation.idempotencyKey,
+        );
+        sent = result.sent;
+      }
+      if (sent > 0) {
         await widget.onSynchronized?.call();
       }
       await Future.wait([_loadDeviceState(), _loadServerHistory()]);
@@ -163,35 +186,34 @@ class _FieldActivityHistoryPageState extends State<FieldActivityHistoryPage> {
     );
     if (input == null || !mounted) return;
 
-    final fingerprint =
-        '${item.id}|${item.productName}|${input.status}|${input.note.trim()}';
-    final key = _fieldCheckKeys.putIfAbsent(
-      fingerprint,
-      () => CanonicalIdempotencyKey.create('field-check.result.update'),
-    );
-
     setState(() {
       _syncing = true;
       _message = null;
     });
     try {
-      await client.updateFieldCheck(
+      final outcome = await FieldCheckSubmissionService(
+        client: client,
+        queue: widget.queue,
+      ).update(
         resultId: item.id,
         productName: item.productName,
         status: input.status,
         note: input.note,
-        idempotencyKey: key,
       );
-      _fieldCheckKeys.remove(fingerprint);
-      _checks = await client.loadFieldChecks();
+      if (outcome == FieldCheckSubmitStatus.completed) {
+        _checks = await client.loadFieldChecks();
+      }
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Đã cập nhật kết quả hậu kiểm.')),
+        SnackBar(
+          content: Text(
+            outcome == FieldCheckSubmitStatus.completed
+                ? 'Đã cập nhật kết quả hậu kiểm.'
+                : 'Đã lưu kết quả hậu kiểm chờ gửi. Ứng dụng sẽ tự đồng bộ lại.',
+          ),
+        ),
       );
     } on FieldHistoryFailure catch (failure) {
-      if (!failure.retryable) {
-        _fieldCheckKeys.remove(fingerprint);
-      }
       if (mounted) {
         setState(() => _message = failure.message);
       }

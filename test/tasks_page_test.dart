@@ -5,6 +5,10 @@ import 'package:mcp_field/features/tasks/tasks_page.dart';
 
 class FakeHistoryClient implements FieldHistoryClient {
   @override
+  Future<List<OutletHistoryItem>> loadOutletHistory(String routeCustomerId) async =>
+      const [];
+
+  @override
   Future<List<FieldTaskItem>> loadTasks() async {
     return const [
       FieldTaskItem(

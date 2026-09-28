@@ -406,10 +406,80 @@ class SessionReportDetail {
   }
 }
 
+class OutletHistoryItem {
+  const OutletHistoryItem({
+    required this.sessionCustomerId,
+    required this.sessionId,
+    required this.routeCustomerId,
+    required this.customerName,
+    required this.routeName,
+    required this.visitStatus,
+    required this.checkedIn,
+    required this.hasOrder,
+    required this.hasTest,
+    required this.hasReport,
+    required this.followupCount,
+    this.sessionDate,
+    this.sales,
+    this.sessionStatus,
+    this.statusReason,
+    this.note,
+    this.checkinAt,
+  });
+
+  final String sessionCustomerId;
+  final String sessionId;
+  final String routeCustomerId;
+  final String customerName;
+  final String routeName;
+  final String visitStatus;
+  final bool checkedIn;
+  final bool hasOrder;
+  final bool hasTest;
+  final bool hasReport;
+  final int followupCount;
+  final String? sessionDate;
+  final String? sales;
+  final String? sessionStatus;
+  final String? statusReason;
+  final String? note;
+  final String? checkinAt;
+
+  factory OutletHistoryItem.fromJson(Map<String, dynamic> json) {
+    return OutletHistoryItem(
+      sessionCustomerId: _text(json['session_customer_id']),
+      sessionId: _text(json['session_id']),
+      routeCustomerId: _text(json['route_customer_id']),
+      customerName: _text(
+        json['customer_name'] ?? json['account_name'],
+        fallback: 'Điểm bán',
+      ),
+      routeName: _text(json['route_name'], fallback: 'Tuyến làm việc'),
+      visitStatus: _text(
+        json['visit_status'],
+        fallback: _text(json['status'], fallback: 'pending'),
+      ),
+      checkedIn: _nullableText(json['checkin_at']) != null,
+      hasOrder: _nullableText(json['order_id']) != null,
+      hasTest: _nullableText(json['test_id']) != null,
+      hasReport: _nullableText(json['report_id']) != null,
+      followupCount: _integer(json['followup_count']),
+      sessionDate: _nullableText(json['session_date']),
+      sales: _nullableText(json['sales']),
+      sessionStatus: _nullableText(json['session_status']),
+      statusReason: _nullableText(json['status_reason']),
+      note: _nullableText(json['note']),
+      checkinAt: _nullableText(json['checkin_at']),
+    );
+  }
+}
+
 abstract interface class FieldHistoryClient {
   Future<List<FieldSessionHistoryItem>> loadSessionHistory();
 
   Future<List<FieldTaskItem>> loadTasks();
+
+  Future<List<OutletHistoryItem>> loadOutletHistory(String routeCustomerId);
 
   Future<List<SessionReportSummary>> loadSessionReports();
 
@@ -503,6 +573,32 @@ class HttpFieldHistoryClient implements FieldHistoryClient {
     return _objects(data['items'])
         .map(FieldTaskItem.fromJson)
         .where((item) => item.id.isNotEmpty)
+        .toList(growable: false);
+  }
+
+  @override
+  Future<List<OutletHistoryItem>> loadOutletHistory(
+    String routeCustomerId,
+  ) async {
+    final normalizedId = routeCustomerId.trim();
+    if (normalizedId.isEmpty) {
+      throw const FieldHistoryFailure(
+        code: 'ROUTE_CUSTOMER_REQUIRED',
+        message: 'Chưa xác định được điểm bán cần xem lịch sử.',
+      );
+    }
+    final data = await _request(
+      'GET',
+      '/api/local-read/mcp-outlet-history',
+      query: {'routeCustomerId': normalizedId},
+    );
+    return _objects(data['items'])
+        .map(OutletHistoryItem.fromJson)
+        .where(
+          (item) =>
+              item.sessionCustomerId.isNotEmpty &&
+              item.routeCustomerId == normalizedId,
+        )
         .toList(growable: false);
   }
 
@@ -726,6 +822,9 @@ String _historyErrorMessage(
   switch (code.toLowerCase()) {
     case 'session_id_required':
       return 'Chưa xác định được phiên cần xem.';
+    case 'route_customer_id_required':
+    case 'route_customer_required':
+      return 'Chưa xác định được điểm bán cần xem lịch sử.';
     case 'mcp_session_not_found':
     case 'session_not_found':
       return 'Phiên làm việc không còn tồn tại.';

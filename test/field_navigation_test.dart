@@ -4,6 +4,7 @@ import 'package:mcp_field/app/navigation/app_shell.dart';
 import 'package:mcp_field/core/auth/mobile_auth_client.dart';
 import 'package:mcp_field/core/data/customer_boundary_client.dart';
 import 'package:mcp_field/core/data/field_data_client.dart';
+import 'package:mcp_field/core/data/management_proposal_client.dart';
 import 'package:mcp_field/core/data/order_data_client.dart';
 import 'package:mcp_field/core/location/field_location.dart';
 import 'package:mcp_field/core/selection/route_selection_store.dart';
@@ -201,6 +202,15 @@ const session = MobileSession(
   expiresAt: null,
 );
 
+const proposalSession = MobileSession(
+  token: 'nppusr.test-token',
+  employeeId: '11111111-1111-4111-8111-111111111111',
+  loginName: 'staff.test',
+  displayName: 'Nguyễn Văn A',
+  expiresAt: null,
+  permissions: ['mcp.report.write'],
+);
+
 class FakeFieldDataClient implements FieldDataClient, FieldActionClient {
   FakeFieldDataClient({
     this.routes = const [route],
@@ -269,6 +279,15 @@ class FakeFieldDataClient implements FieldDataClient, FieldActionClient {
       sessionCustomerId: 'line-new',
     );
   }
+
+  @override
+  Future<void> updateRouteCustomerLocation({
+    required String routeCustomerId,
+    required double latitude,
+    required double longitude,
+    required double accuracy,
+    required String idempotencyKey,
+  }) async {}
 
   @override
   Future<void> setSessionCustomerCheckIn({
@@ -395,6 +414,30 @@ class FakeCustomerBoundaryClient implements CustomerBoundaryClient {
     required String idempotencyKey,
   }) async {
     return (await loadVerifications()).single;
+  }
+}
+
+class FakeManagementProposalClient implements ManagementProposalClient {
+  @override
+  Future<List<ManagementProposal>> load() async => const [];
+
+  @override
+  Future<ManagementProposal> create({
+    required ManagementProposalDraft draft,
+    required String idempotencyKey,
+  }) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<ManagementProposal> resubmit({
+    required String proposalId,
+    required String content,
+    required String reason,
+    required List<String> evidence,
+    required String idempotencyKey,
+  }) {
+    throw UnimplementedError();
   }
 }
 
@@ -628,6 +671,111 @@ void main() {
     expect(reports, 1);
     expect(trials, 1);
     expect(followups, 1);
+  });
+
+  testWidgets('outlet exposes map and GPS update actions', (
+    WidgetTester tester,
+  ) async {
+    var mapCalls = 0;
+    var locationUpdates = 0;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: OutletDetailPage(
+          routeName: 'Tuyến Quận 3',
+          outlet: const FieldOutlet(
+            id: 'outlet-map',
+            routeId: 'route-2',
+            routeName: 'Tuyến Quận 3',
+            code: 'MCP002',
+            name: 'Đại lý Bản Đồ',
+            phone: '',
+            area: 'Quận 3',
+            address: '100 Lê Lợi',
+            status: 'linked_existing',
+            note: '',
+            gps: FieldGps(
+              lat: 10.77,
+              lng: 106.69,
+              accuracyMeters: 8,
+            ),
+          ),
+          onOpenMap: (gps, query) async {
+            mapCalls += 1;
+            expect(gps?.lat, 10.77);
+            expect(query, '100 Lê Lợi');
+          },
+          onUpdateLocation: (routeCustomerId, customerName) async {
+            locationUpdates += 1;
+            expect(routeCustomerId, 'outlet-map');
+            expect(customerName, 'Đại lý Bản Đồ');
+            return true;
+          },
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    const mapKey = Key('outlet-open-map');
+    await revealOutletActivityAction(tester, mapKey);
+    await tester.tap(find.byKey(mapKey));
+    await tester.pumpAndSettle();
+
+    const updateKey = Key('outlet-update-location');
+    await revealOutletActivityAction(tester, updateKey);
+    await tester.tap(find.byKey(updateKey));
+    await tester.pumpAndSettle();
+
+    expect(mapCalls, 1);
+    expect(locationUpdates, 1);
+    expect(find.text('Đã cập nhật vị trí điểm bán.'), findsOneWidget);
+  });
+
+  testWidgets('management proposals are hidden without report permission', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AppShell(
+          session: session,
+          fieldDataClient: FakeFieldDataClient(),
+          managementProposalClient: FakeManagementProposalClient(),
+          mutationQueueStore: MemoryMutationQueueStore(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(navLabel('Thêm'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Đề xuất'), findsNothing);
+  });
+
+  testWidgets('management proposals are shown with report permission', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AppShell(
+          session: proposalSession,
+          fieldDataClient: FakeFieldDataClient(),
+          managementProposalClient: FakeManagementProposalClient(),
+          mutationQueueStore: MemoryMutationQueueStore(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(navLabel('Thêm'));
+    await tester.pumpAndSettle();
+    expect(find.text('Đề xuất'), findsOneWidget);
+
+    await tester.tap(find.text('Đề xuất'));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('management-proposals-screen')),
+      findsOneWidget,
+    );
   });
 
   testWidgets('more opens customer onboarding workflow', (

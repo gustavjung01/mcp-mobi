@@ -334,7 +334,7 @@ String _mediaErrorMessage(
     case 'invalid_media_mime_type':
       return 'Định dạng ảnh chưa được hỗ trợ.';
     case 'route_customer_not_found':
-      return 'Điểm bán này không còn tồn tại trong MCP.';
+      return 'Điểm bán này không còn tồn tại trong hệ thống.';
     case 'linked_customer_not_found':
       return 'Điểm bán chưa liên kết đúng hồ sơ khách hàng. Vui lòng đồng bộ lại.';
     case 'linked_customer_inactive':

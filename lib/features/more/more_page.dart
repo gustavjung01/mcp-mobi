@@ -13,6 +13,7 @@ class MorePage extends StatelessWidget {
     this.onReports,
     this.onProductTrials,
     this.onTasks,
+    this.onManagementProposals,
     this.onCustomerOnboarding,
     this.onLogout,
   });
@@ -22,21 +23,23 @@ class MorePage extends StatelessWidget {
   final VoidCallback? onReports;
   final VoidCallback? onProductTrials;
   final VoidCallback? onTasks;
+  final VoidCallback? onManagementProposals;
   final VoidCallback? onCustomerOnboarding;
   final Future<void> Function()? onLogout;
 
-  static const _items = <_MoreItem>[
-    _MoreItem(Icons.route_outlined, 'Tuyến cố định'),
-    _MoreItem(Icons.history, 'Lịch sử phiên'),
-    _MoreItem(Icons.assignment_outlined, 'Báo cáo'),
-    _MoreItem(Icons.science_outlined, 'Kết quả thử sản phẩm'),
-    _MoreItem(Icons.task_alt_outlined, 'Kế hoạch & Công việc'),
-    _MoreItem(Icons.qr_code_scanner, 'Mở hoặc liên kết mã khách'),
-    _MoreItem(Icons.settings_outlined, 'Thiết lập'),
-  ];
-
   @override
   Widget build(BuildContext context) {
+    final items = <_MoreItem>[
+      const _MoreItem(Icons.route_outlined, 'Tuyến cố định'),
+      const _MoreItem(Icons.history, 'Lịch sử phiên'),
+      const _MoreItem(Icons.assignment_outlined, 'Báo cáo'),
+      const _MoreItem(Icons.science_outlined, 'Kết quả thử sản phẩm'),
+      const _MoreItem(Icons.task_alt_outlined, 'Kế hoạch & Công việc'),
+      if (onManagementProposals != null)
+        const _MoreItem(Icons.lightbulb_outline_rounded, 'Đề xuất'),
+      const _MoreItem(Icons.qr_code_scanner, 'Mở hoặc liên kết mã khách'),
+      const _MoreItem(Icons.settings_outlined, 'Thiết lập'),
+    ];
     return SafeArea(
       key: const Key('more-screen'),
       child: ListView(
@@ -52,15 +55,16 @@ class MorePage extends StatelessWidget {
             padding: EdgeInsets.zero,
             child: Column(
               children: [
-                for (var index = 0; index < _items.length; index++) ...[
+                for (var index = 0; index < items.length; index++) ...[
                   _MoreTile(
-                    item: _items[index],
-                    onTap: switch (_items[index].label) {
+                    item: items[index],
+                    onTap: switch (items[index].label) {
                       'Tuyến cố định' => onFixedRoutes,
                       'Lịch sử phiên' => onSessionHistory,
                       'Báo cáo' => onReports,
                       'Kết quả thử sản phẩm' => onProductTrials,
                       'Kế hoạch & Công việc' => onTasks,
+                      'Đề xuất' => onManagementProposals,
                       'Mở hoặc liên kết mã khách' => onCustomerOnboarding,
                       'Thiết lập' => () {
                         Navigator.of(context).push(
@@ -72,7 +76,7 @@ class MorePage extends StatelessWidget {
                       _ => null,
                     },
                   ),
-                  if (index < _items.length - 1)
+                  if (index < items.length - 1)
                     const Divider(height: 1, indent: 64),
                 ],
               ],
