@@ -128,6 +128,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   bool _routeSelectionLoaded = false;
   bool _localPersistenceReady = false;
   String? _fieldMessage;
+  String? _localPersistenceMessage;
   String? _outletMessage;
   String? _companyCustomerMessage;
   int _workspaceLoadGeneration = 0;
@@ -193,17 +194,20 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     if (_fieldDataClient != null) {
       _loadingRoutes = true;
       _loadingOutlets = true;
+      _loadRoutes();
+      _loadOutlets();
     }
     if (_customerBoundaryClient != null) {
       _loadingCompanyCustomers = true;
+      _loadCompanyCustomers();
     }
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _initializeData();
+      _initializeLocalPersistence();
     });
   }
 
-  Future<void> _initializeData() async {
+  Future<void> _initializeLocalPersistence() async {
     String? migrationWarning;
     final migrator = _legacyMigrator;
     if (migrator != null) {
@@ -216,16 +220,10 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
 
     _localPersistenceReady = migrationWarning == null;
 
-    await Future.wait([
-      if (_fieldDataClient != null) _loadRoutes(),
-      if (_fieldDataClient != null) _loadOutlets(),
-      if (_customerBoundaryClient != null) _loadCompanyCustomers(),
-    ]);
-
     if (!mounted) return;
     if (migrationWarning != null) {
       setState(() {
-        _fieldMessage ??= migrationWarning;
+        _localPersistenceMessage = migrationWarning;
       });
       return;
     }
@@ -1521,7 +1519,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
         selectedRoute: _selectedRoute,
         workspace: _workspace,
         loading: loading,
-        message: _fieldMessage,
+        message: _localPersistenceMessage ?? _fieldMessage,
         onOpenRoutes: () => _openTab(1),
         onOpenRouteOutlet: (line) =>
             _openRouteOutlet(_customerForLine(line), line),
@@ -1532,7 +1530,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
         selectedRoute: _selectedRoute,
         workspace: _workspace,
         loading: loading,
-        message: _fieldMessage,
+        message: _localPersistenceMessage ?? _fieldMessage,
         routeActionBusy: _routeActionBusy,
         onSelectRoute: _selectRoute,
         onRefresh: _fieldDataClient == null ? null : _refreshFieldData,

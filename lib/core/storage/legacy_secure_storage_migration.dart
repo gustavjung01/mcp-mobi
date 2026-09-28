@@ -42,6 +42,7 @@ class LegacySecureStorageMigrator {
     required this.database,
     required this.scope,
     LegacySecureKeyStore? secureStore,
+    this.ioTimeout = const Duration(seconds: 5),
   }) : _secureStore = secureStore ?? const FlutterSecureLegacyKeyStore(),
        _queue = LocalMutationQueueStore(database: database, scope: scope),
        _orderStore = LocalOrderOfflineStore(
@@ -61,6 +62,7 @@ class LegacySecureStorageMigrator {
 
   final LocalDataStore database;
   final LocalDataScope scope;
+  final Duration ioTimeout;
   final LegacySecureKeyStore _secureStore;
   final LocalMutationQueueStore _queue;
   final LocalOrderOfflineStore _orderStore;
@@ -81,7 +83,7 @@ class LegacySecureStorageMigrator {
     final raw = <String, String?>{};
     try {
       for (final key in _legacyKeys) {
-        raw[key] = await _secureStore.read(key);
+        raw[key] = await _secureStore.read(key).timeout(ioTimeout);
       }
     } catch (error) {
       throw LegacyStorageMigrationFailure(
@@ -120,7 +122,7 @@ class LegacySecureStorageMigrator {
     try {
       for (final key in _legacyKeys) {
         if ((raw[key] ?? '').isNotEmpty) {
-          await _secureStore.delete(key);
+          await _secureStore.delete(key).timeout(ioTimeout);
         }
       }
     } catch (error) {

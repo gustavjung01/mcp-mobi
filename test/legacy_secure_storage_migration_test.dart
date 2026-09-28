@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -11,6 +12,14 @@ import 'package:mcp_field/core/storage/legacy_secure_storage_migration.dart';
 import 'package:mcp_field/core/storage/local_data_store.dart';
 import 'package:mcp_field/core/sync/mutation_queue.dart';
 import 'package:mcp_field/core/sync/order_offline_store.dart';
+
+class HangingLegacySecureKeyStore implements LegacySecureKeyStore {
+  @override
+  Future<void> delete(String key) => Completer<void>().future;
+
+  @override
+  Future<String?> read(String key) => Completer<String?>().future;
+}
 
 class MemoryLegacySecureKeyStore implements LegacySecureKeyStore {
   final values = <String, String>{};
@@ -154,4 +163,26 @@ void main() {
       isNull,
     );
   });
+
+  test('secure storage timeout never marks legacy migration complete', () async {
+    final migrator = LegacySecureStorageMigrator(
+      database: database,
+      scope: scope,
+      secureStore: HangingLegacySecureKeyStore(),
+      ioTimeout: const Duration(milliseconds: 20),
+    );
+
+    await expectLater(
+      migrator.run(),
+      throwsA(isA<LegacyStorageMigrationFailure>()),
+    );
+    expect(
+      await database.readMetadata(
+        scope: scope,
+        key: LegacySecureStorageMigrator.migrationMetadataKey,
+      ),
+      isNull,
+    );
+  });
+
 }
