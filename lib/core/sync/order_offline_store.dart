@@ -1,9 +1,6 @@
-import 'dart:convert';
-
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-
 import '../data/order_data_client.dart';
 import '../idempotency/canonical_idempotency.dart';
+import '../storage/local_data_store.dart';
 import 'mutation_queue.dart';
 
 const orderMutationOperation = 'mcp.sales-order.create';
@@ -263,85 +260,55 @@ abstract interface class OrderOfflineStore {
   Future<void> removeMutation(String idempotencyKey);
 }
 
-class SecureOrderOfflineStore implements OrderOfflineStore {
-  SecureOrderOfflineStore({
-    required String installationKey,
-    required String employeeId,
-    FlutterSecureStorage? storage,
+class LocalOrderOfflineStore implements OrderOfflineStore {
+  LocalOrderOfflineStore({
+    required this.database,
+    required this.scope,
     MutationQueueStore? mutationQueueStore,
-  }) : _storage = storage ?? const FlutterSecureStorage(),
-       _scope = base64Url
-           .encode(utf8.encode('$installationKey|$employeeId'))
-           .replaceAll('=', ''),
-       _mutationQueue =
+  }) : _mutationQueue =
            mutationQueueStore ??
-           SecureMutationQueueStore(
-             installationKey: installationKey,
-             employeeId: employeeId,
-             storage: storage,
+           LocalMutationQueueStore(
+             database: database,
+             scope: scope,
            );
 
-  final FlutterSecureStorage _storage;
-  final String _scope;
+  final LocalDataStore database;
+  final LocalDataScope scope;
   final MutationQueueStore _mutationQueue;
-
-  String get _draftsKey => 'mcp.orders.drafts.$_scope';
-
-  String get _legacyMutationsKey => 'mcp.orders.mutations.$_scope';
-
-  Future<String?> _read(String key) async {
-    try {
-      return await _storage.read(key: key);
-    } catch (_) {
-      return null;
-    }
-  }
-
-  Future<Map<String, Object?>> _readDraftMap() async {
-    final raw = await _read(_draftsKey);
-    if ((raw ?? '').isEmpty) return <String, Object?>{};
-    try {
-      return _object(jsonDecode(raw!)).map(
-        (key, value) => MapEntry(key, value),
-      );
-    } on FormatException {
-      return <String, Object?>{};
-    }
-  }
 
   @override
   Future<OrderDraft?> readDraft(String outletId) async {
-    final drafts = await _readDraftMap();
-    return OrderDraft.fromJson(drafts[outletId]);
-  }
-
-  @override
-  Future<void> saveDraft(OrderDraft draft) async {
-    final drafts = await _readDraftMap();
-    drafts[draft.outletId] = draft.toJson();
-    await _storage.write(key: _draftsKey, value: jsonEncode(drafts));
-  }
-
-  @override
-  Future<void> deleteDraft(String outletId) async {
-    final drafts = await _readDraftMap();
-    if (drafts.remove(outletId) == null) return;
-    await _storage.write(key: _draftsKey, value: jsonEncode(drafts));
-  }
-
-  Future<List<QueuedOrderMutation>> _loadLegacyMutations() async {
-    final raw = await _read(_legacyMutationsKey);
-    if ((raw ?? '').isEmpty) return const [];
-    try {
-      final decoded = jsonDecode(raw!);
-      if (decoded is! List) return const [];
-      return decoded
-          .map(QueuedOrderMutation.fromJson)
-          .whereType<QueuedOrderMutation>()
-          .toList(growable: false);
-    } on FormatException {
-      return const [];
+    final record = await database.readDraft(
+      scope: scope,
+      outletId: outletId,
+    );
+    if (record == null) return null;
+    final draft = OrderDraft.fromJson(record);
+    if (draft == null) {
+      throw const LocalDataFailure(
+        code: 'LOCAL_DRAFT_CORRUPT',
+        message: 'Đơn đang soạn trên thiết bị có dữ liệu không hợp lệ.',
+      );
     }
+    return draft;
+  }
+
+  @override
+  Future<void> saveDraft(OrderDraft draft) {
+    return database.saveDraft(
+      scope: scope,
+      outletId: draft.outletId,
+      updatedAt: draft.updatedAt,
+      record: draft.toJson(),
+    );
+  }
+
+  @override
+  Future<void> deleteDraft(String outletId) {
+    return database.deleteDraft(
+      scope: scope,
+      outletId: outletId,
+    );
   }
 
   @override
@@ -349,24 +316,18 @@ class SecureOrderOfflineStore implements OrderOfflineStore {
     final shared = await _mutationQueue.load(
       operations: const {orderMutationOperation},
     );
-    if (shared.isNotEmpty) {
-      return shared
-          .map(_orderMutationFromShared)
-          .whereType<QueuedOrderMutation>()
-          .toList(growable: false);
+    final result = <QueuedOrderMutation>[];
+    for (final mutation in shared) {
+      final order = _orderMutationFromShared(mutation);
+      if (order == null) {
+        throw const LocalDataFailure(
+          code: 'LOCAL_QUEUE_CORRUPT',
+          message: 'Đơn chờ gửi trên thiết bị có dữ liệu không hợp lệ.',
+        );
+      }
+      result.add(order);
     }
-
-    final legacy = await _loadLegacyMutations();
-    if (legacy.isEmpty) return const [];
-    for (final mutation in legacy) {
-      await _mutationQueue.save(_orderMutationToShared(mutation));
-    }
-    try {
-      await _storage.delete(key: _legacyMutationsKey);
-    } catch (_) {
-      // The migrated shared queue is authoritative.
-    }
-    return legacy;
+    return result;
   }
 
   @override

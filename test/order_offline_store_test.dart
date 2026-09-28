@@ -1,6 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:mcp_field/core/data/order_data_client.dart';
 import 'package:mcp_field/core/idempotency/canonical_idempotency.dart';
+import 'package:mcp_field/core/storage/local_data_store.dart';
 import 'package:mcp_field/core/sync/mutation_queue.dart';
 import 'package:mcp_field/core/sync/order_offline_store.dart';
 
@@ -99,6 +101,8 @@ class RetryOrderClient implements OrderDataClient {
 }
 
 void main() {
+  sqfliteFfiInit();
+
   test('draft JSON keeps product data needed for offline restore', () {
     final draft = OrderDraft(
       outletId: 'outlet-1',
@@ -130,12 +134,20 @@ void main() {
   });
 
   test(
-    'secure order store writes mutations through the shared queue',
+    'local order store writes mutations through the shared queue',
     () async {
       final queue = MemoryMutationQueueStore();
-      final store = SecureOrderOfflineStore(
+      final database = LocalDataStore(
+        factory: databaseFactoryFfi,
+        databasePath: inMemoryDatabasePath,
+      );
+      const scope = LocalDataScope(
         installationKey: 'https://mcp.example.vn',
         employeeId: 'employee-1',
+      );
+      final store = LocalOrderOfflineStore(
+        database: database,
+        scope: scope,
         mutationQueueStore: queue,
       );
       const key = 'mcp.sales-order.create-123e4567-e89b-42d3-a456-426614174000';
@@ -161,6 +173,7 @@ void main() {
       final restored = await store.loadMutations();
       expect(restored.single.idempotencyKey, key);
       expect(restored.single.lines.single.variantId, 'variant-1');
+      await database.dispose();
     },
   );
 

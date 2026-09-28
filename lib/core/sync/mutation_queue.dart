@@ -1,8 +1,5 @@
-import 'dart:convert';
-
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-
 import '../idempotency/canonical_idempotency.dart';
+import '../storage/local_data_store.dart';
 
 enum MutationQueueState {
   waiting,
@@ -143,97 +140,53 @@ abstract interface class MutationQueueStore {
   Future<void> remove(String idempotencyKey);
 }
 
-class SecureMutationQueueStore implements MutationQueueStore {
-  SecureMutationQueueStore({
-    required String installationKey,
-    required String employeeId,
-    FlutterSecureStorage? storage,
-  }) : _storage = storage ?? const FlutterSecureStorage(),
-       _scope = base64Url
-           .encode(utf8.encode('$installationKey|$employeeId'))
-           .replaceAll('=', '');
+class LocalMutationQueueStore implements MutationQueueStore {
+  const LocalMutationQueueStore({
+    required this.database,
+    required this.scope,
+  });
 
-  final FlutterSecureStorage _storage;
-  final String _scope;
-
-  String get _key => 'mcp.mutation_queue.$_scope';
-
-  Future<List<QueuedMutation>> _readAll() async {
-    String? raw;
-    try {
-      raw = await _storage.read(key: _key);
-    } catch (_) {
-      return const [];
-    }
-    if ((raw ?? '').isEmpty) return const [];
-    try {
-      final decoded = jsonDecode(raw!);
-      if (decoded is! List) return const [];
-      final mutations = decoded
-          .map(QueuedMutation.fromJson)
-          .whereType<QueuedMutation>()
-          .toList(growable: true);
-      mutations.sort(
-        (left, right) => left.createdAt.compareTo(right.createdAt),
-      );
-      return mutations;
-    } on FormatException {
-      return const [];
-    }
-  }
+  final LocalDataStore database;
+  final LocalDataScope scope;
 
   @override
   Future<List<QueuedMutation>> load({Set<String>? operations}) async {
-    final mutations = await _readAll();
-    if (operations == null || operations.isEmpty) return mutations;
-    return mutations
-        .where((mutation) => operations.contains(mutation.operation))
-        .toList(growable: false);
-  }
-
-  @override
-  Future<void> save(QueuedMutation mutation) async {
-    final mutations = await _readAll();
-    final index = mutations.indexWhere(
-      (item) => item.idempotencyKey == mutation.idempotencyKey,
+    final records = await database.loadMutationRecords(
+      scope: scope,
+      operations: operations,
     );
-    if (index >= 0) {
-      mutations[index] = mutation;
-    } else {
+    final mutations = <QueuedMutation>[];
+    for (final record in records) {
+      final mutation = QueuedMutation.fromJson(record);
+      if (mutation == null) {
+        throw const LocalDataFailure(
+          code: 'LOCAL_QUEUE_CORRUPT',
+          message: 'Hàng chờ gửi trên thiết bị có dữ liệu không hợp lệ.',
+        );
+      }
       mutations.add(mutation);
     }
-
-    final acknowledged =
-        mutations
-            .where((item) => item.state == MutationQueueState.acknowledged)
-            .toList(growable: false)
-          ..sort(
-            (left, right) => right.createdAt.compareTo(left.createdAt),
-          );
-    final keepAcknowledgedKeys = acknowledged
-        .take(30)
-        .map((item) => item.idempotencyKey)
-        .toSet();
-    final compact = mutations
-        .where(
-          (item) =>
-              item.isOutstanding ||
-              keepAcknowledgedKeys.contains(item.idempotencyKey),
-        )
-        .map((item) => item.toJson())
-        .toList(growable: false);
-
-    await _storage.write(key: _key, value: jsonEncode(compact));
+    return mutations;
   }
 
   @override
-  Future<void> remove(String idempotencyKey) async {
-    final mutations = await _readAll();
-    final remaining = mutations
-        .where((item) => item.idempotencyKey != idempotencyKey)
-        .map((item) => item.toJson())
-        .toList(growable: false);
-    await _storage.write(key: _key, value: jsonEncode(remaining));
+  Future<void> save(QueuedMutation mutation) {
+    return database.saveMutationRecord(
+      scope: scope,
+      idempotencyKey: mutation.idempotencyKey,
+      operation: mutation.operation,
+      state: mutation.state.name,
+      createdAt: mutation.createdAt,
+      record: mutation.toJson(),
+    );
+  }
+
+  @override
+  Future<void> remove(String idempotencyKey) {
+    return database.removeMutation(
+      scope: scope,
+      idempotencyKey: idempotencyKey,
+    );
   }
 }
 
