@@ -44,7 +44,7 @@ class OrdersPage extends StatefulWidget {
   State<OrdersPage> createState() => _OrdersPageState();
 }
 
-class _OrdersPageState extends State<OrdersPage> with WidgetsBindingObserver {
+class _OrdersPageState extends State<OrdersPage> {
   final _searchController = TextEditingController();
   List<FieldOrder> _orders = const [];
   List<QueuedOrderMutation> _pending = const [];
@@ -58,8 +58,7 @@ class _OrdersPageState extends State<OrdersPage> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this);
-    unawaited(_refreshAll(syncPending: true));
+    unawaited(_refreshAll());
   }
 
   @override
@@ -73,15 +72,7 @@ class _OrdersPageState extends State<OrdersPage> with WidgetsBindingObserver {
   }
 
   @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      unawaited(_refreshAll(syncPending: true));
-    }
-  }
-
-  @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
     _searchController.dispose();
     super.dispose();
   }

@@ -113,20 +113,7 @@ void main() {
     expect(client.submitKeys, hasLength(1));
     expect(
       client.submitKeys.single,
-      matches(RegExp(r'^[A-Za-z0-9._-]+
-
-    final firstKey = client.submitKeys.single;
-    final result = await CustomerBoundarySyncService(
-      client: client,
-      queue: queue,
-    ).syncPending();
-
-    expect(result.sent, 1);
-    expect(result.remaining, 0);
-    expect(client.submitKeys, [firstKey, firstKey]);
-  });
-}
-)),
+      matches(RegExp(r'^[A-Za-z0-9._-]+$')),
     );
 
     final firstKey = client.submitKeys.single;
