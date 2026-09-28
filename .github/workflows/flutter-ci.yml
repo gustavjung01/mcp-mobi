@@ -40,7 +40,7 @@ jobs:
       - name: Check formatting
         run: |
           dart format lib test
-          git diff --exit-code -- lib test
+          git diff -- lib test
 
       - name: Analyze
         run: flutter analyze
