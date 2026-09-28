@@ -722,7 +722,9 @@ void main() {
 
     await tester.tap(navLabel('Đi tuyến'));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('route-line-line-1')));
+    final routeLine = find.byKey(const Key('route-line-line-1'));
+    await tester.ensureVisible(routeLine);
+    await tester.tap(routeLine);
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('outlet-checkin-button')), findsOneWidget);
@@ -761,7 +763,9 @@ void main() {
 
       await tester.tap(navLabel('Đi tuyến'));
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('route-line-line-1')));
+      final routeLine = find.byKey(const Key('route-line-line-1'));
+      await tester.ensureVisible(routeLine);
+      await tester.tap(routeLine);
       await tester.pumpAndSettle();
 
       await tester.tap(find.byKey(const Key('outlet-skip-button')));
