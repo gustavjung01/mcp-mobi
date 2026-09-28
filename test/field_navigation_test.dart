@@ -121,6 +121,24 @@ const unopenedWorkspace = FieldRouteWorkspace(
   day: unopenedDay,
 );
 
+const doneWorkspace = FieldRouteWorkspace(
+  route: route,
+  customers: [customer],
+  day: FieldDayData(
+    sessionOpened: true,
+    run: FieldDayRun(
+      id: 'session-1',
+      routeId: 'route-1',
+      routeName: 'Tuyến Quận 1',
+      date: '2026-09-27',
+      owner: 'Nguyễn Văn A',
+      status: 'done',
+      openedAt: '08:00',
+    ),
+    lines: [line],
+  ),
+);
+
 const skippedLine = FieldDayLine(
   id: 'line-skipped',
   sessionCustomerId: 'line-skipped',
@@ -779,7 +797,85 @@ void main() {
 
     expect(find.byKey(const Key('route-start-button')), findsOneWidget);
     expect(find.byKey(const Key('route-preview-customer-1')), findsOneWidget);
-    expect(find.text('Điểm bán cố định của tuyến'), findsOneWidget);
+    expect(find.text('Tuyến cố định'), findsOneWidget);
+  });
+
+  testWidgets('fixed route remains available while the day run is active', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: RoutesPage(
+          routes: [route],
+          selectedRoute: route,
+          workspace: workspace,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Phiên hôm nay'), findsWidgets);
+    expect(find.byKey(const Key('route-preview-customer-1')), findsNothing);
+
+    await tester.tap(find.text('Tuyến cố định').first);
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('route-preview-customer-1')), findsOneWidget);
+    expect(find.text('1 điểm bán đã được xếp sẵn cho tuyến này.'), findsOneWidget);
+  });
+
+  testWidgets('completed route session is read only and can still show fixed route', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: RoutesPage(
+          routes: [route],
+          selectedRoute: route,
+          workspace: doneWorkspace,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Đã kết thúc'), findsOneWidget);
+    expect(find.byKey(const Key('route-finish-button')), findsNothing);
+    expect(find.byKey(const Key('route-add-customer-button')), findsNothing);
+
+    await tester.tap(find.text('Tuyến cố định').first);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('route-preview-customer-1')), findsOneWidget);
+  });
+
+  testWidgets('bottom navigation is anchored outside scrollable tab content', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AppShell(
+          session: session,
+          fieldDataClient: FakeFieldDataClient(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final scaffold = tester.widget<Scaffold>(
+      find.byKey(const Key('app-shell-scaffold')),
+    );
+    expect(scaffold.resizeToAvoidBottomInset, isFalse);
+    expect(find.byKey(const Key('app-bottom-navigation')), findsOneWidget);
+
+    await tester.tap(navLabel('Đi tuyến'));
+    await tester.pumpAndSettle();
+    final list = find.descendant(
+      of: find.byKey(const Key('routes-screen')),
+      matching: find.byType(ListView),
+    );
+    await tester.drag(list, const Offset(0, -240));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('app-bottom-navigation')), findsOneWidget);
   });
 
   testWidgets('selected route is restored after app restart', (
