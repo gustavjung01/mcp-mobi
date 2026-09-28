@@ -27,6 +27,70 @@ void main() {
         seen.add('${request.method} ${request.url.path}');
         expect(request.headers['authorization'], 'Bearer mobile-token');
 
+        if (request.url.path == '/api/local-read/mcp-shell') {
+          return jsonResponse(
+            {
+              'data': {
+                'cursor': 'cursor-a',
+                'unchanged': false,
+                'snapshot': {
+                  'recentSessions': [
+                    {
+                      'id': 'session-1',
+                      'route_id': 'route-1',
+                      'route_name': 'Tuyến 1',
+                      'session_date': '2026-09-27',
+                      'sales': 'Nhân viên A',
+                      'status': 'done',
+                      'planned_customers': 4,
+                      'visited_customers': 2,
+                    },
+                  ],
+                  'recentSessionAggregates': [
+                    {
+                      'session_id': 'session-1',
+                      'planned': 4,
+                      'visited': 3,
+                      'orders': 1,
+                      'tests': 1,
+                      'reports': 2,
+                      'followups': 1,
+                    },
+                  ],
+                },
+              },
+            },
+            200,
+          );
+        }
+
+        if (request.url.path == '/api/local-read/mcp-followups') {
+          return jsonResponse(
+            {
+              'data': {
+                'days': 45,
+                'items': [
+                  {
+                    'id': 'followup-1',
+                    'session_id': 'session-1',
+                    'session_date': '2026-09-27',
+                    'route_name': 'Tuyến 1',
+                    'customer_name': 'Điểm bán B',
+                    'followup_type': 'order',
+                    'title': 'Gọi lại chốt đơn',
+                    'due_date': '2026-09-28',
+                    'status': 'pending',
+                    'priority': 'high',
+                    'owner': 'Nhân viên A',
+                    'note': 'Khách cần xác nhận số lượng',
+                  },
+                ],
+              },
+            },
+            200,
+          );
+        }
+
         if (request.url.path == '/api/local-read/mcp-session-reports') {
           return jsonResponse(
             {
@@ -157,6 +221,16 @@ void main() {
       }),
     );
 
+    final sessions = await client.loadSessionHistory();
+    expect(sessions.single.id, 'session-1');
+    expect(sessions.single.visited, 3);
+    expect(sessions.single.reports, 2);
+
+    final tasks = await client.loadTasks();
+    expect(tasks.single.title, 'Gọi lại chốt đơn');
+    expect(tasks.single.status, 'todo');
+    expect(tasks.single.priority, 'high');
+
     final reports = await client.loadSessionReports();
     expect(reports.single.sessionId, 'session-1');
     expect(reports.single.reports, 2);
@@ -180,12 +254,25 @@ void main() {
     expect(
       seen,
       [
+        'GET /api/local-read/mcp-shell',
+        'GET /api/local-read/mcp-followups',
         'GET /api/local-read/mcp-session-reports',
         'GET /api/local-read/mcp-session-report',
         'GET /api/market-checks/data',
         'POST /api/field-checks/result',
       ],
     );
+  });
+
+  test('session and task states follow office presentation contract', () {
+    expect(normalizeSessionStatus('completed'), 'done');
+    expect(normalizeSessionStatus('active'), 'active');
+    expect(normalizeTaskStatus('pending'), 'todo');
+    expect(normalizeTaskStatus('in_progress'), 'doing');
+    expect(normalizeTaskStatus('blocked'), 'blocked');
+    expect(normalizeTaskStatus('closed'), 'done');
+    expect(normalizeTaskPriority('urgent'), 'urgent');
+    expect(normalizeTaskPriority('unknown'), 'medium');
   });
 
   test('field check status follows MCP presentation states', () {

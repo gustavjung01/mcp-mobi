@@ -17,6 +17,124 @@ class FieldHistoryFailure implements Exception {
   final bool retryable;
 }
 
+
+class FieldSessionHistoryItem {
+  const FieldSessionHistoryItem({
+    required this.id,
+    required this.routeId,
+    required this.routeName,
+    required this.status,
+    required this.salesOwner,
+    this.sessionDate,
+    this.note,
+    this.planned = 0,
+    this.visited = 0,
+    this.orders = 0,
+    this.tests = 0,
+    this.reports = 0,
+    this.followups = 0,
+  });
+
+  final String id;
+  final String routeId;
+  final String routeName;
+  final String status;
+  final String salesOwner;
+  final String? sessionDate;
+  final String? note;
+  final int planned;
+  final int visited;
+  final int orders;
+  final int tests;
+  final int reports;
+  final int followups;
+
+  factory FieldSessionHistoryItem.fromJson(
+    Map<String, dynamic> json, {
+    Map<String, dynamic> aggregate = const {},
+  }) {
+    return FieldSessionHistoryItem(
+      id: _text(json['id']),
+      routeId: _text(json['route_id']),
+      routeName: _text(json['route_name'], fallback: 'Tuyến làm việc'),
+      status: normalizeSessionStatus(json['status']),
+      salesOwner: _text(json['sales'], fallback: 'Chưa phân công'),
+      sessionDate: _nullableText(json['session_date']),
+      note: _nullableText(json['note']),
+      planned: _integer(aggregate['planned'] ?? json['planned_customers']),
+      visited: _integer(aggregate['visited'] ?? json['visited_customers']),
+      orders: _integer(aggregate['orders'] ?? json['order_count']),
+      tests: _integer(aggregate['tests'] ?? json['test_count']),
+      reports: _integer(aggregate['reports'] ?? json['report_count']),
+      followups: _integer(aggregate['followups'] ?? json['followup_count']),
+    );
+  }
+}
+
+class FieldTaskItem {
+  const FieldTaskItem({
+    required this.id,
+    required this.title,
+    required this.customerName,
+    required this.routeName,
+    required this.status,
+    required this.priority,
+    required this.owner,
+    required this.followupType,
+    this.sessionId,
+    this.sessionDate,
+    this.dueDate,
+    this.note,
+  });
+
+  final String id;
+  final String title;
+  final String customerName;
+  final String routeName;
+  final String status;
+  final String priority;
+  final String owner;
+  final String followupType;
+  final String? sessionId;
+  final String? sessionDate;
+  final String? dueDate;
+  final String? note;
+
+  factory FieldTaskItem.fromJson(Map<String, dynamic> json) {
+    return FieldTaskItem(
+      id: _text(json['id']),
+      title: _text(json['title'], fallback: 'Công việc theo dõi'),
+      customerName: _text(json['customer_name'], fallback: 'Điểm bán'),
+      routeName: _text(json['route_name'], fallback: 'Chưa xác định tuyến'),
+      status: normalizeTaskStatus(json['status']),
+      priority: normalizeTaskPriority(json['priority']),
+      owner: _text(json['owner'], fallback: 'Chưa phân công'),
+      followupType: _text(json['followup_type'], fallback: 'general'),
+      sessionId: _nullableText(json['session_id']),
+      sessionDate: _nullableText(json['session_date']),
+      dueDate: _nullableText(json['due_date']),
+      note: _nullableText(json['note']),
+    );
+  }
+
+  bool isOverdue(DateTime now) {
+    if (status == 'done') return false;
+    final due = DateTime.tryParse((dueDate ?? '').trim());
+    if (due == null) return false;
+    final today = DateTime(now.year, now.month, now.day);
+    final dueDay = DateTime(due.year, due.month, due.day);
+    return dueDay.isBefore(today);
+  }
+
+  bool isDueToday(DateTime now) {
+    final due = DateTime.tryParse((dueDate ?? '').trim());
+    if (due == null) return false;
+    return due.year == now.year &&
+        due.month == now.month &&
+        due.day == now.day;
+  }
+}
+
 class FieldCheckItem {
   const FieldCheckItem({
     required this.id,
@@ -292,6 +410,10 @@ class SessionReportDetail {
 }
 
 abstract interface class FieldHistoryClient {
+  Future<List<FieldSessionHistoryItem>> loadSessionHistory();
+
+  Future<List<FieldTaskItem>> loadTasks();
+
   Future<List<SessionReportSummary>> loadSessionReports();
 
   Future<SessionReportDetail> loadSessionReportDetail(String sessionId);
@@ -347,6 +469,44 @@ class HttpFieldHistoryClient implements FieldHistoryClient {
       if (hasBody) 'Content-Type': 'application/json',
       if ((idempotencyKey ?? '').isNotEmpty) 'Idempotency-Key': idempotencyKey!,
     };
+  }
+
+  @override
+  Future<List<FieldSessionHistoryItem>> loadSessionHistory() async {
+    final data = await _request('GET', '/api/local-read/mcp-shell');
+    final snapshot = _object(data['snapshot']);
+    if (snapshot.isEmpty) {
+      throw const FieldHistoryFailure(
+        code: 'RESPONSE_INVALID',
+        message: 'Hệ thống chưa trả lịch sử phiên.',
+        retryable: true,
+      );
+    }
+
+    final aggregates = <String, Map<String, dynamic>>{};
+    for (final row in _objects(snapshot['recentSessionAggregates'])) {
+      final sessionId = _text(row['session_id']);
+      if (sessionId.isNotEmpty) aggregates[sessionId] = row;
+    }
+
+    return _objects(snapshot['recentSessions'])
+        .map(
+          (row) => FieldSessionHistoryItem.fromJson(
+            row,
+            aggregate: aggregates[_text(row['id'])] ?? const {},
+          ),
+        )
+        .where((item) => item.id.isNotEmpty)
+        .toList(growable: false);
+  }
+
+  @override
+  Future<List<FieldTaskItem>> loadTasks() async {
+    final data = await _request('GET', '/api/local-read/mcp-followups');
+    return _objects(data['items'])
+        .map(FieldTaskItem.fromJson)
+        .where((item) => item.id.isNotEmpty)
+        .toList(growable: false);
   }
 
   @override
@@ -496,6 +656,35 @@ class HttpFieldHistoryClient implements FieldHistoryClient {
     }
     return data;
   }
+}
+
+String normalizeSessionStatus(Object? value) {
+  final status = _text(value).toLowerCase();
+  if (status == 'completed' || status == 'closed') return 'done';
+  if (status == 'done' || status == 'cancelled') return status;
+  return 'active';
+}
+
+String normalizeTaskStatus(Object? value) {
+  final status = _text(value).toLowerCase();
+  if (const {'doing', 'in_progress', 'in-progress', 'progress'}.contains(status)) {
+    return 'doing';
+  }
+  if (const {'done', 'completed', 'closed', 'cancelled'}.contains(status)) {
+    return 'done';
+  }
+  if (const {'blocked', 'hold', 'on_hold', 'on-hold'}.contains(status)) {
+    return 'blocked';
+  }
+  return 'todo';
+}
+
+String normalizeTaskPriority(Object? value) {
+  final priority = _text(value).toLowerCase();
+  if (priority == 'urgent') return 'urgent';
+  if (priority == 'high') return 'high';
+  if (priority == 'low') return 'low';
+  return 'medium';
 }
 
 String normalizeFieldCheckStatus(Object? value) {

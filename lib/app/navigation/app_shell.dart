@@ -24,11 +24,13 @@ import '../../features/outlets/outlet_detail_page.dart';
 import '../../features/product_trials/product_trial_page.dart';
 import '../../features/reports/field_activity_history_page.dart';
 import '../../features/reports/market_report_page.dart';
+import '../../features/reports/session_history_page.dart';
 import '../../features/outlets/outlets_page.dart';
 import '../../features/routes/add_route_customer_page.dart';
 import '../../features/routes/fixed_routes_page.dart';
 import '../../features/routes/routes_page.dart';
 import '../../features/tasks/followup_page.dart';
+import '../../features/tasks/tasks_page.dart';
 import '../../features/today/today_page.dart';
 import '../theme/app_theme.dart';
 
@@ -815,6 +817,38 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     );
   }
 
+  Future<void> _openSessionHistory() async {
+    final client = _fieldHistoryClient;
+    if (client == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Chưa kết nối được lịch sử phiên.')),
+      );
+      return;
+    }
+
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (context) => SessionHistoryPage(client: client),
+      ),
+    );
+  }
+
+  Future<void> _openTasks() async {
+    final client = _fieldHistoryClient;
+    if (client == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Chưa kết nối được danh sách công việc.')),
+      );
+      return;
+    }
+
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (context) => TasksPage(client: client),
+      ),
+    );
+  }
+
   Future<void> _openActivityHistory(FieldActivityKind kind) async {
     final client = _fieldActivityClient;
     final queue = _mutationQueueStore;
@@ -1193,15 +1227,15 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       ),
       MorePage(
         onFixedRoutes: _fieldDataClient == null ? null : _openFixedRoutes,
+        onSessionHistory:
+            _fieldHistoryClient == null ? null : _openSessionHistory,
         onReports: _fieldActivityClient == null
             ? null
             : () => _openActivityHistory(FieldActivityKind.report),
         onProductTrials: _fieldActivityClient == null
             ? null
             : () => _openActivityHistory(FieldActivityKind.productTrial),
-        onTasks: _fieldActivityClient == null
-            ? null
-            : () => _openActivityHistory(FieldActivityKind.followup),
+        onTasks: _fieldHistoryClient == null ? null : _openTasks,
         onCustomerOnboarding: _customerBoundaryClient == null
             ? null
             : () => _openCustomerOnboarding(),
