@@ -1,0 +1,236 @@
+name: Runtime Self-contained CI
+
+on:
+  pull_request:
+    paths:
+      - 'lib/**'
+      - 'integration_test/**'
+      - 'tool/runtime/**'
+      - 'android/**'
+      - 'ios/**'
+      - 'pubspec.yaml'
+      - 'pubspec.lock'
+      - '.github/workflows/runtime-self-contained-ci.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'lib/**'
+      - 'integration_test/**'
+      - 'tool/runtime/**'
+      - 'android/**'
+      - 'ios/**'
+      - 'pubspec.yaml'
+      - 'pubspec.lock'
+      - '.github/workflows/runtime-self-contained-ci.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: runtime-self-contained-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  android-runtime:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: npp_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d npp_e2e"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/npp_e2e
+      NPP_RUNTIME_DIR: ${{ github.workspace }}/_runtime/NPP-Platform
+      RUNTIME_CONFIG: ${{ runner.temp }}/mcp-runtime-gate.json
+      MCP_RUNTIME_API_BASE_URL: http://127.0.0.1:3001
+      MCP_RUNTIME_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}-android
+
+    steps:
+      - name: Checkout mobile
+        uses: actions/checkout@v4
+
+      - name: Checkout NPP runtime
+        uses: actions/checkout@v4
+        with:
+          repository: binhnxwjfjxm/NPP-Platform
+          ref: main
+          path: _runtime/NPP-Platform
+
+      - name: Record exact NPP runtime SHA
+        shell: bash
+        run: |
+          set -euo pipefail
+          sha="$(git -C "$NPP_RUNTIME_DIR" rev-parse HEAD)"
+          echo "NPP runtime SHA: $sha"
+          echo "### Android runtime evidence" >> "$GITHUB_STEP_SUMMARY"
+          echo "- NPP runtime SHA: `$sha`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Mobile SHA: `$GITHUB_SHA`" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install NPP dependencies
+        working-directory: _runtime/NPP-Platform
+        run: npm ci
+
+      - name: Install Flutter 3.47.2
+        shell: bash
+        run: |
+          git clone --depth 1 --branch 3.47.2 https://github.com/flutter/flutter.git "$HOME/flutter"
+          echo "$HOME/flutter/bin" >> "$GITHUB_PATH"
+
+      - name: Install mobile dependencies
+        run: flutter pub get
+
+      - name: Check runtime test sources
+        shell: bash
+        run: |
+          dart format --output=none --set-exit-if-changed integration_test
+          bash -n tool/runtime/start_test_installation.sh
+          node --check tool/runtime/report_agent_test_server.mjs
+
+      - name: Prepare isolated test installation
+        shell: bash
+        run: bash tool/runtime/start_test_installation.sh
+
+      - name: Run Android app -> MCP -> Công Ty gate
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          script: |
+            adb reverse tcp:3001 tcp:3001
+            adb reverse tcp:9000 tcp:9000
+            flutter test integration_test/runtime_gate_test.dart -d emulator-5554 --dart-define-from-file="$RUNTIME_CONFIG"
+
+      - name: Upload runtime logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: l7-android-runtime-logs
+          path: ${{ runner.temp }}/logs
+          if-no-files-found: ignore
+          retention-days: 7
+
+  ios-runtime:
+    runs-on: macos-latest
+    timeout-minutes: 60
+    env:
+      NPP_RUNTIME_DIR: ${{ github.workspace }}/_runtime/NPP-Platform
+      RUNTIME_CONFIG: ${{ runner.temp }}/mcp-runtime-gate.json
+      MCP_RUNTIME_API_BASE_URL: http://127.0.0.1:3001
+      MCP_RUNTIME_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}-ios
+
+    steps:
+      - name: Checkout mobile
+        uses: actions/checkout@v4
+
+      - name: Checkout NPP runtime
+        uses: actions/checkout@v4
+        with:
+          repository: binhnxwjfjxm/NPP-Platform
+          ref: main
+          path: _runtime/NPP-Platform
+
+      - name: Record exact NPP runtime SHA
+        shell: bash
+        run: |
+          set -euo pipefail
+          sha="$(git -C "$NPP_RUNTIME_DIR" rev-parse HEAD)"
+          echo "NPP runtime SHA: $sha"
+          echo "### iOS runtime evidence" >> "$GITHUB_STEP_SUMMARY"
+          echo "- NPP runtime SHA: `$sha`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Mobile SHA: `$GITHUB_SHA`" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install NPP dependencies
+        working-directory: _runtime/NPP-Platform
+        run: npm ci
+
+      - name: Prepare PostgreSQL 16
+        shell: bash
+        run: |
+          set -euo pipefail
+          brew install postgresql@16
+          pg_bin="$(brew --prefix postgresql@16)/bin"
+          echo "$pg_bin" >> "$GITHUB_PATH"
+          export PATH="$pg_bin:$PATH"
+          brew services start postgresql@16
+          for _ in $(seq 1 60); do
+            if pg_isready -h 127.0.0.1 >/dev/null 2>&1; then break; fi
+            sleep 1
+          done
+          current_user="$(whoami)"
+          psql postgres -v ON_ERROR_STOP=1 -c "ALTER USER \"$current_user\" WITH PASSWORD 'postgres';"
+          dropdb --if-exists npp_e2e
+          createdb npp_e2e
+          echo "DATABASE_URL=postgresql://$current_user:postgres@127.0.0.1:5432/npp_e2e" >> "$GITHUB_ENV"
+
+      - name: Install Flutter 3.47.2
+        shell: bash
+        run: |
+          git clone --depth 1 --branch 3.47.2 https://github.com/flutter/flutter.git "$HOME/flutter"
+          echo "$HOME/flutter/bin" >> "$GITHUB_PATH"
+
+      - name: Install mobile dependencies
+        run: flutter pub get
+
+      - name: Check runtime test sources
+        shell: bash
+        run: |
+          dart format --output=none --set-exit-if-changed integration_test
+          bash -n tool/runtime/start_test_installation.sh
+          node --check tool/runtime/report_agent_test_server.mjs
+
+      - name: Prepare isolated test installation
+        shell: bash
+        run: bash tool/runtime/start_test_installation.sh
+
+      - name: Boot iPhone simulator
+        id: simulator
+        shell: bash
+        run: |
+          set -euo pipefail
+          udid="$(xcrun simctl list devices available -j | python3 -c '
+          import json,sys
+          data=json.load(sys.stdin)["devices"]
+          for runtime in sorted(data.keys(), reverse=True):
+              for device in data[runtime]:
+                  if device.get("isAvailable") and device.get("name","").startswith("iPhone"):
+                      print(device["udid"])
+                      raise SystemExit
+          raise SystemExit(1)
+          ')"
+          xcrun simctl boot "$udid" 2>/dev/null || true
+          xcrun simctl bootstatus "$udid" -b
+          echo "udid=$udid" >> "$GITHUB_OUTPUT"
+
+      - name: Run iOS app -> MCP -> Công Ty gate
+        run: flutter test integration_test/runtime_gate_test.dart -d "${{ steps.simulator.outputs.udid }}" --dart-define-from-file="$RUNTIME_CONFIG"
+
+      - name: Upload runtime logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: l7-ios-runtime-logs
+          path: ${{ runner.temp }}/logs
+          if-no-files-found: ignore
+          retention-days: 7

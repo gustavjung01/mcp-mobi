@@ -2,12 +2,15 @@
 
 ## Mục tiêu
 
-Lô 7 không dùng unit/widget test để thay thế bằng chứng runtime. Gate được tách thành hai lớp:
+Lô 7 không dùng unit/widget test để thay thế bằng chứng runtime. Gate có ba lớp độc lập:
 
-1. **Device Foundation CI** chạy tự động trên Android emulator và iOS simulator, dùng plugin thật của Flutter/native.
-2. **Runtime Integration Gate** chỉ chạy thủ công trên một installation test đã được phê duyệt, gọi MCP API thật và chuỗi MCP -> Công Ty thật.
+1. **Flutter CI** — format/analyze/unit/widget/build.
+2. **Device Foundation CI** — Android emulator + iOS simulator, plugin/native storage thật.
+3. **Runtime Self-contained CI** — app thật -> MCP API thật -> Công Ty API thật trên một installation test tạm, cô lập hoàn toàn với production.
 
-Không workflow nào trong tài liệu này đồng nghĩa với deploy production, migration database hoặc phát hành app.
+Workflow manual `.github/workflows/runtime-integration-gate.yml` vẫn giữ để chạy với một installation test bên ngoài khi có nhu cầu. Nó không phải điều kiện để CI tự dựng test installation.
+
+Không gate nào tự deploy production, migrate production DB hoặc phát hành app.
 
 ## Device Foundation CI
 
@@ -17,95 +20,109 @@ Test: `integration_test/device_foundation_test.dart`
 
 Gate này chứng minh trên Android/iOS:
 
-- `FlutterSecureStorage` ghi/đọc/xóa được dữ liệu riêng của test;
-- SQLite thật lưu và đọc lại mutation queue sau khi đóng/mở database;
+- `FlutterSecureStorage` ghi/đọc/xóa được dữ liệu test;
+- SQLite thật giữ mutation queue sau khi đóng/mở database;
 - nháp đơn vẫn còn sau khi đóng/mở database;
 - tuyến đã chọn vẫn còn sau khi đóng/mở database;
 - ảnh chờ gửi + metadata nằm trong private app storage và đọc lại được;
-- dữ liệu test dùng scope/key riêng và được dọn sau khi chạy.
+- cùng một canonical Idempotency-Key vẫn được giữ khi queue được mở lại.
 
-Gate này không gọi production API.
+## Runtime Self-contained CI
 
-## Runtime Integration Gate
-
-Workflow: `.github/workflows/runtime-integration-gate.yml`
+Workflow: `.github/workflows/runtime-self-contained-ci.yml`
 
 Test: `integration_test/runtime_gate_test.dart`
 
-Workflow chỉ nhận HTTPS API origin của **installation test**. Hai guard bắt buộc:
+Runtime này được tạo mới trong từng GitHub Actions job. Android và iOS chạy cùng một kịch bản trên database riêng của job.
 
-- input `environment_name` phải bắt đầu bằng `test-`;
-- input `guard` phải đúng `APPROVED_TEST_INSTALLATION_ONLY`.
+### Thành phần thật được chạy trong job
 
-Credential/fixture không nằm trong repo và không truyền trực tiếp trên command line. Workflow tạo một JSON tạm dưới `RUNNER_TEMP`, quyền file `0600`, rồi dùng `--dart-define-from-file`.
+- PostgreSQL test riêng;
+- migrations Công Ty thật;
+- migrations MCP thật;
+- Công Ty API thật từ NPP-Platform `main`;
+- MCP API thật từ NPP-Platform `main`;
+- workforce auth thật;
+- customer onboarding boundary thật;
+- Công Ty Sales boundary thật;
+- S3-compatible object storage cục bộ cho contract R2;
+- deterministic report-analysis adapter cục bộ;
+- MCP Field app thật trên Android emulator/iOS simulator.
 
-### Secret names cần cấu hình ngoài repo
+Object storage và report-analysis adapter chỉ thay provider bên ngoài; **MCP/Công Ty contract, persistence, auth, idempotency và nghiệp vụ không bị mock**.
 
-- `MCP_RUNTIME_LOGIN_NAME`
-- `MCP_RUNTIME_PASSWORD`
-- `MCP_RUNTIME_OWNER_CODE` — chỉ cần nếu tài khoản test yêu cầu mã xác nhận
-- `MCP_RUNTIME_ORDER_CUSTOMER_ID`
-- `MCP_RUNTIME_ORDER_CUSTOMER_ADDRESS_ID`
-- `MCP_RUNTIME_ORDER_VARIANT_ID`
-- `MCP_RUNTIME_ONBOARDING_ROUTE_CUSTOMER_ID`
-- `MCP_RUNTIME_MEDIA_ROUTE_CUSTOMER_ID`
+### Fixture an toàn
 
-Không ghi giá trị thật của các biến này vào issue, PR, chat, screenshot hoặc source.
+NPP-Platform cung cấp `npp-core/api/scripts/prepare-mcp-mobile-runtime-e2e.js`.
+
+Script fixture bắt buộc:
+
+- `NODE_ENV=test`;
+- PostgreSQL chỉ được là `localhost`, `127.0.0.1` hoặc `::1`;
+- không nhận production DB;
+- chỉ tạo dữ liệu trong database ephemeral của CI.
+
+Workforce password, service tokens, object-storage credentials và report-agent token được sinh mới trong từng job, được mask, không commit vào repo và không upload artifact.
 
 ### Chuỗi nghiệp vụ runtime
 
-Gate chạy cùng một contract mobile production:
+Gate chạy đúng contract mobile production:
 
-- health live/ready + auth boundary;
+- health live/ready + mobile auth boundary;
 - đăng nhập + đọc lại phiên;
-- đọc tuyến, điểm bán, khách Công Ty, báo cáo, phiếu thử, lịch sử, công việc, catalog, đơn, đề xuất;
-- CRUD cấu hình mẫu báo cáo và chuyển dữ liệu test sang inactive;
-- submit/sync mở hoặc liên kết mã trên fixture test;
-- upload ảnh thật qua R2 rồi xóa ảnh vừa tạo;
-- lưu đơn vào SQLite queue -> replay thật -> Công Ty;
-- gọi lại cùng **đúng Idempotency-Key** và xác nhận không sinh đơn thứ hai;
+- đọc tuyến, điểm bán, khách Công Ty, report settings/templates, phiếu thử, lịch sử, công việc, catalog, đơn và Đề xuất;
+- CRUD cấu hình mẫu báo cáo;
 - tạo/cập nhật tuyến tạm;
 - tạo và xóa phiên rỗng;
-- thêm/sửa vị trí điểm bán, mở phiên, check-in, cập nhật kết quả ghé;
-- báo cáo thị trường, thử sản phẩm, follow-up, thêm khách trong phiên + bỏ qua có lý do;
-- kết thúc phiên, đọc lịch sử, hậu kiểm thử sản phẩm;
-- tạo snapshot báo cáo, AI phân tích, dựng Word/Excel/PDF/Markdown/JSON/CSV;
-- tạo Đề xuất quản lý;
-- archive dữ liệu tuyến/điểm bán tạm trong cleanup.
+- thêm/cập nhật/vị trí điểm bán;
+- submit/sync mở hoặc liên kết mã khách;
+- upload ảnh qua S3/R2 contract rồi xóa ảnh vừa tạo;
+- mở phiên, check-in, cập nhật kết quả ghé;
+- báo cáo thị trường, thử sản phẩm, follow-up;
+- thêm khách trong phiên và bỏ qua có lý do;
+- lưu đơn vào SQLite queue -> replay thật qua MCP -> Công Ty;
+- gọi lại cùng **đúng Idempotency-Key** và xác nhận không sinh đơn thứ hai;
+- kết thúc phiên, đọc lịch sử và hậu kiểm thử sản phẩm;
+- tạo snapshot báo cáo;
+- gọi endpoint AI report và xác nhận kết quả được persist;
+- dựng Word/Excel/PDF/Markdown/JSON và các CSV từ read model thật;
+- tạo/list Đề xuất quản lý;
+- archive tuyến/điểm bán tạm trong cleanup.
 
-Nếu một contract, permission, adapter hoặc provider chưa sẵn sàng thì workflow phải đỏ. Không đổi sang mock để làm xanh.
+Nếu contract, permission, adapter hoặc persistence sai thì workflow phải đỏ. Không đổi sang mock để làm xanh.
 
-## Boundary production
+## Runtime manual ngoài CI
 
-Runtime Integration Gate **không được chạy vào production** chỉ để đóng Issue #42.
+Workflow: `.github/workflows/runtime-integration-gate.yml`
 
-Trước khi dùng bất kỳ runtime nào làm bằng chứng Lô 7 phải xác nhận:
+Dùng khi có installation test bên ngoài được phê duyệt. Guard bắt buộc:
 
-1. backend runtime exact release SHA;
-2. SHA đó chứa đủ contract mobile đang test;
-3. test fixture là dữ liệu test có thể mutate/cleanup;
-4. không có migration/deploy ngầm trong workflow;
-5. Android và iOS chạy cùng một scenario.
+- tên environment bắt đầu bằng `test-`;
+- guard đúng `APPROVED_TEST_INSTALLATION_ONLY`;
+- HTTPS cho runtime bên ngoài;
+- chỉ loopback `http://127.0.0.1`, `localhost`, `10.0.2.2` được chấp nhận cho environment `test-local-*`.
 
-## Audit runtime ngày 2026-09-29
+Không chạy manual mutation gate vào production.
 
-Read-only diagnostic của NPP-Platform xác nhận MCP service đang active, PostgreSQL schema `mcp`, R2/Core Auth/Core Onboarding/Core Sales đều configured.
+## Production audit 2026-09-29
 
-Tuy nhiên:
+Read-only diagnostic xác nhận MCP service active, PostgreSQL schema `mcp`, R2, Core Auth, Core Onboarding và Core Sales đều configured.
 
-- backend source `main`: `2425427eccad1d5419615ef4117495ca9cfc9f70`;
-- release MCP VPS gần nhất có evidence exact SHA: `aa3ed0734e4d36a39efe6375b87bc87890ba1158`;
-- vì vậy production hiện **không phải bằng chứng** rằng endpoint AI/report mới trên `main` đã được deploy.
+Production MCP backend đã được deploy/smoke ở exact SHA:
 
-Không đổi Matrix sang DONE cho các dòng runtime cho đến khi có workflow run thật trên runtime đúng contract.
+`1d8d78ae0121106b8153d32c42cfb33c3f81c1e7`
+
+Sau đó NPP-Platform `main` tiến lên `e09197c0b64e1a2e7c2e49fb4315c2d9bfe07247`, nhưng diff chỉ thuộc export phía Công Ty web; không thay `mcp/apps/backend/**` hay contract mobile. Vì vậy không deploy MCP lặp lại chỉ để bám thay đổi web.
+
+Production chỉ là bằng chứng deploy/smoke. Runtime Self-contained CI mới là nơi chạy mutation E2E an toàn.
 
 ## Gate đóng Issue #42
 
 Chỉ đóng #42 khi đồng thời:
 
-- Flutter CI xanh exact head;
-- Device Foundation CI Android + iOS xanh exact head;
-- Runtime Integration Gate Android + iOS xanh trên installation test được phê duyệt;
-- exact backend release SHA được ghi nhận và khớp contract mobile;
-- Matrix không còn `MISSING`, `BROKEN` hoặc `PARTIAL` thuộc scope business/runtime;
+- Flutter CI xanh exact mobile head;
+- Device Foundation CI Android + iOS xanh exact mobile head;
+- Runtime Self-contained CI Android + iOS xanh;
+- workflow ghi lại exact NPP runtime SHA đã checkout;
+- Matrix không còn `MISSING`, `BROKEN` hoặc `PARTIAL` thuộc scope nghiệp vụ/runtime;
 - release APK/iOS signing và rollout vẫn là thao tác riêng khi Owner yêu cầu.
