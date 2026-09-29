@@ -194,15 +194,16 @@ class HttpRouteManagementClient implements RouteManagementClient {
     String note = '',
     required String idempotencyKey,
   }) async {
+    final body = <String, Object?>{
+      'routeName': routeName.trim(),
+      if (area.trim().isNotEmpty) 'area': area.trim(),
+      if (note.trim().isNotEmpty) 'note': note.trim(),
+    };
+    if (weekday != null) body['weekday'] = weekday;
     await _request(
       'POST',
       '/api/routes',
-      body: {
-        'routeName': routeName.trim(),
-        if (area.trim().isNotEmpty) 'area': area.trim(),
-        if (weekday != null) 'weekday': weekday,
-        if (note.trim().isNotEmpty) 'note': note.trim(),
-      },
+      body: body,
       idempotencyKey: idempotencyKey,
     );
   }
@@ -217,16 +218,17 @@ class HttpRouteManagementClient implements RouteManagementClient {
     bool? active,
     required String idempotencyKey,
   }) async {
+    final body = <String, Object?>{
+      if (routeName != null) 'routeName': routeName.trim(),
+      if (area != null) 'area': area.trim(),
+      if (note != null) 'note': note.trim(),
+    };
+    if (weekday != null) body['weekday'] = weekday;
+    if (active != null) body['active'] = active;
     await _request(
       'PATCH',
       '/api/routes/${Uri.encodeComponent(routeId.trim())}',
-      body: {
-        if (routeName != null) 'routeName': routeName.trim(),
-        if (area != null) 'area': area.trim(),
-        if (weekday != null) 'weekday': weekday,
-        if (note != null) 'note': note.trim(),
-        if (active != null) 'active': active,
-      },
+      body: body,
       idempotencyKey: idempotencyKey,
     );
   }
@@ -256,21 +258,23 @@ class HttpRouteManagementClient implements RouteManagementClient {
     String? activeSessionId,
     required String idempotencyKey,
   }) async {
+    final body = <String, Object?>{
+      'routeId': routeId.trim(),
+      'customerName': customerName.trim(),
+      if (phone.trim().isNotEmpty) 'phone': phone.trim(),
+      if (area.trim().isNotEmpty) 'area': area.trim(),
+      if (address.trim().isNotEmpty) 'address': address.trim(),
+      if (note.trim().isNotEmpty) 'note': note.trim(),
+      'includeActiveSession': includeActiveSession,
+    };
+    if (sortOrder != null) body['sortOrder'] = sortOrder;
+    if (includeActiveSession && (activeSessionId ?? '').trim().isNotEmpty) {
+      body['activeSessionId'] = activeSessionId!.trim();
+    }
     await _request(
       'POST',
       '/api/route-customers',
-      body: {
-        'routeId': routeId.trim(),
-        'customerName': customerName.trim(),
-        if (phone.trim().isNotEmpty) 'phone': phone.trim(),
-        if (area.trim().isNotEmpty) 'area': area.trim(),
-        if (address.trim().isNotEmpty) 'address': address.trim(),
-        if (sortOrder != null) 'sortOrder': sortOrder,
-        if (note.trim().isNotEmpty) 'note': note.trim(),
-        'includeActiveSession': includeActiveSession,
-        if (includeActiveSession && (activeSessionId ?? '').trim().isNotEmpty)
-          'activeSessionId': activeSessionId!.trim(),
-      },
+      body: body,
       idempotencyKey: idempotencyKey,
     );
   }
@@ -287,18 +291,19 @@ class HttpRouteManagementClient implements RouteManagementClient {
     bool? active,
     required String idempotencyKey,
   }) async {
+    final body = <String, Object?>{
+      if (customerName != null) 'customerName': customerName.trim(),
+      if (phone != null) 'phone': phone.trim(),
+      if (area != null) 'area': area.trim(),
+      if (address != null) 'address': address.trim(),
+      if (note != null) 'note': note.trim(),
+    };
+    if (sortOrder != null) body['sortOrder'] = sortOrder;
+    if (active != null) body['active'] = active;
     await _request(
       'PATCH',
       '/api/route-customers/${Uri.encodeComponent(routeCustomerId.trim())}',
-      body: {
-        if (customerName != null) 'customerName': customerName.trim(),
-        if (phone != null) 'phone': phone.trim(),
-        if (area != null) 'area': area.trim(),
-        if (address != null) 'address': address.trim(),
-        if (sortOrder != null) 'sortOrder': sortOrder,
-        if (note != null) 'note': note.trim(),
-        if (active != null) 'active': active,
-      },
+      body: body,
       idempotencyKey: idempotencyKey,
     );
   }

@@ -592,8 +592,16 @@ class _RouteSummaryCard extends StatelessWidget {
           const Divider(height: 24),
           _InfoRow(label: 'Điểm tuyến', value: route.plannedCustomers.toString()),
           _InfoRow(
+            label: 'Phụ trách',
+            value: route.salesOwner.isEmpty ? 'Chưa phân công' : route.salesOwner,
+          ),
+          _InfoRow(
             label: 'Ngày cố định',
             value: _weekdayLabel(route.weekday),
+          ),
+          _InfoRow(
+            label: 'Lần ghé gần nhất',
+            value: _displayDate(route.lastVisitDate),
           ),
           _InfoRow(
             label: 'Ghi chú',
@@ -952,4 +960,13 @@ String _weekdayLabel(int? weekday) {
     6 => 'Thứ Bảy',
     _ => 'Không cố định',
   };
+}
+
+
+String _displayDate(String value) {
+  final parsed = DateTime.tryParse(value.trim());
+  if (parsed == null) return value.trim().isEmpty ? 'Chưa có' : value.trim();
+  final day = parsed.day.toString().padLeft(2, '0');
+  final month = parsed.month.toString().padLeft(2, '0');
+  return '$day/$month/${parsed.year}';
 }

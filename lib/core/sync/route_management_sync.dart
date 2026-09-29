@@ -28,9 +28,9 @@ class RouteManagementSubmissionService {
     final payload = <String, Object?>{
       'routeName': routeName.trim(),
       'area': area.trim(),
-      if (weekday != null) 'weekday': weekday,
       'note': note.trim(),
     };
+    if (weekday != null) payload['weekday'] = weekday;
     return _submit(
       operation: 'mcp.route.create',
       entityType: 'route',
@@ -57,9 +57,9 @@ class RouteManagementSubmissionService {
       'routeId': routeId.trim(),
       'routeName': routeName.trim(),
       'area': area.trim(),
-      if (weekday != null) 'weekday': weekday,
       'note': note.trim(),
     };
+    if (weekday != null) payload['weekday'] = weekday;
     return _submit(
       operation: 'mcp.route.update',
       entityType: 'route',
@@ -110,12 +110,13 @@ class RouteManagementSubmissionService {
       'phone': phone.trim(),
       'area': area.trim(),
       'address': address.trim(),
-      if (sortOrder != null) 'sortOrder': sortOrder,
       'note': note.trim(),
       'includeActiveSession': includeActiveSession,
-      if ((activeSessionId ?? '').trim().isNotEmpty)
-        'activeSessionId': activeSessionId!.trim(),
     };
+    if (sortOrder != null) payload['sortOrder'] = sortOrder;
+    if ((activeSessionId ?? '').trim().isNotEmpty) {
+      payload['activeSessionId'] = activeSessionId!.trim();
+    }
     return _submit(
       operation: 'mcp.route-customer.create',
       entityType: 'route_customer',
