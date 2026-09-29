@@ -1,6 +1,7 @@
 name: Flutter CI
 
 on:
+  workflow_dispatch:
   pull_request:
   push:
     branches:
@@ -62,6 +63,9 @@ jobs:
         run: flutter build appbundle --release
 
   ios:
+    # Owner decision 2026-09-30: iOS is deferred while Android is the active release target.
+    # Keep iOS compile/tests manually runnable without blocking Android PR/push.
+    if: ${{ github.event_name == 'workflow_dispatch' }}
     runs-on: macos-latest
 
     steps:
