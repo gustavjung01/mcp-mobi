@@ -13,6 +13,7 @@ class MorePage extends StatelessWidget {
     this.onReports,
     this.onProductTrials,
     this.onReportSettings,
+    this.onDataExports,
     this.onTasks,
     this.onManagementProposals,
     this.onCustomerOnboarding,
@@ -24,6 +25,7 @@ class MorePage extends StatelessWidget {
   final VoidCallback? onReports;
   final VoidCallback? onProductTrials;
   final VoidCallback? onReportSettings;
+  final VoidCallback? onDataExports;
   final VoidCallback? onTasks;
   final VoidCallback? onManagementProposals;
   final VoidCallback? onCustomerOnboarding;
@@ -36,6 +38,8 @@ class MorePage extends StatelessWidget {
       const _MoreItem(Icons.history, 'Lịch sử phiên'),
       const _MoreItem(Icons.assignment_outlined, 'Báo cáo'),
       const _MoreItem(Icons.science_outlined, 'Kết quả thử sản phẩm'),
+      if (onDataExports != null)
+        const _MoreItem(Icons.file_download_outlined, 'Xuất dữ liệu'),
       if (onReportSettings != null)
         const _MoreItem(Icons.tune_rounded, 'Thiết lập báo cáo thị trường'),
       const _MoreItem(Icons.task_alt_outlined, 'Kế hoạch & Công việc'),
@@ -67,6 +71,7 @@ class MorePage extends StatelessWidget {
                       'Lịch sử phiên' => onSessionHistory,
                       'Báo cáo' => onReports,
                       'Kết quả thử sản phẩm' => onProductTrials,
+                      'Xuất dữ liệu' => onDataExports,
                       'Thiết lập báo cáo thị trường' => onReportSettings,
                       'Kế hoạch & Công việc' => onTasks,
                       'Đề xuất' => onManagementProposals,

@@ -196,6 +196,13 @@ class SessionReportExporter {
     };
   }
 
+  static SessionReportExport buildCsv({
+    required String fileName,
+    required Iterable<Iterable<Object?>> rows,
+  }) {
+    return _csvExport(fileName, rows);
+  }
+
   static SessionReportExport _csvExport(
     String name,
     Iterable<Iterable<Object?>> rows,

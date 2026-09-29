@@ -38,7 +38,9 @@ class _SessionReportDetailPageState extends State<SessionReportDetailPage> {
 
   SessionReportActionClient? get _actions {
     final client = widget.client;
-    return client is SessionReportActionClient ? client : null;
+    return client is SessionReportActionClient
+        ? client as SessionReportActionClient
+        : null;
   }
 
   @override

@@ -108,6 +108,7 @@ jobs:
           test/session_history_page_test.dart
           test/tasks_page_test.dart
           test/session_report_detail_page_test.dart
+          test/data_exports_page_test.dart
           test/management_proposal_test.dart
           test/field_check_sync_test.dart
           test/local_data_store_test.dart
