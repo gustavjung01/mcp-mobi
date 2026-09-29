@@ -1,0 +1,211 @@
+name: Runtime Integration Gate
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment_name:
+        description: 'Tên installation test, bắt buộc bắt đầu bằng test-'
+        required: true
+        type: string
+      api_base_url:
+        description: 'HTTPS MCP API origin của installation test'
+        required: true
+        type: string
+      platform:
+        description: 'Nền tảng cần chạy'
+        required: true
+        default: both
+        type: choice
+        options:
+          - both
+          - android
+          - ios
+      guard:
+        description: 'Nhập APPROVED_TEST_INSTALLATION_ONLY'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: runtime-integration-gate-${{ inputs.environment_name }}
+  cancel-in-progress: false
+
+jobs:
+  android-runtime:
+    if: inputs.platform == 'both' || inputs.platform == 'android'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      RUNTIME_CONFIG: ${{ runner.temp }}/mcp-runtime-gate.json
+      MCP_RUNTIME_GUARD: ${{ inputs.guard }}
+      MCP_RUNTIME_ENVIRONMENT: ${{ inputs.environment_name }}
+      MCP_RUNTIME_API_BASE_URL: ${{ inputs.api_base_url }}
+      MCP_RUNTIME_LOGIN_NAME: ${{ secrets.MCP_RUNTIME_LOGIN_NAME }}
+      MCP_RUNTIME_PASSWORD: ${{ secrets.MCP_RUNTIME_PASSWORD }}
+      MCP_RUNTIME_OWNER_CODE: ${{ secrets.MCP_RUNTIME_OWNER_CODE }}
+      MCP_RUNTIME_ORDER_CUSTOMER_ID: ${{ secrets.MCP_RUNTIME_ORDER_CUSTOMER_ID }}
+      MCP_RUNTIME_ORDER_CUSTOMER_ADDRESS_ID: ${{ secrets.MCP_RUNTIME_ORDER_CUSTOMER_ADDRESS_ID }}
+      MCP_RUNTIME_ORDER_VARIANT_ID: ${{ secrets.MCP_RUNTIME_ORDER_VARIANT_ID }}
+      MCP_RUNTIME_ONBOARDING_ROUTE_CUSTOMER_ID: ${{ secrets.MCP_RUNTIME_ONBOARDING_ROUTE_CUSTOMER_ID }}
+      MCP_RUNTIME_MEDIA_ROUTE_CUSTOMER_ID: ${{ secrets.MCP_RUNTIME_MEDIA_ROUTE_CUSTOMER_ID }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate test-installation guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$MCP_RUNTIME_GUARD" = 'APPROVED_TEST_INSTALLATION_ONLY'
+          case "$MCP_RUNTIME_ENVIRONMENT" in test-*) ;; *) exit 1 ;; esac
+          case "$MCP_RUNTIME_API_BASE_URL" in https://*) ;; *) exit 1 ;; esac
+
+      - name: Prepare runtime configuration
+        shell: bash
+        env:
+          MCP_RUNTIME_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, os
+          names = [
+              "MCP_RUNTIME_GUARD",
+              "MCP_RUNTIME_ENVIRONMENT",
+              "MCP_RUNTIME_API_BASE_URL",
+              "MCP_RUNTIME_LOGIN_NAME",
+              "MCP_RUNTIME_PASSWORD",
+              "MCP_RUNTIME_OWNER_CODE",
+              "MCP_RUNTIME_ORDER_CUSTOMER_ID",
+              "MCP_RUNTIME_ORDER_CUSTOMER_ADDRESS_ID",
+              "MCP_RUNTIME_ORDER_VARIANT_ID",
+              "MCP_RUNTIME_ONBOARDING_ROUTE_CUSTOMER_ID",
+              "MCP_RUNTIME_MEDIA_ROUTE_CUSTOMER_ID",
+              "MCP_RUNTIME_RUN_ID",
+          ]
+          required = [name for name in names if name != "MCP_RUNTIME_OWNER_CODE"]
+          missing = [name for name in required if not os.environ.get(name, "").strip()]
+          if missing:
+              raise SystemExit("Missing required runtime gate configuration: " + ", ".join(missing))
+          with open(os.environ["RUNTIME_CONFIG"], "w", encoding="utf-8") as handle:
+              json.dump({name: os.environ.get(name, "") for name in names}, handle)
+          os.chmod(os.environ["RUNTIME_CONFIG"], 0o600)
+          PY
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install Flutter 3.47.2
+        shell: bash
+        run: |
+          git clone --depth 1 --branch 3.47.2 https://github.com/flutter/flutter.git "$HOME/flutter"
+          echo "$HOME/flutter/bin" >> "$GITHUB_PATH"
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Run Android runtime integration gate
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          script: flutter test integration_test/runtime_gate_test.dart -d emulator-5554 --dart-define-from-file="$RUNTIME_CONFIG"
+
+  ios-runtime:
+    if: inputs.platform == 'both' || inputs.platform == 'ios'
+    runs-on: macos-latest
+    timeout-minutes: 45
+    env:
+      RUNTIME_CONFIG: ${{ runner.temp }}/mcp-runtime-gate.json
+      MCP_RUNTIME_GUARD: ${{ inputs.guard }}
+      MCP_RUNTIME_ENVIRONMENT: ${{ inputs.environment_name }}
+      MCP_RUNTIME_API_BASE_URL: ${{ inputs.api_base_url }}
+      MCP_RUNTIME_LOGIN_NAME: ${{ secrets.MCP_RUNTIME_LOGIN_NAME }}
+      MCP_RUNTIME_PASSWORD: ${{ secrets.MCP_RUNTIME_PASSWORD }}
+      MCP_RUNTIME_OWNER_CODE: ${{ secrets.MCP_RUNTIME_OWNER_CODE }}
+      MCP_RUNTIME_ORDER_CUSTOMER_ID: ${{ secrets.MCP_RUNTIME_ORDER_CUSTOMER_ID }}
+      MCP_RUNTIME_ORDER_CUSTOMER_ADDRESS_ID: ${{ secrets.MCP_RUNTIME_ORDER_CUSTOMER_ADDRESS_ID }}
+      MCP_RUNTIME_ORDER_VARIANT_ID: ${{ secrets.MCP_RUNTIME_ORDER_VARIANT_ID }}
+      MCP_RUNTIME_ONBOARDING_ROUTE_CUSTOMER_ID: ${{ secrets.MCP_RUNTIME_ONBOARDING_ROUTE_CUSTOMER_ID }}
+      MCP_RUNTIME_MEDIA_ROUTE_CUSTOMER_ID: ${{ secrets.MCP_RUNTIME_MEDIA_ROUTE_CUSTOMER_ID }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate test-installation guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$MCP_RUNTIME_GUARD" = 'APPROVED_TEST_INSTALLATION_ONLY'
+          case "$MCP_RUNTIME_ENVIRONMENT" in test-*) ;; *) exit 1 ;; esac
+          case "$MCP_RUNTIME_API_BASE_URL" in https://*) ;; *) exit 1 ;; esac
+
+      - name: Prepare runtime configuration
+        shell: bash
+        env:
+          MCP_RUNTIME_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, os
+          names = [
+              "MCP_RUNTIME_GUARD",
+              "MCP_RUNTIME_ENVIRONMENT",
+              "MCP_RUNTIME_API_BASE_URL",
+              "MCP_RUNTIME_LOGIN_NAME",
+              "MCP_RUNTIME_PASSWORD",
+              "MCP_RUNTIME_OWNER_CODE",
+              "MCP_RUNTIME_ORDER_CUSTOMER_ID",
+              "MCP_RUNTIME_ORDER_CUSTOMER_ADDRESS_ID",
+              "MCP_RUNTIME_ORDER_VARIANT_ID",
+              "MCP_RUNTIME_ONBOARDING_ROUTE_CUSTOMER_ID",
+              "MCP_RUNTIME_MEDIA_ROUTE_CUSTOMER_ID",
+              "MCP_RUNTIME_RUN_ID",
+          ]
+          required = [name for name in names if name != "MCP_RUNTIME_OWNER_CODE"]
+          missing = [name for name in required if not os.environ.get(name, "").strip()]
+          if missing:
+              raise SystemExit("Missing required runtime gate configuration: " + ", ".join(missing))
+          with open(os.environ["RUNTIME_CONFIG"], "w", encoding="utf-8") as handle:
+              json.dump({name: os.environ.get(name, "") for name in names}, handle)
+          os.chmod(os.environ["RUNTIME_CONFIG"], 0o600)
+          PY
+
+      - name: Install Flutter 3.47.2
+        shell: bash
+        run: |
+          git clone --depth 1 --branch 3.47.2 https://github.com/flutter/flutter.git "$HOME/flutter"
+          echo "$HOME/flutter/bin" >> "$GITHUB_PATH"
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Boot iPhone simulator
+        id: simulator
+        shell: bash
+        run: |
+          set -euo pipefail
+          udid="$(xcrun simctl list devices available -j | python3 -c '
+          import json,sys
+          data=json.load(sys.stdin)["devices"]
+          for runtime in sorted(data.keys(), reverse=True):
+              for device in data[runtime]:
+                  if device.get("isAvailable") and device.get("name","").startswith("iPhone"):
+                      print(device["udid"])
+                      raise SystemExit
+          raise SystemExit(1)
+          ')"
+          xcrun simctl boot "$udid" 2>/dev/null || true
+          xcrun simctl bootstatus "$udid" -b
+          echo "udid=$udid" >> "$GITHUB_OUTPUT"
+
+      - name: Run iOS runtime integration gate
+        run: flutter test integration_test/runtime_gate_test.dart -d "${{ steps.simulator.outputs.udid }}" --dart-define-from-file="$RUNTIME_CONFIG"
