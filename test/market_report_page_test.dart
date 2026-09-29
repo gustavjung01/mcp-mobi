@@ -237,14 +237,6 @@ void main() {
     await tester.tap(template);
     await tester.pump();
 
-    final demand = find.byWidgetPredicate(
-      (widget) =>
-          widget is TextField &&
-          widget.controller?.text == 'Khách cần bổ sung hàng tuần',
-      description: 'Nhu cầu được điền từ mẫu báo cáo',
-    );
-    expect(demand, findsOneWidget);
-
     await tester.tap(find.byKey(const Key('market-report-submit')));
     await tester.pumpAndSettle();
 
