@@ -1,6 +1,7 @@
 name: Device Foundation CI
 
 on:
+  workflow_dispatch:
   pull_request:
   push:
     branches:
@@ -43,6 +44,9 @@ jobs:
           script: flutter test integration_test/device_foundation_test.dart -d emulator-5554
 
   ios-device:
+    # Owner decision 2026-09-30: iOS is deferred while Android is the active release target.
+    # Keep this gate manual so it remains visible but does not block Android delivery.
+    if: ${{ github.event_name == 'workflow_dispatch' }}
     runs-on: macos-latest
     timeout-minutes: 35
 
