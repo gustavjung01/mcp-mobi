@@ -225,9 +225,10 @@ class _DataExportsPageState extends State<DataExportsPage> {
             ),
           ),
           Expanded(
-            child: ListView(
+            child: SingleChildScrollView(
               padding: const EdgeInsets.all(AppSpacing.md),
-              children: [
+              child: Column(
+                children: [
                 const AppCard(
                   child: Text(
                     'Chọn nội dung cần xuất. File được tạo từ dữ liệu MCP theo quyền của tài khoản và mở bằng chức năng chia sẻ của thiết bị.',
@@ -258,8 +259,10 @@ class _DataExportsPageState extends State<DataExportsPage> {
                     padding: const EdgeInsets.only(bottom: AppSpacing.sm),
                     child: AppCard(
                       padding: EdgeInsets.zero,
-                      child: ListTile(
-                        key: Key('data-export-${entry.keyName}'),
+                      child: Material(
+                        color: Colors.transparent,
+                        child: ListTile(
+                          key: Key('data-export-${entry.keyName}'),
                         leading: Icon(entry.icon, color: AppColors.primaryDark),
                         title: Text(
                           entry.title,
@@ -273,13 +276,14 @@ class _DataExportsPageState extends State<DataExportsPage> {
                                 child: CircularProgressIndicator(strokeWidth: 2),
                               )
                             : const Icon(Icons.ios_share_outlined),
-                        onTap: _busy == null
-                            ? () => _share(
-                                  entry.keyName,
-                                  entry.fileName,
-                                  entry.loadRows,
-                                )
-                            : null,
+                          onTap: _busy == null
+                              ? () => _share(
+                                    entry.keyName,
+                                    entry.fileName,
+                                    entry.loadRows,
+                                  )
+                              : null,
+                        ),
                       ),
                     ),
                   ),

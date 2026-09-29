@@ -106,11 +106,14 @@ void main() {
     expect(find.byKey(const Key('task-task-blocked')), findsOneWidget);
     expect(find.text('Bị chặn'), findsOneWidget);
 
+    final scrollable = find.byType(Scrollable).first;
     await tester.scrollUntilVisible(
       find.byKey(const Key('tasks-due-filter')),
       -300,
-      scrollable: find.byType(Scrollable).first,
+      scrollable: scrollable,
     );
+    await tester.drag(scrollable, const Offset(0, 160));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('tasks-due-filter')));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Quá hạn').last);
