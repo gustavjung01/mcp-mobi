@@ -25,6 +25,8 @@ class OutletDetailPage extends StatefulWidget {
     this.historyClient,
     this.onOpenMap,
     this.onUpdateLocation,
+    this.onEditOutlet,
+    this.onArchiveOutlet,
     this.onSetCheckIn,
     this.onSkip,
     this.onCreateOrder,
@@ -46,6 +48,8 @@ class OutletDetailPage extends StatefulWidget {
   final Future<void> Function(FieldGps? gps, String query)? onOpenMap;
   final Future<bool> Function(String routeCustomerId, String customerName)?
   onUpdateLocation;
+  final Future<bool> Function()? onEditOutlet;
+  final Future<bool> Function()? onArchiveOutlet;
   final Future<bool> Function(FieldDayLine line, bool checkedIn)? onSetCheckIn;
   final Future<bool> Function(
     FieldDayLine line,
@@ -70,6 +74,7 @@ class _OutletDetailPageState extends State<OutletDetailPage> {
   bool _checkingIn = false;
   bool _skipping = false;
   bool _updatingLocation = false;
+  bool _managingProfile = false;
   List<OutletHistoryItem> _historyItems = const [];
   String? _historyMessage;
   late bool _checkedIn;
@@ -162,6 +167,25 @@ class _OutletDetailPageState extends State<OutletDetailPage> {
       );
     } finally {
       if (mounted) setState(() => _updatingLocation = false);
+    }
+  }
+
+  Future<void> _runProfileAction(
+    Future<bool> Function()? action,
+  ) async {
+    if (action == null || _managingProfile) return;
+    setState(() => _managingProfile = true);
+    try {
+      final changed = await action();
+      if (!mounted || !changed) return;
+      Navigator.of(context).pop();
+    } on FieldDataFailure catch (failure) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(failure.message)),
+      );
+    } finally {
+      if (mounted) setState(() => _managingProfile = false);
     }
   }
 
@@ -592,6 +616,48 @@ class _OutletDetailPageState extends State<OutletDetailPage> {
                           ],
                         ),
                       ),
+                      if (routeCustomerId.isNotEmpty &&
+                          (widget.onEditOutlet != null ||
+                              widget.onArchiveOutlet != null)) ...[
+                        const SizedBox(height: AppSpacing.md),
+                        AppCard(
+                          child: Row(
+                            children: [
+                              if (widget.onEditOutlet != null)
+                                Expanded(
+                                  child: OutlinedButton.icon(
+                                    key: const Key('outlet-edit-button'),
+                                    onPressed: _managingProfile
+                                        ? null
+                                        : () => _runProfileAction(
+                                              widget.onEditOutlet,
+                                            ),
+                                    icon: const Icon(Icons.edit_outlined),
+                                    label: const Text('Chỉnh sửa'),
+                                  ),
+                                ),
+                              if (widget.onEditOutlet != null &&
+                                  widget.onArchiveOutlet != null)
+                                const SizedBox(width: AppSpacing.sm),
+                              if (widget.onArchiveOutlet != null)
+                                Expanded(
+                                  child: OutlinedButton.icon(
+                                    key: const Key('outlet-archive-button'),
+                                    onPressed: _managingProfile
+                                        ? null
+                                        : () => _runProfileAction(
+                                              widget.onArchiveOutlet,
+                                            ),
+                                    icon: const Icon(
+                                      Icons.remove_circle_outline_rounded,
+                                    ),
+                                    label: const Text('Loại khỏi tuyến'),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ],
                       if (widget.onOpenMap != null ||
                           (routeCustomerId.isNotEmpty &&
                               widget.onUpdateLocation != null)) ...[

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../app/theme/app_theme.dart';
 import '../../core/data/field_data_client.dart';
+import '../../core/sync/route_management_sync.dart';
 import '../../shared/widgets/app_card.dart';
 import '../../shared/widgets/empty_state.dart';
 import '../../shared/widgets/navy_page_header.dart';
@@ -12,11 +13,17 @@ class FixedRoutesPage extends StatefulWidget {
     super.key,
     this.initialRoute,
     this.dataClient,
+    this.managementService,
+    this.canManageRoutes = false,
+    this.canManageCustomers = false,
   });
 
   final List<FieldRoute> routes;
   final FieldRoute? initialRoute;
   final FieldDataClient? dataClient;
+  final RouteManagementSubmissionService? managementService;
+  final bool canManageRoutes;
+  final bool canManageCustomers;
 
   @override
   State<FixedRoutesPage> createState() => _FixedRoutesPageState();
@@ -27,6 +34,7 @@ class _FixedRoutesPageState extends State<FixedRoutesPage> {
   FieldRoute? _selectedRoute;
   FieldRouteWorkspace? _workspace;
   bool _loading = false;
+  bool _busy = false;
   String? _message;
   String _query = '';
 
@@ -77,23 +85,17 @@ class _FixedRoutesPageState extends State<FixedRoutesPage> {
         _loading = false;
         _message = error.message;
       });
-    } catch (_) {
-      if (!mounted || _selectedRoute?.id != route.id) return;
-      setState(() {
-        _loading = false;
-        _message = 'Không tải được dữ liệu tuyến. Vui lòng thử lại.';
-      });
     }
   }
 
-  Future<void> _refresh() async {
+  Future<void> _refresh({String? selectRouteId}) async {
     final client = widget.dataClient;
     if (client == null) return;
-
+    setState(() => _loading = true);
     try {
       final routes = await client.loadRoutes();
       if (!mounted) return;
-      final currentId = _selectedRoute?.id;
+      final currentId = selectRouteId ?? _selectedRoute?.id;
       FieldRoute? selected;
       for (final route in routes) {
         if (route.id == currentId) {
@@ -105,18 +107,21 @@ class _FixedRoutesPageState extends State<FixedRoutesPage> {
       setState(() {
         _routes = routes;
         _selectedRoute = selected;
+        _loading = selected != null;
       });
       if (selected != null) {
         await _loadWorkspace(selected);
-      } else {
+      } else if (mounted) {
         setState(() {
           _workspace = null;
+          _loading = false;
           _message = null;
         });
       }
     } on FieldDataFailure catch (error) {
       if (!mounted) return;
       setState(() {
+        _loading = false;
         _message = error.message;
       });
     }
@@ -160,109 +165,210 @@ class _FixedRoutesPageState extends State<FixedRoutesPage> {
     if (route != null) await _loadWorkspace(route);
   }
 
+  Future<void> _createRoute() async {
+    final service = widget.managementService;
+    if (!widget.canManageRoutes || service == null || _busy) return;
+    final input = await _showRouteForm(context);
+    if (input == null || !mounted) return;
+    await _runManagement(
+      () => service.createRoute(
+        routeName: input.name,
+        area: input.area,
+        weekday: input.weekday,
+        note: input.note,
+      ),
+      success: 'Đã tạo tuyến.',
+      queued: 'Đã lưu tuyến chờ gửi.',
+      refreshRoutes: true,
+    );
+  }
+
+  Future<void> _editRoute(FieldRoute route) async {
+    final service = widget.managementService;
+    if (!widget.canManageRoutes || service == null || _busy) return;
+    final input = await _showRouteForm(context, route: route);
+    if (input == null || !mounted) return;
+    await _runManagement(
+      () => service.updateRoute(
+        routeId: route.id,
+        routeName: input.name,
+        area: input.area,
+        weekday: input.weekday,
+        note: input.note,
+      ),
+      success: 'Đã cập nhật tuyến.',
+      queued: 'Đã lưu thay đổi tuyến chờ gửi.',
+      refreshRoutes: true,
+      selectRouteId: route.id,
+    );
+  }
+
+  Future<void> _archiveRoute(FieldRoute route) async {
+    final service = widget.managementService;
+    if (!widget.canManageRoutes || service == null || _busy) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Ngừng sử dụng tuyến?'),
+        content: Text(
+          'Tuyến “${route.name}” sẽ không còn dùng cho phiên mới. Dữ liệu cũ vẫn được giữ.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Không'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Ngừng sử dụng'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    await _runManagement(
+      () => service.archiveRoute(
+        routeId: route.id,
+        routeName: route.name,
+      ),
+      success: 'Đã ngừng sử dụng tuyến.',
+      queued: 'Đã lưu yêu cầu ngừng tuyến chờ gửi.',
+      refreshRoutes: true,
+    );
+  }
+
+  Future<void> _addCustomer(FieldRoute route) async {
+    final service = widget.managementService;
+    if (!widget.canManageCustomers || service == null || _busy) return;
+    final input = await _showCustomerForm(context);
+    if (input == null || !mounted) return;
+    final activeDay = _workspace?.day;
+    final includeActive =
+        activeDay?.sessionOpened == true &&
+        _isActiveStatus(activeDay!.run.status);
+    await _runManagement(
+      () => service.addRouteCustomer(
+        routeId: route.id,
+        customerName: input.name,
+        phone: input.phone,
+        area: input.area,
+        address: input.address,
+        sortOrder: input.sortOrder,
+        note: input.note,
+        includeActiveSession: includeActive,
+        activeSessionId: includeActive ? activeDay.run.id : null,
+      ),
+      success: includeActive
+          ? 'Đã thêm điểm bán vào tuyến và phiên đang đi.'
+          : 'Đã thêm điểm bán vào tuyến.',
+      queued: 'Đã lưu điểm bán chờ gửi.',
+      refreshWorkspace: true,
+    );
+  }
+
+  Future<void> _editCustomer(FieldRouteCustomer customer) async {
+    final service = widget.managementService;
+    if (!widget.canManageCustomers || service == null || _busy) return;
+    final input = await _showCustomerForm(context, customer: customer);
+    if (input == null || !mounted) return;
+    await _runManagement(
+      () => service.updateRouteCustomer(
+        routeCustomerId: customer.id,
+        customerName: input.name,
+        phone: input.phone,
+        area: input.area,
+        address: input.address,
+        sortOrder: input.sortOrder,
+        note: input.note,
+      ),
+      success: 'Đã cập nhật điểm bán.',
+      queued: 'Đã lưu thay đổi điểm bán chờ gửi.',
+      refreshWorkspace: true,
+    );
+  }
+
+  Future<void> _archiveCustomer(FieldRouteCustomer customer) async {
+    final service = widget.managementService;
+    if (!widget.canManageCustomers || service == null || _busy) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Loại khỏi tuyến cố định?'),
+        content: Text(
+          '“${customer.accountName}” sẽ được loại khỏi danh sách tuyến cố định. Lịch sử cũ vẫn được giữ.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Không'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Loại khỏi tuyến'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    await _runManagement(
+      () => service.archiveRouteCustomer(
+        routeCustomerId: customer.id,
+        customerName: customer.accountName,
+      ),
+      success: 'Đã loại điểm bán khỏi tuyến.',
+      queued: 'Đã lưu yêu cầu loại điểm bán chờ gửi.',
+      refreshWorkspace: true,
+    );
+  }
+
+  Future<void> _runManagement(
+    Future<RouteManagementSubmitStatus> Function() action, {
+    required String success,
+    required String queued,
+    bool refreshRoutes = false,
+    bool refreshWorkspace = false,
+    String? selectRouteId,
+  }) async {
+    setState(() {
+      _busy = true;
+      _message = null;
+    });
+    try {
+      final result = await action();
+      if (!mounted) return;
+      setState(() {
+        _message = result == RouteManagementSubmitStatus.completed
+            ? success
+            : queued;
+      });
+      if (result == RouteManagementSubmitStatus.completed) {
+        if (refreshRoutes) {
+          await _refresh(selectRouteId: selectRouteId);
+        } else if (refreshWorkspace && _selectedRoute != null) {
+          await _loadWorkspace(_selectedRoute!);
+        }
+      }
+    } on FieldDataFailure catch (error) {
+      if (!mounted) return;
+      setState(() => _message = error.message);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final route = _selectedRoute;
     final customers = _workspace?.customers ?? const <FieldRouteCustomer>[];
     final normalized = _query.trim().toLowerCase();
-    final visibleCustomers = customers
-        .where((customer) {
-          if (normalized.isEmpty) return true;
-          return customer.accountName.toLowerCase().contains(normalized) ||
-              customer.area.toLowerCase().contains(normalized) ||
-              customer.accountId.toLowerCase().contains(normalized) ||
-              customer.note.toLowerCase().contains(normalized);
-        })
-        .toList(growable: false);
-
-    final body = ListView(
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.md,
-        AppSpacing.md,
-        AppSpacing.md,
-        AppSpacing.xl,
-      ),
-      children: [
-        if (_loading) const LinearProgressIndicator(minHeight: 2),
-        if ((_message ?? '').isNotEmpty) ...[
-          if (_loading) const SizedBox(height: AppSpacing.sm),
-          _RouteNotice(message: _message!),
-          const SizedBox(height: AppSpacing.md),
-        ],
-        if (route == null)
-          const AppCard(
-            child: EmptyState(
-              icon: Icons.route_outlined,
-              title: 'Chưa có tuyến cố định',
-              message: 'Công Ty chưa phân công tuyến cho tài khoản này.',
-            ),
-          )
-        else ...[
-          _RouteSummaryCard(
-            route: route,
-            onChangeRoute: _routes.length > 1 ? _showRoutePicker : null,
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          Row(
-            children: [
-              const Expanded(
-                child: Text(
-                  'Danh sách điểm bán',
-                  style: TextStyle(
-                    color: AppColors.textPrimary,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ),
-              Text(
-                '${customers.length} điểm',
-                style: const TextStyle(
-                  color: AppColors.textSecondary,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          TextField(
-            key: const Key('fixed-route-search'),
-            onChanged: (value) => setState(() => _query = value),
-            decoration: const InputDecoration(
-              hintText: 'Tìm điểm bán trong tuyến...',
-              prefixIcon: Icon(Icons.search_rounded),
-            ),
-          ),
-          const SizedBox(height: AppSpacing.md),
-          if (_loading && customers.isEmpty)
-            const SizedBox.shrink()
-          else if (customers.isEmpty)
-            const AppCard(
-              child: EmptyState(
-                icon: Icons.storefront_outlined,
-                title: 'Tuyến chưa có điểm bán',
-                message: 'Danh sách điểm bán cố định hiện đang trống.',
-              ),
-            )
-          else if (visibleCustomers.isEmpty)
-            const AppCard(
-              child: EmptyState(
-                icon: Icons.search_off_rounded,
-                title: 'Không tìm thấy điểm bán',
-                message: 'Thử đổi từ khóa tìm kiếm.',
-              ),
-            )
-          else
-            ...visibleCustomers.map(
-              (customer) => Padding(
-                padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                child: _FixedCustomerCard(customer: customer),
-              ),
-            ),
-        ],
-      ],
-    );
+    final visibleCustomers = customers.where((customer) {
+      if (normalized.isEmpty) return true;
+      return customer.accountName.toLowerCase().contains(normalized) ||
+          customer.area.toLowerCase().contains(normalized) ||
+          customer.phone.toLowerCase().contains(normalized) ||
+          customer.address.toLowerCase().contains(normalized) ||
+          customer.accountId.toLowerCase().contains(normalized);
+    }).toList(growable: false);
 
     return Scaffold(
       key: const Key('fixed-routes-screen'),
@@ -270,17 +376,135 @@ class _FixedRoutesPageState extends State<FixedRoutesPage> {
         children: [
           NavyPageHeader(
             title: 'Tuyến cố định',
-            subtitle: 'Tuyến và điểm bán được Công Ty phân công',
+            subtitle: widget.canManageRoutes || widget.canManageCustomers
+                ? 'Quản lý tuyến và điểm bán theo quyền được cấp'
+                : 'Tuyến và điểm bán được Công Ty phân công',
             leading: IconButton(
               tooltip: 'Quay lại',
               onPressed: () => Navigator.of(context).maybePop(),
               icon: const Icon(Icons.arrow_back_rounded),
             ),
+            trailing: widget.canManageRoutes
+                ? IconButton(
+                    key: const Key('fixed-route-create'),
+                    tooltip: 'Thêm tuyến',
+                    onPressed: _busy ? null : _createRoute,
+                    icon: const Icon(Icons.add_rounded),
+                  )
+                : null,
           ),
           Expanded(
             child: RefreshIndicator(
               onRefresh: _refresh,
-              child: body,
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.md,
+                  AppSpacing.md,
+                  AppSpacing.md,
+                  AppSpacing.xl,
+                ),
+                children: [
+                  if (_loading || _busy)
+                    const LinearProgressIndicator(minHeight: 2),
+                  if ((_message ?? '').isNotEmpty) ...[
+                    const SizedBox(height: AppSpacing.sm),
+                    _Notice(message: _message!),
+                    const SizedBox(height: AppSpacing.md),
+                  ],
+                  if (route == null)
+                    AppCard(
+                      child: EmptyState(
+                        icon: Icons.route_outlined,
+                        title: 'Chưa có tuyến cố định',
+                        message: widget.canManageRoutes
+                            ? 'Bấm dấu + để tạo tuyến đầu tiên.'
+                            : 'Công Ty chưa phân công tuyến cho tài khoản này.',
+                      ),
+                    )
+                  else ...[
+                    _RouteSummaryCard(
+                      route: route,
+                      onChangeRoute:
+                          _routes.length > 1 ? _showRoutePicker : null,
+                      onEdit:
+                          widget.canManageRoutes ? () => _editRoute(route) : null,
+                      onArchive: widget.canManageRoutes
+                          ? () => _archiveRoute(route)
+                          : null,
+                    ),
+                    const SizedBox(height: AppSpacing.lg),
+                    Row(
+                      children: [
+                        const Expanded(
+                          child: Text(
+                            'Danh sách điểm bán',
+                            style: TextStyle(
+                              color: AppColors.textPrimary,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ),
+                        if (widget.canManageCustomers)
+                          TextButton.icon(
+                            key: const Key('fixed-route-add-customer'),
+                            onPressed: _busy ? null : () => _addCustomer(route),
+                            icon: const Icon(Icons.add_business_outlined),
+                            label: const Text('Thêm'),
+                          )
+                        else
+                          Text(
+                            '${customers.length} điểm',
+                            style: const TextStyle(
+                              color: AppColors.textSecondary,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    TextField(
+                      key: const Key('fixed-route-search'),
+                      onChanged: (value) => setState(() => _query = value),
+                      decoration: const InputDecoration(
+                        hintText: 'Tìm điểm bán trong tuyến...',
+                        prefixIcon: Icon(Icons.search_rounded),
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    if (!_loading && customers.isEmpty)
+                      const AppCard(
+                        child: EmptyState(
+                          icon: Icons.storefront_outlined,
+                          title: 'Tuyến chưa có điểm bán',
+                          message: 'Danh sách điểm bán cố định hiện đang trống.',
+                        ),
+                      )
+                    else if (visibleCustomers.isEmpty && customers.isNotEmpty)
+                      const AppCard(
+                        child: EmptyState(
+                          icon: Icons.search_off_rounded,
+                          title: 'Không tìm thấy điểm bán',
+                          message: 'Thử đổi từ khóa tìm kiếm.',
+                        ),
+                      )
+                    else
+                      ...visibleCustomers.map(
+                        (customer) => Padding(
+                          padding:
+                              const EdgeInsets.only(bottom: AppSpacing.sm),
+                          child: _CustomerCard(
+                            customer: customer,
+                            canManage: widget.canManageCustomers,
+                            onEdit: () => _editCustomer(customer),
+                            onArchive: () => _archiveCustomer(customer),
+                          ),
+                        ),
+                      ),
+                  ],
+                ],
+              ),
             ),
           ),
         ],
@@ -293,10 +517,14 @@ class _RouteSummaryCard extends StatelessWidget {
   const _RouteSummaryCard({
     required this.route,
     this.onChangeRoute,
+    this.onEdit,
+    this.onArchive,
   });
 
   final FieldRoute route;
   final VoidCallback? onChangeRoute;
+  final VoidCallback? onEdit;
+  final VoidCallback? onArchive;
 
   @override
   Widget build(BuildContext context) {
@@ -324,63 +552,52 @@ class _RouteSummaryCard extends StatelessWidget {
                       route.area,
                       style: const TextStyle(
                         color: AppColors.textSecondary,
-                        fontSize: 13,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
                   ],
                 ),
               ),
-              if (onChangeRoute != null)
-                TextButton.icon(
-                  key: const Key('fixed-route-change'),
-                  onPressed: onChangeRoute,
-                  icon: const Icon(Icons.swap_horiz_rounded, size: 18),
-                  label: const Text('Đổi tuyến'),
+              if (onEdit != null || onArchive != null)
+                PopupMenuButton<String>(
+                  key: const Key('fixed-route-actions'),
+                  onSelected: (value) {
+                    if (value == 'edit') onEdit?.call();
+                    if (value == 'archive') onArchive?.call();
+                  },
+                  itemBuilder: (context) => [
+                    if (onEdit != null)
+                      const PopupMenuItem(
+                        value: 'edit',
+                        child: Text('Chỉnh sửa tuyến'),
+                      ),
+                    if (onArchive != null)
+                      const PopupMenuItem(
+                        value: 'archive',
+                        child: Text('Ngừng sử dụng tuyến'),
+                      ),
+                  ],
                 ),
             ],
           ),
-          const SizedBox(height: AppSpacing.md),
-          Row(
-            children: [
-              Expanded(
-                child: _Metric(
-                  label: 'Điểm tuyến',
-                  value: route.plannedCustomers.toString(),
-                ),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              Expanded(
-                child: _Metric(
-                  label: 'Đã ghé',
-                  value: route.visitedCustomers.toString(),
-                ),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              Expanded(
-                child: _Metric(
-                  label: 'Đơn hàng',
-                  value: route.orderCount.toString(),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.md),
-          const Divider(height: 1),
-          const SizedBox(height: AppSpacing.sm),
+          if (onChangeRoute != null) ...[
+            const SizedBox(height: AppSpacing.sm),
+            TextButton.icon(
+              key: const Key('fixed-route-change'),
+              onPressed: onChangeRoute,
+              icon: const Icon(Icons.swap_horiz_rounded, size: 18),
+              label: const Text('Đổi tuyến'),
+            ),
+          ],
+          const Divider(height: 24),
+          _InfoRow(label: 'Điểm tuyến', value: route.plannedCustomers.toString()),
           _InfoRow(
-            label: 'Phụ trách',
-            value: route.salesOwner.isEmpty
-                ? 'Chưa phân công'
-                : route.salesOwner,
+            label: 'Ngày cố định',
+            value: _weekdayLabel(route.weekday),
           ),
           _InfoRow(
-            label: 'Lần ghé gần nhất',
-            value: _displayDate(route.lastVisitDate),
-          ),
-          _InfoRow(
-            label: 'Trạng thái',
-            value: _routeStatusLabel(route.status),
+            label: 'Ghi chú',
+            value: route.note.isEmpty ? 'Không có' : route.note,
           ),
         ],
       ),
@@ -388,43 +605,97 @@ class _RouteSummaryCard extends StatelessWidget {
   }
 }
 
-class _Metric extends StatelessWidget {
-  const _Metric({required this.label, required this.value});
+class _CustomerCard extends StatelessWidget {
+  const _CustomerCard({
+    required this.customer,
+    required this.canManage,
+    required this.onEdit,
+    required this.onArchive,
+  });
 
-  final String label;
-  final String value;
+  final FieldRouteCustomer customer;
+  final bool canManage;
+  final VoidCallback onEdit;
+  final VoidCallback onArchive;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.sm,
-        vertical: AppSpacing.md,
-      ),
-      decoration: BoxDecoration(
-        color: AppColors.primarySoft,
-        borderRadius: BorderRadius.circular(AppRadius.md),
-      ),
-      child: Column(
+    return AppCard(
+      key: Key('fixed-route-customer-${customer.id}'),
+      child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            value,
-            style: const TextStyle(
-              color: AppColors.primaryDark,
-              fontSize: 20,
-              fontWeight: FontWeight.w900,
+          CircleAvatar(
+            backgroundColor: AppColors.primarySoft,
+            foregroundColor: AppColors.primaryDark,
+            child: Text(customer.sortOrder > 0
+                ? customer.sortOrder.toString()
+                : '•'),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  customer.accountName,
+                  style: const TextStyle(
+                    color: AppColors.textPrimary,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  [
+                    customer.area,
+                    if (customer.phone.isNotEmpty) customer.phone,
+                    if (customer.address.isNotEmpty) customer.address,
+                  ].join(' · '),
+                  style: const TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 2),
-          Text(
-            label,
-            style: const TextStyle(
-              color: AppColors.textSecondary,
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
+          if (canManage)
+            PopupMenuButton<String>(
+              key: Key('fixed-route-customer-actions-${customer.id}'),
+              onSelected: (value) {
+                if (value == 'edit') onEdit();
+                if (value == 'archive') onArchive();
+              },
+              itemBuilder: (context) => const [
+                PopupMenuItem(
+                  value: 'edit',
+                  child: Text('Chỉnh sửa điểm bán'),
+                ),
+                PopupMenuItem(
+                  value: 'archive',
+                  child: Text('Loại khỏi tuyến'),
+                ),
+              ],
             ),
-          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Notice extends StatelessWidget {
+  const _Notice({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      child: Row(
+        children: [
+          const Icon(Icons.info_outline_rounded, color: AppColors.primary),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(child: Text(message)),
         ],
       ),
     );
@@ -444,13 +715,12 @@ class _InfoRow extends StatelessWidget {
       child: Row(
         children: [
           SizedBox(
-            width: 120,
+            width: 115,
             child: Text(
               label,
               style: const TextStyle(
                 color: AppColors.textSecondary,
                 fontSize: 12,
-                fontWeight: FontWeight.w600,
               ),
             ),
           ),
@@ -471,164 +741,215 @@ class _InfoRow extends StatelessWidget {
   }
 }
 
-class _FixedCustomerCard extends StatelessWidget {
-  const _FixedCustomerCard({required this.customer});
+class _RouteFormInput {
+  const _RouteFormInput({
+    required this.name,
+    required this.area,
+    required this.weekday,
+    required this.note,
+  });
 
-  final FieldRouteCustomer customer;
+  final String name;
+  final String area;
+  final int? weekday;
+  final String note;
+}
 
-  @override
-  Widget build(BuildContext context) {
-    final gps = customer.gps;
-    return AppCard(
-      key: Key('fixed-route-customer-${customer.id}'),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 38,
-            height: 38,
-            decoration: const BoxDecoration(
-              color: AppColors.primarySoft,
-              shape: BoxShape.circle,
-            ),
-            alignment: Alignment.center,
-            child: Text(
-              customer.sortOrder > 0 ? customer.sortOrder.toString() : '•',
-              style: const TextStyle(
-                color: AppColors.primaryDark,
-                fontWeight: FontWeight.w900,
+Future<_RouteFormInput?> _showRouteForm(
+  BuildContext context, {
+  FieldRoute? route,
+}) {
+  final name = TextEditingController(text: route?.name ?? '');
+  final area = TextEditingController(text: route?.area ?? '');
+  final note = TextEditingController(text: route?.note ?? '');
+  int? weekday = route?.weekday;
+  return showDialog<_RouteFormInput>(
+    context: context,
+    builder: (context) => StatefulBuilder(
+      builder: (context, setState) => AlertDialog(
+        title: Text(route == null ? 'Thêm tuyến cố định' : 'Chỉnh sửa tuyến'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                key: const Key('route-form-name'),
+                controller: name,
+                decoration: const InputDecoration(labelText: 'Tên tuyến *'),
               ),
-            ),
-          ),
-          const SizedBox(width: AppSpacing.sm),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  customer.accountName,
-                  style: const TextStyle(
-                    color: AppColors.textPrimary,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  customer.area,
-                  style: const TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 12,
-                  ),
-                ),
-                if (customer.contactName.trim().isNotEmpty) ...[
-                  const SizedBox(height: 6),
-                  Text(
-                    'Liên hệ: ${customer.contactName}',
-                    style: const TextStyle(
-                      color: AppColors.textSecondary,
-                      fontSize: 12,
-                    ),
-                  ),
+              const SizedBox(height: AppSpacing.sm),
+              TextField(
+                controller: area,
+                decoration: const InputDecoration(labelText: 'Khu vực'),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              DropdownButtonFormField<int?>(
+                initialValue: weekday,
+                decoration: const InputDecoration(labelText: 'Ngày cố định'),
+                items: const [
+                  DropdownMenuItem(value: null, child: Text('Không cố định')),
+                  DropdownMenuItem(value: 1, child: Text('Thứ Hai')),
+                  DropdownMenuItem(value: 2, child: Text('Thứ Ba')),
+                  DropdownMenuItem(value: 3, child: Text('Thứ Tư')),
+                  DropdownMenuItem(value: 4, child: Text('Thứ Năm')),
+                  DropdownMenuItem(value: 5, child: Text('Thứ Sáu')),
+                  DropdownMenuItem(value: 6, child: Text('Thứ Bảy')),
+                  DropdownMenuItem(value: 0, child: Text('Chủ Nhật')),
                 ],
-                const SizedBox(height: 6),
-                Text(
-                  gps == null
-                      ? 'Vị trí: Chưa định vị'
-                      : 'Vị trí: ${gps.lat.toStringAsFixed(5)}, ${gps.lng.toStringAsFixed(5)}',
-                  style: const TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 12,
-                  ),
-                ),
-                if ((gps?.updatedAt ?? '').trim().isNotEmpty)
-                  Text(
-                    'Cập nhật vị trí: ${_displayDate(gps!.updatedAt!)}',
-                    style: const TextStyle(
-                      color: AppColors.textSecondary,
-                      fontSize: 11,
-                    ),
-                  ),
-                if (customer.note.trim().isNotEmpty) ...[
-                  const SizedBox(height: 6),
-                  Text(
-                    'Ghi chú: ${customer.note}',
-                    style: const TextStyle(
-                      color: AppColors.textSecondary,
-                      fontSize: 12,
-                    ),
-                  ),
-                ],
-              ],
-            ),
+                onChanged: (value) => setState(() => weekday = value),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              TextField(
+                controller: note,
+                maxLines: 3,
+                decoration: const InputDecoration(labelText: 'Ghi chú'),
+              ),
+            ],
           ),
-          const SizedBox(width: AppSpacing.sm),
-          Text(
-            _customerStatusLabel(customer.status),
-            style: TextStyle(
-              color: customer.status == 'needs_gps'
-                  ? AppColors.warning
-                  : AppColors.success,
-              fontSize: 11,
-              fontWeight: FontWeight.w800,
-            ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Hủy'),
+          ),
+          FilledButton(
+            onPressed: () {
+              if (name.text.trim().isEmpty) return;
+              Navigator.of(context).pop(
+                _RouteFormInput(
+                  name: name.text.trim(),
+                  area: area.text.trim(),
+                  weekday: weekday,
+                  note: note.text.trim(),
+                ),
+              );
+            },
+            child: const Text('Lưu'),
           ),
         ],
       ),
-    );
-  }
+    ),
+  );
 }
 
-class _RouteNotice extends StatelessWidget {
-  const _RouteNotice({required this.message});
+class _CustomerFormInput {
+  const _CustomerFormInput({
+    required this.name,
+    required this.phone,
+    required this.area,
+    required this.address,
+    required this.sortOrder,
+    required this.note,
+  });
 
-  final String message;
+  final String name;
+  final String phone;
+  final String area;
+  final String address;
+  final int sortOrder;
+  final String note;
+}
 
-  @override
-  Widget build(BuildContext context) {
-    return AppCard(
-      child: Row(
-        children: [
-          const Icon(Icons.info_outline_rounded, color: AppColors.warning),
-          const SizedBox(width: AppSpacing.sm),
-          Expanded(
-            child: Text(
-              message,
-              style: const TextStyle(
-                color: AppColors.textPrimary,
-                fontSize: 12,
-              ),
+Future<_CustomerFormInput?> _showCustomerForm(
+  BuildContext context, {
+  FieldRouteCustomer? customer,
+}) {
+  final name = TextEditingController(text: customer?.accountName ?? '');
+  final phone = TextEditingController(text: customer?.phone ?? '');
+  final area = TextEditingController(text: customer?.area ?? '');
+  final address = TextEditingController(text: customer?.address ?? '');
+  final sortOrder = TextEditingController(
+    text: customer == null || customer.sortOrder <= 0
+        ? ''
+        : customer.sortOrder.toString(),
+  );
+  final note = TextEditingController(text: customer?.note ?? '');
+  return showDialog<_CustomerFormInput>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Text(customer == null ? 'Thêm điểm bán' : 'Chỉnh sửa điểm bán'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              key: const Key('route-customer-form-name'),
+              controller: name,
+              decoration: const InputDecoration(labelText: 'Tên điểm bán *'),
             ),
-          ),
-        ],
+            const SizedBox(height: AppSpacing.sm),
+            TextField(
+              controller: phone,
+              keyboardType: TextInputType.phone,
+              decoration: const InputDecoration(labelText: 'Điện thoại'),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            TextField(
+              controller: area,
+              decoration: const InputDecoration(labelText: 'Khu vực'),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            TextField(
+              controller: address,
+              decoration: const InputDecoration(labelText: 'Địa chỉ'),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            TextField(
+              controller: sortOrder,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(labelText: 'Thứ tự ghé'),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            TextField(
+              controller: note,
+              maxLines: 3,
+              decoration: const InputDecoration(labelText: 'Ghi chú'),
+            ),
+          ],
+        ),
       ),
-    );
-  }
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Hủy'),
+        ),
+        FilledButton(
+          onPressed: () {
+            if (name.text.trim().isEmpty) return;
+            final parsed = int.tryParse(sortOrder.text.trim()) ?? 0;
+            if (parsed < 0) return;
+            Navigator.of(context).pop(
+              _CustomerFormInput(
+                name: name.text.trim(),
+                phone: phone.text.trim(),
+                area: area.text.trim(),
+                address: address.text.trim(),
+                sortOrder: parsed,
+                note: note.text.trim(),
+              ),
+            );
+          },
+          child: const Text('Lưu'),
+        ),
+      ],
+    ),
+  );
 }
 
-String _routeStatusLabel(String status) {
-  return switch (status.trim().toLowerCase()) {
-    'active' => 'Đang chạy',
-    'watch' => 'Theo dõi',
-    'paused' => 'Tạm dừng',
-    _ => 'Đang chạy',
+bool _isActiveStatus(String value) {
+  return const {'active', 'opened', 'open', 'in_progress'}
+      .contains(value.trim().toLowerCase());
+}
+
+String _weekdayLabel(int? weekday) {
+  return switch (weekday) {
+    0 => 'Chủ Nhật',
+    1 => 'Thứ Hai',
+    2 => 'Thứ Ba',
+    3 => 'Thứ Tư',
+    4 => 'Thứ Năm',
+    5 => 'Thứ Sáu',
+    6 => 'Thứ Bảy',
+    _ => 'Không cố định',
   };
-}
-
-String _customerStatusLabel(String status) {
-  return switch (status.trim().toLowerCase()) {
-    'needs_gps' => 'Cần định vị',
-    'hidden' => 'Đang ẩn',
-    _ => 'Đang trong tuyến',
-  };
-}
-
-String _displayDate(String value) {
-  final normalized = value.trim();
-  if (normalized.isEmpty || normalized == '-') return 'Chưa có';
-  final parsed = DateTime.tryParse(normalized);
-  if (parsed == null) return normalized;
-  final day = parsed.day.toString().padLeft(2, '0');
-  final month = parsed.month.toString().padLeft(2, '0');
-  return '$day/$month/${parsed.year}';
 }

@@ -28,6 +28,8 @@ class FieldRoute {
     required this.orderCount,
     required this.status,
     this.lastVisitDate = '',
+    this.weekday,
+    this.note = '',
   });
 
   final String id;
@@ -39,6 +41,8 @@ class FieldRoute {
   final int orderCount;
   final String status;
   final String lastVisitDate;
+  final int? weekday;
+  final String note;
 
   factory FieldRoute.fromJson(Map<String, dynamic> json) {
     return FieldRoute(
@@ -51,6 +55,8 @@ class FieldRoute {
       orderCount: _integer(json['orderCount']),
       status: _text(json['status'], fallback: 'active'),
       lastVisitDate: _text(json['lastVisitDate']),
+      weekday: _optionalInt(json['weekday']),
+      note: _text(json['note']),
     );
   }
 }
@@ -90,6 +96,8 @@ class FieldRouteCustomer {
     required this.sortOrder,
     required this.status,
     required this.note,
+    this.phone = '',
+    this.address = '',
     this.gps,
   });
 
@@ -103,6 +111,8 @@ class FieldRouteCustomer {
   final int sortOrder;
   final String status;
   final String note;
+  final String phone;
+  final String address;
   final FieldGps? gps;
 
   factory FieldRouteCustomer.fromJson(Map<String, dynamic> json) {
@@ -118,6 +128,8 @@ class FieldRouteCustomer {
       sortOrder: _integer(json['sortOrder']),
       status: _text(json['status'], fallback: 'active'),
       note: _text(json['note']),
+      phone: _text(json['phone']),
+      address: _text(json['address']),
       gps: gpsJson.isEmpty ? null : FieldGps.fromJson(gpsJson),
     );
   }
@@ -138,6 +150,7 @@ class FieldOutlet {
     this.coreCustomerId,
     this.coreCustomerAddressId,
     this.coreCustomerCode,
+    this.sortOrder = 0,
     this.gps,
   });
 
@@ -154,6 +167,7 @@ class FieldOutlet {
   final String? coreCustomerId;
   final String? coreCustomerAddressId;
   final String? coreCustomerCode;
+  final int sortOrder;
   final FieldGps? gps;
 
   factory FieldOutlet.fromJson(Map<String, dynamic> json) {
@@ -182,6 +196,7 @@ class FieldOutlet {
       coreCustomerId: _nullableText(json['coreCustomerId']),
       coreCustomerAddressId: _nullableText(json['coreCustomerAddressId']),
       coreCustomerCode: _nullableText(json['coreCustomerCode']),
+      sortOrder: _integer(json['sortOrder']),
       gps: gps,
     );
   }
@@ -515,9 +530,11 @@ class HttpFieldDataClient implements FieldDataClient, FieldActionClient {
       }
       throw FieldDataFailure(
         code: code,
-        message: serverMessage.isNotEmpty
-            ? serverMessage
-            : 'Không xử lý được yêu cầu. Vui lòng thử lại.',
+        message: _fieldBusinessMessage(
+          code,
+          serverMessage: serverMessage,
+          statusCode: response.statusCode,
+        ),
         retryable: response.statusCode >= 500 || error['retryable'] == true,
       );
     }
@@ -808,6 +825,8 @@ List<FieldRoute> _routesFromShellSnapshot(
           orderCount: _integer(session['order_count']),
           status: 'active',
           lastVisitDate: _text(session['session_date']),
+          weekday: _optionalInt(row['weekday']),
+          note: _text(row['note']),
         );
       })
       .where((route) => route.id.isNotEmpty)
@@ -857,11 +876,39 @@ List<FieldRouteCustomer> _routeCustomersFromShellSnapshot(
           sortOrder: _integer(row['sort_order']),
           status: 'active',
           note: _text(row['note']),
+          phone: _text(row['phone']),
+          address: _text(row['address']),
           gps: gps,
         );
       })
       .where((customer) => customer.id.isNotEmpty)
       .toList(growable: false);
+}
+
+String _fieldBusinessMessage(
+  String code, {
+  required String serverMessage,
+  required int statusCode,
+}) {
+  switch (code) {
+    case 'route_active_session_exists':
+      return 'Đang có một phiên tuyến khác hoạt động. Hãy mở tuyến đó để tiếp tục hoặc kết thúc phiên trước.';
+    case 'route_active_session_ambiguous':
+      return 'Có nhiều phiên đang hoạt động. Cần xử lý trạng thái phiên trước khi bắt đầu tuyến.';
+    case 'session_closed':
+    case 'session_read_only':
+      return 'Phiên đã đóng và chỉ còn chế độ xem.';
+    case 'route_not_found':
+      return 'Tuyến không còn tồn tại hoặc đã ngừng sử dụng.';
+    case 'route_customer_not_found':
+      return 'Điểm bán không còn trong tuyến.';
+  }
+  if (statusCode == 409 && serverMessage.isEmpty) {
+    return 'Trạng thái dữ liệu đã thay đổi. Tải lại để tiếp tục.';
+  }
+  return serverMessage.isNotEmpty
+      ? serverMessage
+      : 'Không xử lý được yêu cầu. Vui lòng thử lại.';
 }
 
 Map<String, dynamic> _object(Object? value) {
@@ -894,6 +941,13 @@ int _integer(Object? value) {
   if (value is int) return value;
   if (value is num) return value.toInt();
   return int.tryParse(_text(value)) ?? 0;
+}
+
+int? _optionalInt(Object? value) {
+  if (value == null || _text(value).isEmpty) return null;
+  if (value is int) return value;
+  if (value is num) return value.toInt();
+  return int.tryParse(_text(value));
 }
 
 double _double(Object? value) {

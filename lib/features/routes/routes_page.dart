@@ -20,6 +20,8 @@ class RoutesPage extends StatefulWidget {
     this.onOpenOutlet,
     this.onStartRoute,
     this.onFinishRoute,
+    this.onCancelRoute,
+    this.onDeleteEmptySession,
     this.onAddCustomer,
   });
 
@@ -34,6 +36,8 @@ class RoutesPage extends StatefulWidget {
   final void Function(FieldDayLine line)? onOpenOutlet;
   final Future<void> Function()? onStartRoute;
   final Future<void> Function()? onFinishRoute;
+  final Future<void> Function()? onCancelRoute;
+  final Future<void> Function()? onDeleteEmptySession;
   final Future<void> Function()? onAddCustomer;
 
   @override
@@ -89,6 +93,16 @@ class _RoutesPageState extends State<RoutesPage> {
     final day = widget.workspace?.day;
     final activeSession = _isSessionActive(day);
     final lines = day?.lines ?? const <FieldDayLine>[];
+    final emptySession = day?.sessionOpened == true &&
+        lines.every(
+          (line) =>
+              !line.checkedIn &&
+              !line.hasOrder &&
+              !line.hasTest &&
+              !line.hasReport &&
+              line.followupCount == 0 &&
+              const {'pending', ''}.contains(line.status.trim().toLowerCase()),
+        );
     final query = _sessionQuery.trim().toLowerCase();
     final visibleLines = lines
         .where((line) {
@@ -324,9 +338,12 @@ class _RoutesPageState extends State<RoutesPage> {
                 ? _formatVietnameseDate(DateTime.now())
                 : '${_formatVietnameseDate(DateTime.now())} · ${route.area}',
             trailing: activeSession
-                ? _FinishButton(
+                ? _SessionActions(
                     busy: widget.routeActionBusy,
-                    onPressed: widget.onFinishRoute,
+                    canDeleteEmpty: emptySession,
+                    onFinish: widget.onFinishRoute,
+                    onCancel: widget.onCancelRoute,
+                    onDeleteEmpty: widget.onDeleteEmptySession,
                   )
                 : null,
           ),
@@ -390,27 +407,60 @@ class _SessionFilterBar extends StatelessWidget {
   }
 }
 
-class _FinishButton extends StatelessWidget {
-  const _FinishButton({
+class _SessionActions extends StatelessWidget {
+  const _SessionActions({
     required this.busy,
-    this.onPressed,
+    required this.canDeleteEmpty,
+    this.onFinish,
+    this.onCancel,
+    this.onDeleteEmpty,
   });
 
   final bool busy;
-  final Future<void> Function()? onPressed;
+  final bool canDeleteEmpty;
+  final Future<void> Function()? onFinish;
+  final Future<void> Function()? onCancel;
+  final Future<void> Function()? onDeleteEmpty;
 
   @override
   Widget build(BuildContext context) {
-    return FilledButton(
-      key: const Key('route-finish-button'),
-      onPressed: busy || onPressed == null ? null : () => onPressed!(),
-      style: FilledButton.styleFrom(
-        minimumSize: const Size(0, 38),
-        padding: const EdgeInsets.symmetric(horizontal: 14),
-        backgroundColor: AppColors.danger,
-        disabledBackgroundColor: const Color(0x66FFFFFF),
-      ),
-      child: Text(busy ? 'Đang lưu' : 'Kết thúc'),
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        FilledButton(
+          key: const Key('route-finish-button'),
+          onPressed: busy || onFinish == null ? null : () => onFinish!(),
+          style: FilledButton.styleFrom(
+            minimumSize: const Size(0, 38),
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            backgroundColor: AppColors.danger,
+            disabledBackgroundColor: const Color(0x66FFFFFF),
+          ),
+          child: Text(busy ? 'Đang lưu' : 'Kết thúc'),
+        ),
+        if (onCancel != null || (canDeleteEmpty && onDeleteEmpty != null))
+          PopupMenuButton<String>(
+            key: const Key('route-session-actions'),
+            enabled: !busy,
+            iconColor: Colors.white,
+            onSelected: (value) {
+              if (value == 'cancel') onCancel?.call();
+              if (value == 'delete') onDeleteEmpty?.call();
+            },
+            itemBuilder: (context) => [
+              if (onCancel != null)
+                const PopupMenuItem(
+                  value: 'cancel',
+                  child: Text('Hủy phiên hôm nay'),
+                ),
+              if (canDeleteEmpty && onDeleteEmpty != null)
+                const PopupMenuItem(
+                  value: 'delete',
+                  child: Text('Xóa phiên rỗng'),
+                ),
+            ],
+          ),
+      ],
     );
   }
 }

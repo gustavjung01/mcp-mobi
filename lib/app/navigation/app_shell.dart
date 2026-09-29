@@ -10,6 +10,7 @@ import '../../core/data/field_history_client.dart';
 import '../../core/data/management_proposal_client.dart';
 import '../../core/data/local_catalog_order_data_client.dart';
 import '../../core/data/order_data_client.dart';
+import '../../core/data/route_management_client.dart';
 import '../../core/installation/installation_profile.dart';
 import '../../core/location/external_navigation.dart';
 import '../../core/location/field_location.dart';
@@ -24,13 +25,16 @@ import '../../core/sync/management_proposal_sync.dart';
 import '../../core/sync/mutation_queue.dart';
 import '../../core/sync/order_offline_store.dart';
 import '../../core/sync/route_mutation_sync.dart';
+import '../../core/sync/route_management_sync.dart';
 import '../../core/storage/legacy_secure_storage_migration.dart';
 import '../../core/storage/local_data_store.dart';
+import '../../features/customers/company_customer_detail_page.dart';
 import '../../features/customers/customer_onboarding_page.dart';
 import '../../features/more/more_page.dart';
 import '../../features/orders/create_order_page.dart';
 import '../../features/orders/orders_page.dart';
 import '../../features/outlets/outlet_detail_page.dart';
+import '../../features/outlets/outlet_edit_page.dart';
 import '../../features/product_trials/product_trial_page.dart';
 import '../../features/reports/field_activity_history_page.dart';
 import '../../features/reports/management_proposals_page.dart';
@@ -55,6 +59,7 @@ class AppShell extends StatefulWidget {
     this.fieldHistoryClient,
     this.customerBoundaryClient,
     this.managementProposalClient,
+    this.routeManagementClient,
     this.orderDataClient,
     this.fieldLocationProvider,
     this.externalNavigation,
@@ -74,6 +79,7 @@ class AppShell extends StatefulWidget {
   final FieldHistoryClient? fieldHistoryClient;
   final CustomerBoundaryClient? customerBoundaryClient;
   final ManagementProposalClient? managementProposalClient;
+  final RouteManagementClient? routeManagementClient;
   final OrderDataClient? orderDataClient;
   final FieldLocationProvider? fieldLocationProvider;
   final ExternalNavigation? externalNavigation;
@@ -96,6 +102,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   FieldHistoryClient? _fieldHistoryClient;
   CustomerBoundaryClient? _customerBoundaryClient;
   ManagementProposalClient? _managementProposalClient;
+  RouteManagementClient? _routeManagementClient;
   LocalDataStore? _localDataStore;
   LocalDataScope? _localDataScope;
   LegacySecureStorageMigrator? _legacyMigrator;
@@ -119,6 +126,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   bool _loadingWorkspace = false;
   bool _routeActionBusy = false;
   bool _routeMutationSyncing = false;
+  bool _routeManagementSyncing = false;
   bool _fieldActivitySyncing = false;
   bool _fieldCheckSyncing = false;
   bool _customerBoundarySyncing = false;
@@ -173,6 +181,8 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
         widget.customerBoundaryClient ?? _defaultCustomerBoundaryClient();
     _managementProposalClient =
         widget.managementProposalClient ?? _defaultManagementProposalClient();
+    _routeManagementClient =
+        widget.routeManagementClient ?? _defaultRouteManagementClient();
     _mutationQueueStore =
         widget.mutationQueueStore ?? _defaultMutationQueueStore();
     _routeSelectionStore =
@@ -304,6 +314,34 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       token: session.token,
     );
   }
+
+  RouteManagementClient? _defaultRouteManagementClient() {
+    final profile = widget.profile;
+    final session = widget.session;
+    if (profile == null || session == null) return null;
+    final permissions = session.permissions;
+    if (!permissions.contains('mcp.route.write') &&
+        !permissions.contains('mcp.route-customer.write') &&
+        !permissions.contains('mcp.session.write')) {
+      return null;
+    }
+    return HttpRouteManagementClient(
+      profile: profile,
+      token: session.token,
+    );
+  }
+
+  bool get _canManageRoutes =>
+      widget.session?.permissions.contains('mcp.route.write') == true;
+
+  bool get _canManageRouteCustomers =>
+      widget.session?.permissions.contains('mcp.route-customer.write') == true;
+
+  bool get _canManageSessions =>
+      widget.session?.permissions.contains('mcp.session.write') == true;
+
+  bool get _canManageSessionCustomers =>
+      widget.session?.permissions.contains('mcp.session-customer.write') == true;
 
   bool get _canUpdateOutletLocation =>
       widget.session?.permissions.contains('mcp.route-customer.write') == true;
@@ -664,6 +702,229 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     );
   }
 
+  RouteManagementSubmissionService? get _routeManagementSubmissionService {
+    final client = _routeManagementClient;
+    final queue = _mutationQueueStore;
+    if (client == null || queue == null) return null;
+    return RouteManagementSubmissionService(
+      client: client,
+      queue: queue,
+    );
+  }
+
+  Future<void> _cancelRouteSession() async {
+    final route = _selectedRoute;
+    final day = _workspace?.day;
+    final service = _routeManagementSubmissionService;
+    if (!_canManageSessions ||
+        route == null ||
+        day?.sessionOpened != true ||
+        service == null ||
+        _routeActionBusy) {
+      return;
+    }
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Hủy phiên hôm nay?'),
+        content: const Text(
+          'Phiên sẽ chuyển sang đã hủy. Các dữ liệu đã ghi nhận vẫn được giữ.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Không'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Hủy phiên'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() {
+      _routeActionBusy = true;
+      _fieldMessage = null;
+    });
+    try {
+      final result = await service.cancelSession(
+        sessionId: day!.run.id,
+        routeName: route.name,
+      );
+      if (result == RouteManagementSubmitStatus.completed) {
+        await _loadWorkspace(route);
+      } else if (mounted) {
+        setState(() {
+          _fieldMessage = 'Đã lưu hủy phiên chờ gửi.';
+        });
+      }
+    } on FieldDataFailure catch (failure) {
+      if (!mounted) return;
+      setState(() => _fieldMessage = failure.message);
+    } finally {
+      if (mounted) setState(() => _routeActionBusy = false);
+    }
+  }
+
+  Future<void> _deleteEmptyRouteSession() async {
+    final route = _selectedRoute;
+    final day = _workspace?.day;
+    final service = _routeManagementSubmissionService;
+    if (!_canManageSessions ||
+        route == null ||
+        day?.sessionOpened != true ||
+        service == null ||
+        _routeActionBusy) {
+      return;
+    }
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Xóa phiên rỗng?'),
+        content: const Text(
+          'Chỉ phiên chưa có tác nghiệp mới xóa được. Tuyến cố định không bị ảnh hưởng.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Không'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Xóa phiên'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() {
+      _routeActionBusy = true;
+      _fieldMessage = null;
+    });
+    try {
+      final result = await service.deleteEmptySession(
+        sessionId: day!.run.id,
+        routeName: route.name,
+      );
+      if (result == RouteManagementSubmitStatus.completed) {
+        await _loadWorkspace(route);
+      } else if (mounted) {
+        setState(() {
+          _fieldMessage = 'Đã lưu xóa phiên rỗng chờ gửi.';
+        });
+      }
+    } on FieldDataFailure catch (failure) {
+      if (!mounted) return;
+      setState(() => _fieldMessage = failure.message);
+    } finally {
+      if (mounted) setState(() => _routeActionBusy = false);
+    }
+  }
+
+  Future<bool> _editOutletProfile({
+    required String routeCustomerId,
+    required String name,
+    required String phone,
+    required String area,
+    required String address,
+    required int sortOrder,
+    required String note,
+  }) async {
+    final service = _routeManagementSubmissionService;
+    if (!_canManageRouteCustomers || service == null) {
+      throw const FieldDataFailure(
+        code: 'ROUTE_CUSTOMER_UPDATE_FORBIDDEN',
+        message: 'Tài khoản chưa được cấp quyền sửa điểm bán.',
+      );
+    }
+    final input = await Navigator.of(context).push<OutletEditInput>(
+      MaterialPageRoute<OutletEditInput>(
+        builder: (context) => OutletEditPage(
+          name: name,
+          phone: phone,
+          area: area,
+          address: address,
+          sortOrder: sortOrder,
+          note: note,
+        ),
+      ),
+    );
+    if (input == null || !mounted) return false;
+
+    final result = await service.updateRouteCustomer(
+      routeCustomerId: routeCustomerId,
+      customerName: input.name,
+      phone: input.phone,
+      area: input.area,
+      address: input.address,
+      sortOrder: input.sortOrder,
+      note: input.note,
+    );
+    if (result == RouteManagementSubmitStatus.completed) {
+      await Future.wait([
+        if (_fieldDataClient != null) _loadOutlets(),
+        if (_selectedRoute != null) _loadWorkspace(_selectedRoute!),
+      ]);
+    } else if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Đã lưu thay đổi điểm bán chờ gửi.')),
+      );
+    }
+    return true;
+  }
+
+  Future<bool> _archiveOutletProfile({
+    required String routeCustomerId,
+    required String customerName,
+  }) async {
+    final service = _routeManagementSubmissionService;
+    if (!_canManageRouteCustomers || service == null) {
+      throw const FieldDataFailure(
+        code: 'ROUTE_CUSTOMER_ARCHIVE_FORBIDDEN',
+        message: 'Tài khoản chưa được cấp quyền loại điểm bán khỏi tuyến.',
+      );
+    }
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Loại khỏi tuyến cố định?'),
+        content: Text(
+          '“$customerName” sẽ không còn trong tuyến cố định. Lịch sử cũ vẫn được giữ.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Không'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Loại khỏi tuyến'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return false;
+
+    final result = await service.archiveRouteCustomer(
+      routeCustomerId: routeCustomerId,
+      customerName: customerName,
+    );
+    if (result == RouteManagementSubmitStatus.completed) {
+      await Future.wait([
+        if (_fieldDataClient != null) _loadOutlets(),
+        if (_selectedRoute != null) _loadWorkspace(_selectedRoute!),
+      ]);
+    } else if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Đã lưu yêu cầu loại điểm bán chờ gửi.')),
+      );
+    }
+    return true;
+  }
+
   Future<bool> _setCheckIn(
     FieldDayLine line,
     bool checkedIn,
@@ -792,6 +1053,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   void _syncPendingWork() {
     if (!_localPersistenceReady) return;
     _syncRouteMutations();
+    _syncRouteManagement();
     _syncFieldActivities();
     _syncFieldChecks();
     _syncCustomerBoundary();
@@ -822,6 +1084,32 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       }
     } finally {
       _routeMutationSyncing = false;
+    }
+  }
+
+  Future<void> _syncRouteManagement() async {
+    final client = _routeManagementClient;
+    final queue = _mutationQueueStore;
+    if (client == null || queue == null || _routeManagementSyncing) return;
+
+    _routeManagementSyncing = true;
+    try {
+      final sent = await RouteManagementSyncService(
+        client: client,
+        queue: queue,
+      ).syncPending();
+      if (sent > 0 && mounted) {
+        await Future.wait([
+          if (_fieldDataClient != null) _loadRoutes(),
+          if (_fieldDataClient != null) _loadOutlets(),
+        ]);
+        final route = _selectedRoute;
+        if (route != null) await _loadWorkspace(route);
+      }
+    } catch (_) {
+      // Đồng bộ nền không chặn người dùng tiếp tục làm việc.
+    } finally {
+      _routeManagementSyncing = false;
     }
   }
 
@@ -1210,12 +1498,33 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
           onUpdateLocation: _canUpdateOutletLocation
               ? _updateOutletLocation
               : null,
-          onSetCheckIn: _routeMutationSubmissionService == null
-              ? null
-              : _setCheckIn,
-          onSkip: _routeMutationSubmissionService == null
-              ? null
-              : _skipRouteOutlet,
+          onEditOutlet: _canManageRouteCustomers
+              ? () => _editOutletProfile(
+                    routeCustomerId:
+                        (line.routeCustomerId ?? customer?.id ?? '').trim(),
+                    name: line.accountName,
+                    phone: line.phone ?? customer?.phone ?? '',
+                    area: line.area,
+                    address: line.address ?? customer?.address ?? '',
+                    sortOrder: customer?.sortOrder ?? line.sortOrder,
+                    note: line.note.isNotEmpty ? line.note : customer?.note ?? '',
+                  )
+              : null,
+          onArchiveOutlet: _canManageRouteCustomers
+              ? () => _archiveOutletProfile(
+                    routeCustomerId:
+                        (line.routeCustomerId ?? customer?.id ?? '').trim(),
+                    customerName: line.accountName,
+                  )
+              : null,
+          onSetCheckIn:
+              _canManageSessionCustomers && _routeMutationSubmissionService != null
+              ? _setCheckIn
+              : null,
+          onSkip:
+              _canManageSessionCustomers && _routeMutationSubmissionService != null
+              ? _skipRouteOutlet
+              : null,
           onCreateOrder: _orderDataClient == null
               ? null
               : () => _openCreateOrder(line),
@@ -1288,6 +1597,23 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
           onUpdateLocation: _canUpdateOutletLocation
               ? _updateOutletLocation
               : null,
+          onEditOutlet: _canManageRouteCustomers
+              ? () => _editOutletProfile(
+                    routeCustomerId: outlet.id,
+                    name: outlet.name,
+                    phone: outlet.phone,
+                    area: outlet.area,
+                    address: outlet.address,
+                    sortOrder: outlet.sortOrder,
+                    note: outlet.note,
+                  )
+              : null,
+          onArchiveOutlet: _canManageRouteCustomers
+              ? () => _archiveOutletProfile(
+                    routeCustomerId: outlet.id,
+                    customerName: outlet.name,
+                  )
+              : null,
           onCreateOrder: _orderDataClient == null
               ? null
               : () => _openOrderForOutlet(outlet),
@@ -1296,6 +1622,19 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
               : () => _openCustomerOnboarding(
                   routeCustomerId: outlet.id,
                 ),
+        ),
+      ),
+    );
+  }
+
+  void _openCompanyCustomer(CompanyCustomer customer) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (context) => CompanyCustomerDetailPage(
+          customer: customer,
+          onCreateOrder: _orderDataClient == null
+              ? null
+              : () => _openOrderForCompanyCustomer(customer),
         ),
       ),
     );
@@ -1495,9 +1834,17 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
           routes: _routes,
           initialRoute: _selectedRoute,
           dataClient: _fieldDataClient,
+          managementService: _routeManagementSubmissionService,
+          canManageRoutes: _canManageRoutes,
+          canManageCustomers: _canManageRouteCustomers,
         ),
       ),
     );
+    if (!mounted || _fieldDataClient == null) return;
+    await Future.wait([
+      _loadRoutes(),
+      _loadOutlets(),
+    ]);
   }
 
   FieldRouteCustomer? _customerForLine(FieldDayLine line) {
@@ -1535,15 +1882,26 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
         onSelectRoute: _selectRoute,
         onRefresh: _fieldDataClient == null ? null : _refreshFieldData,
         onOpenOutlet: (line) => _openRouteOutlet(_customerForLine(line), line),
-        onStartRoute: _routeMutationSubmissionService == null
-            ? null
-            : _startRoute,
-        onFinishRoute: _routeMutationSubmissionService == null
-            ? null
-            : _finishRoute,
-        onAddCustomer: _routeMutationSubmissionService == null
-            ? null
-            : _openAddRouteCustomer,
+        onStartRoute:
+            _canManageSessions && _routeMutationSubmissionService != null
+            ? _startRoute
+            : null,
+        onFinishRoute:
+            _canManageSessions && _routeMutationSubmissionService != null
+            ? _finishRoute
+            : null,
+        onCancelRoute: _canManageSessions &&
+                _routeManagementSubmissionService != null
+            ? _cancelRouteSession
+            : null,
+        onDeleteEmptySession: _canManageSessions &&
+                _routeManagementSubmissionService != null
+            ? _deleteEmptyRouteSession
+            : null,
+        onAddCustomer:
+            _canManageSessionCustomers && _routeMutationSubmissionService != null
+            ? _openAddRouteCustomer
+            : null,
       ),
       OutletsPage(
         outlets: _outlets,
@@ -1556,6 +1914,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
             ? null
             : _refreshOutlets,
         onOpenOutlet: _openDirectoryOutlet,
+        onOpenCompanyCustomer: _openCompanyCustomer,
       ),
       OrdersPage(
         orderClient: _orderDataClient,
