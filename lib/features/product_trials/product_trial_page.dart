@@ -15,10 +15,12 @@ class ProductTrialPage extends StatefulWidget {
     required this.line,
     required this.submissionService,
     super.key,
+    this.activityClient,
   });
 
   final FieldDayLine line;
   final FieldActivitySubmissionService submissionService;
+  final FieldActivityClient? activityClient;
 
   @override
   State<ProductTrialPage> createState() => _ProductTrialPageState();
@@ -37,7 +39,7 @@ class _ProductTrialPageState extends State<ProductTrialPage> {
   static const _quickNotes = <String>[
     'Khách muốn thử',
     'Gửi mẫu',
-    'Test vị mới',
+    'Thử vị mới',
     'Đạt',
     'Chưa đạt',
     'Báo giá sau khi thử',
@@ -46,11 +48,83 @@ class _ProductTrialPageState extends State<ProductTrialPage> {
   final _product = TextEditingController();
   final _note = TextEditingController();
   final Set<String> _selectedQuickNotes = {};
+  List<FieldTestFile> _testFiles = const [];
+  String? _selectedFileId;
+  String? _selectedProductId;
   String _status = 'tested';
+  bool _loadingOptions = true;
   bool _saving = false;
   String? _message;
   String? _submissionFingerprint;
   String? _submissionKey;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadOptions();
+  }
+
+  Future<void> _loadOptions() async {
+    final source = widget.activityClient;
+    if (source is! FieldActivityReferenceClient) {
+      if (mounted) setState(() => _loadingOptions = false);
+      return;
+    }
+    final referenceClient = source as FieldActivityReferenceClient;
+    try {
+      final files = await referenceClient.loadTestFiles();
+      if (!mounted) return;
+      setState(() {
+        _testFiles = files;
+      });
+    } on FieldActivityFailure catch (failure) {
+      if (!mounted) return;
+      setState(() {
+        _message =
+            '${failure.message} Vẫn có thể nhập sản phẩm thử thủ công.';
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _loadingOptions = false);
+      }
+    }
+  }
+
+  FieldTestFile? get _selectedFile {
+    final wanted = (_selectedFileId ?? '').trim();
+    if (wanted.isEmpty) return null;
+    for (final file in _testFiles) {
+      if (file.id == wanted) return file;
+    }
+    return null;
+  }
+
+  FieldTestProduct? get _selectedProduct {
+    final wanted = (_selectedProductId ?? '').trim();
+    final file = _selectedFile;
+    if (wanted.isEmpty || file == null) return null;
+    for (final product in file.products) {
+      if (product.id == wanted) return product;
+    }
+    return null;
+  }
+
+  void _selectFile(String? fileId) {
+    setState(() {
+      _selectedFileId = (fileId ?? '').trim().isEmpty ? null : fileId;
+      _selectedProductId = null;
+      _product.clear();
+      _message = null;
+    });
+  }
+
+  void _selectProduct(FieldTestProduct product) {
+    setState(() {
+      _selectedProductId = product.id;
+      _product.text = product.productName;
+      _message = null;
+    });
+  }
 
   @override
   void dispose() {
@@ -72,11 +146,15 @@ class _ProductTrialPageState extends State<ProductTrialPage> {
       ..._selectedQuickNotes,
       if (_note.text.trim().isNotEmpty) _note.text.trim(),
     ].join(', ');
+    final file = _selectedFile;
+    final product = _selectedProduct;
     return {
       'sessionCustomerId': widget.line.sessionCustomerId,
-      'fileTitle': 'Kết quả thử sản phẩm trong phiên',
+      if (file != null) 'fileId': file.id,
+      'fileTitle': file?.title ?? 'Kết quả thử sản phẩm trong phiên',
       'results': [
         {
+          if (product != null) 'productId': product.id,
           'productName': _product.text.trim(),
           'status': _status,
           if (note.isNotEmpty) 'note': note,
@@ -96,7 +174,7 @@ class _ProductTrialPageState extends State<ProductTrialPage> {
     }
     if (_product.text.trim().isEmpty) {
       setState(() {
-        _message = 'Cần nhập sản phẩm được thử.';
+        _message = 'Cần chọn hoặc nhập sản phẩm được thử.';
       });
       return;
     }
@@ -182,13 +260,85 @@ class _ProductTrialPageState extends State<ProductTrialPage> {
                   ),
                 ),
                 const SizedBox(height: AppSpacing.md),
+                if (_loadingOptions)
+                  const LinearProgressIndicator(
+                    key: Key('product-trial-options-loading'),
+                    minHeight: 2,
+                  )
+                else if (_testFiles.isNotEmpty) ...[
+                  DropdownButtonFormField<String>(
+                    key: const Key('product-trial-file'),
+                    initialValue: _selectedFileId ?? '',
+                    isExpanded: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Phiếu thử sản phẩm',
+                      prefixIcon: Icon(Icons.description_outlined),
+                    ),
+                    items: [
+                      const DropdownMenuItem(
+                        value: '',
+                        child: Text('Không chọn phiếu'),
+                      ),
+                      ..._testFiles.map(
+                        (file) => DropdownMenuItem(
+                          value: file.id,
+                          child: Text(
+                            file.testDate.isEmpty
+                                ? file.title
+                                : '${file.title} · ${file.testDate}',
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ),
+                    ],
+                    onChanged: _saving ? null : _selectFile,
+                  ),
+                  if (_selectedFile != null &&
+                      _selectedFile!.products.isNotEmpty) ...[
+                    const SizedBox(height: AppSpacing.md),
+                    const Text(
+                      'Sản phẩm trong phiếu',
+                      style: TextStyle(
+                        color: AppColors.textPrimary,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
+                    Wrap(
+                      spacing: AppSpacing.xs,
+                      runSpacing: AppSpacing.xs,
+                      children: _selectedFile!.products
+                          .map(
+                            (product) => ChoiceChip(
+                              key: Key(
+                                'product-trial-product-${product.id}',
+                              ),
+                              selected:
+                                  _selectedProductId == product.id,
+                              label: Text(product.productName),
+                              onSelected: _saving
+                                  ? null
+                                  : (_) => _selectProduct(product),
+                            ),
+                          )
+                          .toList(growable: false),
+                    ),
+                  ],
+                ],
+                const SizedBox(height: AppSpacing.md),
                 TextField(
                   key: const Key('product-trial-name'),
                   controller: _product,
                   enabled: !_saving,
+                  onChanged: (_) {
+                    if (_selectedProductId != null) {
+                      setState(() => _selectedProductId = null);
+                    }
+                  },
                   decoration: const InputDecoration(
                     labelText: 'Sản phẩm được thử',
-                    hintText: 'Nhập tên sản phẩm',
+                    hintText: 'Chọn từ phiếu hoặc nhập tên sản phẩm',
                     prefixIcon: Icon(Icons.science_outlined),
                   ),
                 ),

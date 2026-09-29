@@ -101,6 +101,10 @@ jobs:
           test/field_history_client_test.dart
           test/outlet_photo_section_test.dart
           test/market_report_page_test.dart
+          test/product_trial_page_test.dart
+          test/field_activity_client_test.dart
+          test/report_settings_page_test.dart
+          test/report_settings_permission_test.dart
           test/management_proposal_test.dart
           test/field_check_sync_test.dart
           test/local_data_store_test.dart

@@ -64,10 +64,13 @@ class _MarketReportPageState extends State<MarketReportPage> {
   ];
 
   List<FieldReportSettingGroup> _groups = const [];
+  List<FieldReportTemplate> _templates = const [];
+  String? _selectedTemplateId;
   final Set<String> _selectedIds = {};
   final Set<String> _selectedQuickNotes = {};
   List<String> _mediaIds = const [];
   bool _loadingSettings = true;
+  bool _loadingTemplates = true;
   bool _saving = false;
   String? _message;
   String? _submissionFingerprint;
@@ -77,6 +80,7 @@ class _MarketReportPageState extends State<MarketReportPage> {
   void initState() {
     super.initState();
     _loadSettings();
+    _loadTemplates();
   }
 
   @override
@@ -118,6 +122,51 @@ class _MarketReportPageState extends State<MarketReportPage> {
         });
       }
     }
+  }
+
+  Future<void> _loadTemplates() async {
+    final source = widget.activityClient;
+    if (source is! FieldActivityReferenceClient) {
+      if (mounted) setState(() => _loadingTemplates = false);
+      return;
+    }
+    final referenceClient = source as FieldActivityReferenceClient;
+    try {
+      final templates = await referenceClient.loadReportTemplates();
+      if (!mounted) return;
+      setState(() {
+        _templates = templates;
+      });
+    } on FieldActivityFailure catch (failure) {
+      if (!mounted) return;
+      setState(() {
+        _message ??= '${failure.message} Vẫn có thể lập báo cáo thủ công.';
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _loadingTemplates = false);
+      }
+    }
+  }
+
+  void _applyTemplate(FieldReportTemplate template) {
+    setState(() {
+      _selectedTemplateId = template.id;
+      _price.text = template.priceSummary;
+      _competitor.text = template.competitorSummary;
+      _display.text = template.displaySummary;
+      _stock.text = template.stockSummary;
+      _demand.text = template.demandSummary;
+      _opportunity.text = template.opportunitySummary;
+      _risk.text = template.riskSummary;
+      _nextAction.text = template.nextAction;
+      final notes = <String>[
+        if (template.content.trim().isNotEmpty) template.content.trim(),
+        if (template.note.trim().isNotEmpty) template.note.trim(),
+      ];
+      _note.text = notes.toSet().join('\n');
+      _message = null;
+    });
   }
 
   void _toggleItem(FieldReportSettingItem item) {
@@ -402,6 +451,42 @@ class _MarketReportPageState extends State<MarketReportPage> {
                     ],
                   ),
                 ),
+                if (_loadingTemplates) ...[
+                  const SizedBox(height: AppSpacing.md),
+                  const LinearProgressIndicator(
+                    key: Key('market-report-template-loading'),
+                    minHeight: 2,
+                  ),
+                ] else if (_templates.isNotEmpty) ...[
+                  const SizedBox(height: AppSpacing.md),
+                  const _SectionTitle(
+                    title: 'Mẫu báo cáo',
+                    subtitle:
+                        'Chọn mẫu dùng sẵn rồi điều chỉnh theo tình hình thực tế.',
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  AppCard(
+                    child: Wrap(
+                      spacing: AppSpacing.xs,
+                      runSpacing: AppSpacing.xs,
+                      children: _templates
+                          .map(
+                            (template) => ChoiceChip(
+                              key: Key(
+                                'market-report-template-${template.id}',
+                              ),
+                              selected:
+                                  _selectedTemplateId == template.id,
+                              label: Text(template.title),
+                              onSelected: _saving
+                                  ? null
+                                  : (_) => _applyTemplate(template),
+                            ),
+                          )
+                          .toList(growable: false),
+                    ),
+                  ),
+                ],
                 const SizedBox(height: AppSpacing.md),
                 const _SectionTitle(
                   title: 'Nội dung báo cáo',
@@ -465,7 +550,7 @@ class _MarketReportPageState extends State<MarketReportPage> {
                   if (_usedProductGroups.isNotEmpty) ...[
                     const SizedBox(height: AppSpacing.md),
                     const _SectionTitle(
-                      title: 'SP khách đang dùng',
+                      title: 'Sản phẩm khách đang dùng',
                       subtitle:
                           'Ghi nhận đúng nhóm sản phẩm khách đang sử dụng.',
                     ),

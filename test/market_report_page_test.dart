@@ -35,7 +35,11 @@ class FakeQueue implements MutationQueueStore {
   }
 }
 
-class FakeActivityClient implements FieldActivityClient {
+class FakeActivityClient
+    implements FieldActivityClient, FieldActivityReferenceClient {
+  FakeActivityClient({this.templates = const []});
+
+  final List<FieldReportTemplate> templates;
   Map<String, Object?>? submittedPayload;
   String? submittedKey;
 
@@ -89,6 +93,12 @@ class FakeActivityClient implements FieldActivityClient {
       ),
     ];
   }
+
+  @override
+  Future<List<FieldReportTemplate>> loadReportTemplates() async => templates;
+
+  @override
+  Future<List<FieldTestFile>> loadTestFiles() async => const [];
 
   @override
   Future<FieldActivityResult> submit({
@@ -179,4 +189,60 @@ void main() {
     expect(client.submittedKey, isNotNull);
     expect(RegExp(r'^[A-Za-z0-9._-]+$').hasMatch(client.submittedKey!), isTrue);
   });
+
+  testWidgets('market report can apply a canonical report template', (
+    tester,
+  ) async {
+    final client = FakeActivityClient(
+      templates: const [
+        FieldReportTemplate(
+          id: 'template-1',
+          title: 'Khảo sát nhu cầu',
+          demandSummary: 'Khách cần bổ sung hàng tuần',
+          nextAction: 'Gửi báo giá',
+          note: 'Theo dõi trong tuần',
+        ),
+      ],
+    );
+    final queue = FakeQueue();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: MarketReportPage(
+          line: line,
+          routeName: 'Tuyến 1',
+          routeId: 'route-1',
+          sessionDate: '2026-09-28',
+          owner: 'Nhân viên A',
+          activityClient: client,
+          submissionService: FieldActivitySubmissionService(
+            client: client,
+            queue: queue,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final template = find.byKey(
+      const Key('market-report-template-template-1'),
+    );
+    await tester.ensureVisible(template);
+    await tester.tap(template);
+    await tester.pump();
+
+    final demand = tester.widget<TextField>(
+      find.widgetWithText(TextField, 'Nhu cầu').first,
+    );
+    expect(demand.controller?.text, 'Khách cần bổ sung hàng tuần');
+
+    await tester.tap(find.byKey(const Key('market-report-submit')));
+    await tester.pumpAndSettle();
+
+    final fields =
+        client.submittedPayload?['fields'] as Map<String, Object?>?;
+    expect(fields?['demandSummary'], 'Khách cần bổ sung hàng tuần');
+    expect(fields?['nextAction'], 'Gửi báo giá');
+  });
+
 }

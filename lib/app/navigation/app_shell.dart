@@ -39,6 +39,7 @@ import '../../features/product_trials/product_trial_page.dart';
 import '../../features/reports/field_activity_history_page.dart';
 import '../../features/reports/management_proposals_page.dart';
 import '../../features/reports/market_report_page.dart';
+import '../../features/reports/report_settings_page.dart';
 import '../../features/reports/session_history_page.dart';
 import '../../features/outlets/outlets_page.dart';
 import '../../features/routes/add_route_customer_page.dart';
@@ -348,6 +349,15 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
 
   bool get _canManageProposals =>
       widget.session?.permissions.contains('mcp.report.write') == true;
+
+  bool get _canCreateReports =>
+      widget.session?.permissions.contains('mcp.report.write') == true;
+
+  bool get _canCreateProductTrials =>
+      widget.session?.permissions.contains('mcp.test.write') == true;
+
+  bool get _canManageReportSettings =>
+      widget.session?.permissions.contains('mcp.report-setting.write') == true;
 
   bool get _canReadOrders =>
       widget.session?.permissions.contains('mcp.sales-order.read') == true;
@@ -1290,6 +1300,26 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     FieldActivityKind kind,
     FieldDayLine line,
   ) async {
+    final allowed = switch (kind) {
+      FieldActivityKind.report => _canCreateReports,
+      FieldActivityKind.productTrial => _canCreateProductTrials,
+      FieldActivityKind.followup => true,
+    };
+    if (!allowed) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            kind == FieldActivityKind.report
+                ? 'Tài khoản chưa được cấp quyền lập báo cáo thị trường.'
+                : kind == FieldActivityKind.productTrial
+                ? 'Tài khoản chưa được cấp quyền ghi nhận thử sản phẩm.'
+                : 'Tài khoản chưa được cấp quyền tạo công việc theo dõi.',
+          ),
+        ),
+      );
+      return;
+    }
+
     final service = _fieldActivitySubmissionService;
     final client = _fieldActivityClient;
     if (service == null || client == null) {
@@ -1338,6 +1368,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
         MaterialPageRoute<FieldActivitySubmitStatus>(
           builder: (context) => ProductTrialPage(
             line: line,
+            activityClient: client,
             submissionService: service,
           ),
         ),
@@ -1540,10 +1571,12 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
               : () => _openCustomerOnboarding(
                   routeCustomerId: line.routeCustomerId,
                 ),
-          onCreateReport: _fieldActivityClient == null
+          onCreateReport:
+              _fieldActivityClient == null || !_canCreateReports
               ? null
               : () => _openFieldActivity(FieldActivityKind.report, line),
-          onCreateProductTrial: _fieldActivityClient == null
+          onCreateProductTrial:
+              _fieldActivityClient == null || !_canCreateProductTrials
               ? null
               : () => _openFieldActivity(
                   FieldActivityKind.productTrial,
@@ -1825,6 +1858,20 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     );
   }
 
+  Future<void> _openReportSettings() async {
+    final source = _fieldActivityClient;
+    if (!_canManageReportSettings ||
+        source is! FieldReportSettingsAdminClient) {
+      return;
+    }
+    final client = source as FieldReportSettingsAdminClient;
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (context) => ReportSettingsPage(client: client),
+      ),
+    );
+  }
+
   Future<void> _openManagementProposals() async {
     final client = _managementProposalClient;
     final queue = _mutationQueueStore;
@@ -1962,6 +2009,11 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
         onProductTrials: _fieldActivityClient == null
             ? null
             : () => _openActivityHistory(FieldActivityKind.productTrial),
+        onReportSettings:
+            _canManageReportSettings &&
+                _fieldActivityClient is FieldReportSettingsAdminClient
+            ? _openReportSettings
+            : null,
         onTasks: _fieldHistoryClient == null ? null : _openTasks,
         onManagementProposals:
             _canManageProposals && _managementProposalClient != null

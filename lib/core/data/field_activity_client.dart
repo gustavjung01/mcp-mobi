@@ -77,6 +77,8 @@ class FieldReportSettingItem {
     this.category = '',
     this.brandName = '',
     this.productId = '',
+    this.status = 'active',
+    this.sortOrder = 0,
   });
 
   final String id;
@@ -88,6 +90,8 @@ class FieldReportSettingItem {
   final String category;
   final String brandName;
   final String productId;
+  final String status;
+  final int sortOrder;
 
   Map<String, Object?> toSelectionJson() => {
     'id': id,
@@ -109,12 +113,16 @@ class FieldReportSettingGroup {
     required this.title,
     required this.items,
     this.description = '',
+    this.status = 'active',
+    this.sortOrder = 0,
   });
 
   final String id;
   final String key;
   final String title;
   final String description;
+  final String status;
+  final int sortOrder;
   final List<FieldReportSettingItem> items;
 
   factory FieldReportSettingGroup.fromJson(Map<String, dynamic> json) {
@@ -126,6 +134,8 @@ class FieldReportSettingGroup {
       key: key,
       title: title,
       description: _text(json['description']),
+      status: _text(json['status'], fallback: 'active'),
+      sortOrder: _integer(json['sortOrder'] ?? json['sort_order']),
       items: _objects(json['items'])
           .map(
             (item) => FieldReportSettingItem(
@@ -140,13 +150,140 @@ class FieldReportSettingGroup {
               groupTitle: title,
               category: _text(item['category']),
               brandName: _text(item['brandName']),
-              productId: _text(item['productId']),
+              productId: _text(item['productId'] ?? item['product_id']),
+              status: _text(item['status'], fallback: 'active'),
+              sortOrder: _integer(item['sortOrder'] ?? item['sort_order']),
             ),
           )
           .where((item) => item.id.isNotEmpty && item.label.isNotEmpty)
           .toList(growable: false),
     );
   }
+}
+
+
+class FieldReportTemplate {
+  const FieldReportTemplate({
+    required this.id,
+    required this.title,
+    this.reportType = 'general',
+    this.content = '',
+    this.priceSummary = '',
+    this.competitorSummary = '',
+    this.displaySummary = '',
+    this.stockSummary = '',
+    this.demandSummary = '',
+    this.opportunitySummary = '',
+    this.riskSummary = '',
+    this.nextAction = '',
+    this.note = '',
+  });
+
+  final String id;
+  final String title;
+  final String reportType;
+  final String content;
+  final String priceSummary;
+  final String competitorSummary;
+  final String displaySummary;
+  final String stockSummary;
+  final String demandSummary;
+  final String opportunitySummary;
+  final String riskSummary;
+  final String nextAction;
+  final String note;
+
+  factory FieldReportTemplate.fromJson(Map<String, dynamic> json) {
+    return FieldReportTemplate(
+      id: _text(json['id']),
+      title: _text(json['title'], fallback: 'Mẫu báo cáo'),
+      reportType: _text(json['reportType'] ?? json['report_type'], fallback: 'general'),
+      content: _text(json['content']),
+      priceSummary: _text(json['priceSummary'] ?? json['price_summary']),
+      competitorSummary: _text(json['competitorSummary'] ?? json['competitor_summary']),
+      displaySummary: _text(json['displaySummary'] ?? json['display_summary']),
+      stockSummary: _text(json['stockSummary'] ?? json['stock_summary']),
+      demandSummary: _text(json['demandSummary'] ?? json['demand_summary']),
+      opportunitySummary: _text(json['opportunitySummary'] ?? json['opportunity_summary']),
+      riskSummary: _text(json['riskSummary'] ?? json['risk_summary']),
+      nextAction: _text(json['nextAction'] ?? json['next_action']),
+      note: _text(json['note']),
+    );
+  }
+}
+
+class FieldTestProduct {
+  const FieldTestProduct({
+    required this.id,
+    required this.productName,
+  });
+
+  final String id;
+  final String productName;
+
+  factory FieldTestProduct.fromJson(Map<String, dynamic> json) {
+    return FieldTestProduct(
+      id: _text(json['id']),
+      productName: _text(json['productName'] ?? json['product_name']),
+    );
+  }
+}
+
+class FieldTestFile {
+  const FieldTestFile({
+    required this.id,
+    required this.title,
+    required this.products,
+    this.testDate = '',
+  });
+
+  final String id;
+  final String title;
+  final String testDate;
+  final List<FieldTestProduct> products;
+
+  factory FieldTestFile.fromJson(Map<String, dynamic> json) {
+    return FieldTestFile(
+      id: _text(json['id']),
+      title: _text(json['title'], fallback: 'Phiếu thử sản phẩm'),
+      testDate: _text(json['testDate'] ?? json['test_date']),
+      products: _objects(json['products'])
+          .map(FieldTestProduct.fromJson)
+          .where((item) => item.id.isNotEmpty && item.productName.isNotEmpty)
+          .toList(growable: false),
+    );
+  }
+}
+
+abstract interface class FieldActivityReferenceClient {
+  Future<List<FieldReportTemplate>> loadReportTemplates();
+  Future<List<FieldTestFile>> loadTestFiles();
+}
+
+abstract interface class FieldReportSettingsAdminClient {
+  Future<List<FieldReportSettingGroup>> loadReportSettingGroups();
+
+  Future<void> saveReportSettingGroup({
+    String? groupId,
+    required String title,
+    required String description,
+    required int sortOrder,
+    String? status,
+    required String idempotencyKey,
+  });
+
+  Future<void> saveReportSettingItem({
+    String? itemId,
+    required String groupId,
+    required String label,
+    required String value,
+    required String category,
+    required String brandName,
+    required String productId,
+    required int sortOrder,
+    String? status,
+    required String idempotencyKey,
+  });
 }
 
 abstract interface class FieldActivityClient {
@@ -159,7 +296,11 @@ abstract interface class FieldActivityClient {
   });
 }
 
-class HttpFieldActivityClient implements FieldActivityClient {
+class HttpFieldActivityClient
+    implements
+        FieldActivityClient,
+        FieldActivityReferenceClient,
+        FieldReportSettingsAdminClient {
   HttpFieldActivityClient({
     required this.profile,
     required this.token,
@@ -212,6 +353,96 @@ class HttpFieldActivityClient implements FieldActivityClient {
   }
 
   @override
+  Future<List<FieldReportTemplate>> loadReportTemplates() async {
+    final data = await _request('GET', '/api/mcp-report-templates');
+    return _objects(data['templates'])
+        .map(FieldReportTemplate.fromJson)
+        .where((item) => item.id.isNotEmpty)
+        .toList(growable: false);
+  }
+
+  @override
+  Future<List<FieldTestFile>> loadTestFiles() async {
+    final data = await _request('GET', '/api/mcp-day/test-options');
+    return _objects(data['files'])
+        .map(FieldTestFile.fromJson)
+        .where((item) => item.id.isNotEmpty)
+        .toList(growable: false);
+  }
+
+  @override
+  Future<List<FieldReportSettingGroup>> loadReportSettingGroups() async {
+    final data = await _request(
+      'GET',
+      '/api/mcp-report-settings',
+      query: const {
+        'groupType': 'market_report',
+        'includeInactive': '1',
+      },
+    );
+    return _objects(data['groups'])
+        .map(FieldReportSettingGroup.fromJson)
+        .where((group) => group.id.isNotEmpty)
+        .toList(growable: false);
+  }
+
+  @override
+  Future<void> saveReportSettingGroup({
+    String? groupId,
+    required String title,
+    required String description,
+    required int sortOrder,
+    String? status,
+    required String idempotencyKey,
+  }) async {
+    final editing = (groupId ?? '').trim().isNotEmpty;
+    await _request(
+      editing ? 'PATCH' : 'POST',
+      '/api/mcp-report-setting-groups',
+      body: {
+        if (editing) 'groupId': groupId!.trim(),
+        'title': title.trim(),
+        'description': description.trim(),
+        'sortOrder': sortOrder,
+        if ((status ?? '').trim().isNotEmpty) 'status': status!.trim(),
+      },
+      idempotencyKey: idempotencyKey,
+    );
+  }
+
+  @override
+  Future<void> saveReportSettingItem({
+    String? itemId,
+    required String groupId,
+    required String label,
+    required String value,
+    required String category,
+    required String brandName,
+    required String productId,
+    required int sortOrder,
+    String? status,
+    required String idempotencyKey,
+  }) async {
+    final editing = (itemId ?? '').trim().isNotEmpty;
+    await _request(
+      editing ? 'PATCH' : 'POST',
+      '/api/mcp-report-settings',
+      body: {
+        if (editing) 'itemId': itemId!.trim(),
+        if (!editing) 'groupId': groupId.trim(),
+        if (!editing || label.trim().isNotEmpty) 'label': label.trim(),
+        if (!editing || value.trim().isNotEmpty) 'value': value.trim(),
+        'category': category.trim(),
+        'brandName': brandName.trim(),
+        'productId': productId.trim(),
+        'sortOrder': sortOrder,
+        if ((status ?? '').trim().isNotEmpty) 'status': status!.trim(),
+      },
+      idempotencyKey: idempotencyKey,
+    );
+  }
+
+  @override
   Future<FieldActivityResult> submit({
     required FieldActivityKind kind,
     required Map<String, Object?> payload,
@@ -255,6 +486,17 @@ class HttpFieldActivityClient implements FieldActivityClient {
         'POST' =>
           await _client
               .post(
+                uri,
+                headers: _headers(
+                  hasBody: true,
+                  idempotencyKey: idempotencyKey,
+                ),
+                body: jsonEncode(body ?? const <String, Object?>{}),
+              )
+              .timeout(timeout),
+        'PATCH' =>
+          await _client
+              .patch(
                 uri,
                 headers: _headers(
                   hasBody: true,
@@ -334,7 +576,21 @@ String _activityErrorMessage(
     case 'test_results_required':
       return 'Cần nhập ít nhất một kết quả thử sản phẩm.';
     case 'product_name_required':
-      return 'Cần nhập sản phẩm được thử.';
+      return 'Cần chọn hoặc nhập sản phẩm được thử.';
+    case 'test_file_not_found':
+      return 'Phiếu thử sản phẩm không còn khả dụng. Cập nhật danh sách rồi chọn lại.';
+    case 'test_product_not_found':
+      return 'Sản phẩm trong phiếu thử không còn khả dụng. Cập nhật danh sách rồi chọn lại.';
+    case 'title_required':
+      return 'Cần nhập tên nhóm mẫu báo cáo.';
+    case 'label_required':
+      return 'Cần nhập tên lựa chọn báo cáo.';
+    case 'group_id_required':
+      return 'Cần chọn nhóm báo cáo.';
+    case 'invalid_sort_order':
+      return 'Thứ tự hiển thị chưa hợp lệ.';
+    case 'report_setting_patch_required':
+      return 'Chưa có thay đổi để lưu.';
     case 'invalid_test_status':
       return 'Kết quả thử sản phẩm chưa hợp lệ.';
     case 'report_content_required':
@@ -379,4 +635,9 @@ List<Map<String, dynamic>> _objects(Object? value) {
 String _text(Object? value, {String fallback = ''}) {
   final normalized = (value ?? '').toString().trim();
   return normalized.isEmpty ? fallback : normalized;
+}
+
+int _integer(Object? value, {int fallback = 0}) {
+  if (value is int) return value;
+  return int.tryParse((value ?? '').toString()) ?? fallback;
 }
