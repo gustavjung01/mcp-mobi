@@ -402,8 +402,6 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   bool get _canManageReportSettings =>
       _capabilities.can(MobileCapability.reportSettings);
 
-  bool get _canReadOrders => _capabilities.can(MobileCapability.readOrders);
-
   bool get _canCreateOrders =>
       _capabilities.can(MobileCapability.createOrders);
 
