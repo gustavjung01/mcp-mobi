@@ -164,4 +164,101 @@ void main() {
       );
     },
   );
+
+  test(
+    'order client turns missing Công Ty price into an actionable message',
+    () async {
+      final client = HttpOrderDataClient(
+        profile: InstallationProfile(
+          name: 'Hưng Phát',
+          baseUrl: Uri.parse('https://mcp.example.vn'),
+        ),
+        token: 'mobile-token',
+        client: MockClient((request) async {
+          return jsonResponse(
+            {
+              'error': {
+                'code': 'BASE_PRICE_NOT_FOUND',
+                'message': 'No active base price is available',
+                'retryable': false,
+              },
+            },
+            409,
+          );
+        }),
+      );
+
+      await expectLater(
+        client.createOrder(
+          customerId: '11111111-1111-4111-8111-111111111111',
+          customerAddressId: '22222222-2222-4222-8222-222222222222',
+          lines: const [
+            OrderLineInput(
+              variantId: '33333333-3333-4333-8333-333333333333',
+              quantity: 1,
+            ),
+          ],
+          idempotencyKey: 'mcp.sales-order.create-test-price',
+        ),
+        throwsA(
+          isA<OrderDataFailure>()
+              .having(
+                (failure) => failure.code,
+                'code',
+                'BASE_PRICE_NOT_FOUND',
+              )
+              .having(
+                (failure) => failure.message,
+                'message',
+                contains('chưa có giá bán áp dụng'),
+              ),
+        ),
+      );
+    },
+  );
+
+
+  test('generic 409 is replaced by an order recovery message', () async {
+    final client = HttpOrderDataClient(
+      profile: InstallationProfile(
+        name: 'Hưng Phát',
+        baseUrl: Uri.parse('https://mcp.example.vn'),
+      ),
+      token: 'mobile-token',
+      client: MockClient((request) async {
+        return jsonResponse(
+          {
+            'error': {
+              'code': 'UNKNOWN_ORDER_CONFLICT',
+              'message': 'Dữ liệu đang xung đột với trạng thái hiện tại.',
+              'retryable': false,
+            },
+          },
+          409,
+        );
+      }),
+    );
+
+    await expectLater(
+      client.createOrder(
+        customerId: '11111111-1111-4111-8111-111111111111',
+        customerAddressId: '22222222-2222-4222-8222-222222222222',
+        lines: const [
+          OrderLineInput(
+            variantId: '33333333-3333-4333-8333-333333333333',
+            quantity: 1,
+          ),
+        ],
+        idempotencyKey: 'mcp.sales-order.create-test-conflict',
+      ),
+      throwsA(
+        isA<OrderDataFailure>().having(
+          (failure) => failure.message,
+          'message',
+          contains('Đơn chưa phù hợp với dữ liệu hiện tại'),
+        ),
+      ),
+    );
+  });
+
 }

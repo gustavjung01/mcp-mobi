@@ -3,7 +3,7 @@ import 'dart:async';
 import 'order_data_client.dart';
 import '../storage/local_data_store.dart';
 
-class LocalCatalogOrderDataClient implements OrderDataClient {
+class LocalCatalogOrderDataClient implements OrderDataClient, OrderCatalogPriceClient {
   LocalCatalogOrderDataClient({
     required this.remote,
     required this.database,
@@ -88,6 +88,28 @@ class LocalCatalogOrderDataClient implements OrderDataClient {
               item.name.isNotEmpty,
         )
         .toList(growable: false);
+  }
+
+  @override
+  Future<Map<String, double?>> loadFreshPrices({
+    required String query,
+    String? category,
+    String? brand,
+  }) async {
+    final source = remote;
+    if (source is OrderCatalogPriceClient) {
+      return source.loadFreshPrices(
+        query: query,
+        category: category,
+        brand: brand,
+      );
+    }
+    final items = await remote.searchProducts(
+      query: query,
+      category: category,
+      brand: brand,
+    );
+    return {for (final item in items) item.variantId: item.price};
   }
 
   @override

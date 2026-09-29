@@ -1028,6 +1028,141 @@ class _OrderDetailSheet extends StatelessWidget {
               ),
             ),
           ],
+          if (order.versions.length > 1) ...[
+            const SizedBox(height: AppSpacing.md),
+            const Text(
+              'Lịch sử phiên bản',
+              style: TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 16,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            ...order.versions.reversed.map(
+              (history) => Padding(
+                padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                child: _OrderVersionCard(
+                  version: history,
+                  current:
+                      history.versionNumber == order.currentVersionNumber,
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _OrderVersionCard extends StatelessWidget {
+  const _OrderVersionCard({
+    required this.version,
+    required this.current,
+  });
+
+  final FieldOrderVersion version;
+  final bool current;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      padding: EdgeInsets.zero,
+      child: ExpansionTile(
+        key: Key('order-version-${version.versionNumber}'),
+        tilePadding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: AppSpacing.xs,
+        ),
+        childrenPadding: const EdgeInsets.fromLTRB(
+          AppSpacing.md,
+          0,
+          AppSpacing.md,
+          AppSpacing.md,
+        ),
+        title: Text(
+          'Phiên bản ${version.versionNumber}${current ? ' · Hiện tại' : ''}',
+          style: const TextStyle(
+            color: AppColors.textPrimary,
+            fontSize: 12,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        subtitle: Text(
+          [
+            _statusLabel(version.status),
+            _dateTimeLabel(version.createdAt),
+          ].where((value) => value.isNotEmpty).join(' · '),
+          style: const TextStyle(
+            color: AppColors.textSecondary,
+            fontSize: 10,
+          ),
+        ),
+        trailing: Text(
+          _money(version.total),
+          style: const TextStyle(
+            color: AppColors.textPrimary,
+            fontSize: 11,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        children: [
+          if (version.lines.isEmpty)
+            const Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Phiên bản này chưa có chi tiết dòng hàng.',
+                style: TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 10,
+                ),
+              ),
+            )
+          else
+            ...version.lines.map(
+              (line) => Padding(
+                padding: const EdgeInsets.only(bottom: AppSpacing.xs),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        '${line.itemName} · ${_quantity(line.quantity)}${line.unitLabel.isEmpty ? '' : ' ${line.unitLabel}'}',
+                        style: const TextStyle(
+                          color: AppColors.textPrimary,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    Text(
+                      _money(line.lineTotal),
+                      style: const TextStyle(
+                        color: AppColors.textPrimary,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          const Divider(),
+          _AmountRow(label: 'Tạm tính', value: version.subtotal),
+          if (version.discountTotal > 0)
+            _AmountRow(
+              label: 'Giảm giá',
+              value: -version.discountTotal,
+            ),
+          if (version.taxTotal > 0)
+            _AmountRow(label: 'Thuế', value: version.taxTotal),
+          _AmountRow(
+            label: 'Tổng cộng',
+            value: version.total,
+            emphasized: true,
+          ),
         ],
       ),
     );
