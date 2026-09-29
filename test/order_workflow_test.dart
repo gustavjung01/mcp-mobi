@@ -161,6 +161,11 @@ void main() {
 
       final addProduct = find.byKey(const Key('order-add-variant-1'));
       await tester.ensureVisible(addProduct);
+      await tester.drag(
+        find.byKey(const Key('order-catalog-panel')),
+        const Offset(0, -120),
+      );
+      await tester.pumpAndSettle();
       await tester.tap(addProduct);
       await tester.pumpAndSettle();
       expect(find.text('Xem giỏ (1)'), findsOneWidget);
@@ -203,6 +208,11 @@ void main() {
 
       final addProduct = find.byKey(const Key('order-add-variant-1'));
       await tester.ensureVisible(addProduct);
+      await tester.drag(
+        find.byKey(const Key('order-catalog-panel')),
+        const Offset(0, -120),
+      );
+      await tester.pumpAndSettle();
       await tester.tap(addProduct);
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('order-primary-action')));
