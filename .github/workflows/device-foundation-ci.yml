@@ -1,0 +1,85 @@
+name: Device Foundation CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  android-device:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install Flutter 3.47.2
+        shell: bash
+        run: |
+          git clone --depth 1 --branch 3.47.2 https://github.com/flutter/flutter.git "$HOME/flutter"
+          echo "$HOME/flutter/bin" >> "$GITHUB_PATH"
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Check integration-test formatting
+        run: dart format --output=none --set-exit-if-changed integration_test
+
+      - name: Run Android device foundation gate
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          script: flutter test integration_test/device_foundation_test.dart -d emulator-5554
+
+  ios-device:
+    runs-on: macos-latest
+    timeout-minutes: 35
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Flutter 3.47.2
+        shell: bash
+        run: |
+          git clone --depth 1 --branch 3.47.2 https://github.com/flutter/flutter.git "$HOME/flutter"
+          echo "$HOME/flutter/bin" >> "$GITHUB_PATH"
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Check integration-test formatting
+        run: dart format --output=none --set-exit-if-changed integration_test
+
+      - name: Boot iPhone simulator
+        id: simulator
+        shell: bash
+        run: |
+          set -euo pipefail
+          udid="$(xcrun simctl list devices available -j | python3 -c '
+          import json,sys
+          data=json.load(sys.stdin)["devices"]
+          for runtime in sorted(data.keys(), reverse=True):
+              for device in data[runtime]:
+                  if device.get("isAvailable") and device.get("name","").startswith("iPhone"):
+                      print(device["udid"])
+                      raise SystemExit
+          raise SystemExit(1)
+          ')"
+          xcrun simctl boot "$udid" 2>/dev/null || true
+          xcrun simctl bootstatus "$udid" -b
+          echo "udid=$udid" >> "$GITHUB_OUTPUT"
+
+      - name: Run iOS device foundation gate
+        run: flutter test integration_test/device_foundation_test.dart -d "${{ steps.simulator.outputs.udid }}"

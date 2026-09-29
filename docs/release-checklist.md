@@ -7,6 +7,10 @@
 - [ ] Không có WebView hoặc direct DB access.
 - [ ] Không có secret, keystore, database credential hoặc internal token trong source.
 - [ ] Canonical Idempotency-Key vẫn được reuse cho cùng một mutation khi retry.
+- [ ] Device Foundation CI xanh trên Android emulator và iOS simulator.
+- [ ] Runtime Integration Gate xanh trên installation test được phê duyệt cho cả Android và iOS.
+- [ ] Exact backend release SHA của runtime test đã được xác nhận và chứa đủ contract mobile đang test.
+- [ ] Parity Matrix không còn MISSING/BROKEN/PARTIAL thuộc scope nghiệp vụ/runtime trước khi đóng Issue #42.
 
 ## Regression nghiệp vụ
 
@@ -47,6 +51,17 @@
 - [ ] Apple signing/provisioning được cấu hình ngoài repo trước khi archive phân phối.
 - [ ] Thiết lập trên iOS không hiển thị luồng tải/cài APK Android.
 
+## Runtime gate
+
+- [ ] Đã đọc `docs/runtime-integration-gate.md`.
+- [ ] Runtime workflow chỉ trỏ vào installation test có tên bắt đầu bằng `test-`.
+- [ ] Không paste credential/fixture thật vào PR, issue, chat hoặc command line.
+- [ ] Customer/order/media fixture được xác nhận là dữ liệu test có thể mutate/cleanup.
+- [ ] Upload R2 runtime đã được xóa sau test.
+- [ ] Route/điểm bán tạm đã archive sau test.
+- [ ] Retry đơn dùng lại đúng Idempotency-Key và không tạo đơn trùng.
+- [ ] Snapshot + AI report chạy trên backend release có endpoint tương ứng.
+
 ## Production boundary
 
-Repo mobile không tự deploy backend/DB. Nếu regression chỉ ra lỗi contract MCP API, mở task backend riêng, audit NPP-Platform và deploy theo boundary riêng.
+Repo mobile không tự deploy backend/DB. Nếu regression chỉ ra lỗi contract MCP API, mở task backend riêng, audit NPP-Platform và deploy theo boundary riêng. Runtime Integration Gate không được nhắm vào production chỉ để đóng Issue #42.
