@@ -715,9 +715,7 @@ class _RuntimeGateConfig {
       throw StateError('runtime_gate_environment_must_start_with_test');
     }
     final uri = Uri.tryParse(apiBaseUrl);
-    final localEnvironment = environmentName
-        .toLowerCase()
-        .startsWith('test-local-');
+    final localEnvironment = environmentName.toLowerCase().startsWith('test-local-');
     const localHosts = {'127.0.0.1', 'localhost', '10.0.2.2'};
     final endpointAllowed =
         uri != null &&

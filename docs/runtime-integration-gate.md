@@ -110,9 +110,9 @@ Read-only diagnostic xác nhận MCP service active, PostgreSQL schema `mcp`, R2
 
 Production MCP backend đã được deploy/smoke ở exact SHA:
 
-`1d8d78ae0121106b8153d32c42cfb33c3f81c1e7`
+`bce7dad4e1e8dadb8498a5e4a69924ea7f9bad48`
 
-Sau đó NPP-Platform `main` tiến lên `e09197c0b64e1a2e7c2e49fb4315c2d9bfe07247`, nhưng diff chỉ thuộc export phía Công Ty web; không thay `mcp/apps/backend/**` hay contract mobile. Vì vậy không deploy MCP lặp lại chỉ để bám thay đổi web.
+Release trên là exact NPP-Platform `main` tại thời điểm deploy Lô 7; `/health/live` và `/health/ready` đều PASS. Evidence production này chỉ chứng minh deploy/smoke, không thay thế mutation E2E.
 
 Production chỉ là bằng chứng deploy/smoke. Runtime Self-contained CI mới là nơi chạy mutation E2E an toàn.
 

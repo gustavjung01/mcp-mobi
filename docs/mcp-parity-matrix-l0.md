@@ -3,7 +3,7 @@
 > Issue: #42  
 > Audit date: 2026-09-28  
 > Mobile source: `gustavjung01/mcp-mobi@fcf4a3d3d44c4aec9bd2881a46ffe83fdb1eec45`  
-> MCP/Công Ty source: `binhnxwjfjxm/NPP-Platform@aa3ed0734e4d36a39efe6375b87bc87890ba1158`
+> MCP/Công Ty source: `binhnxwjfjxm/NPP-Platform@bce7dad4e1e8dadb8498a5e4a69924ea7f9bad48`
 
 ## 1. Kết luận Lô 0
 
@@ -120,7 +120,7 @@ Mobile không được tự suy ra quyền từ UI. Backend là authority.
 | 59 | Lịch sử phiên | local read/sessions | read | Có filter route/status/days + mở chi tiết phiên | Cache | PARTIAL | Không còn card cụt; chờ runtime evidence lịch sử thật |
 | 60 | Chi tiết báo cáo phiên | session report read | read | Có điểm bán/đơn/thử sản phẩm/báo cáo/công việc/bỏ qua | Cache | PARTIAL | Mobile đã gom chi tiết phiên và export từ cùng read model; chờ runtime evidence |
 | 61 | Snapshot báo cáo phiên | `POST /api/mcp-session-report` | `mcp.report.write` | Có tạo/cập nhật bản chốt từ chi tiết phiên | Online idempotent mutation | PARTIAL | Dùng canonical key; chờ runtime evidence |
-| 62 | AI phân tích báo cáo phiên | `/api/mcp-session-report/analyze` + ai-result | `mcp.report.write` | Có sau khi có bản chốt | Online idempotent mutation | PARTIAL | Production MCP exact release 1d8d78ae... đã chứa contract; còn chờ E2E snapshot -> analyze -> persist trên test installation |
+| 62 | AI phân tích báo cáo phiên | `/api/mcp-session-report/analyze` + ai-result | `mcp.report.write` | Có sau khi có bản chốt | Online idempotent mutation | PARTIAL | Production MCP exact release bce7dad4... đã chứa contract; còn chờ E2E snapshot -> analyze -> persist trên test installation |
 | 63 | Xuất báo cáo phiên Word/Excel/PDF/export | session report read model + native share | read | Có Word/Excel/PDF/Markdown/JSON | Local render + native share | PARTIAL | Không phụ thuộc cookie web; Android/iOS build là gate code, chờ device share evidence |
 | 64 | CSV exports: phiên/đơn/điểm bán/report/test/follow-up | canonical mobile read models | read | Có trung tâm Xuất dữ liệu 6 CSV + xuất theo từng phiên | Local render + native share | PARTIAL | Không gọi route web/cookie; chờ device share/runtime evidence |
 | 65 | Đề xuất quản lý | `/api/management-proposals` | `mcp.report.write` | Có role-gated | SQLite queue | PARTIAL | Submit/list/resubmit đã đúng canonical queue; chờ integration thật |
@@ -142,7 +142,7 @@ Mobile không được tự suy ra quyền từ UI. Backend là authority.
 - Device gate: `.github/workflows/device-foundation-ci.yml` + `integration_test/device_foundation_test.dart`; Android + iOS exact-head PR #50 đã xanh.
 - Runtime E2E tự dựng: `.github/workflows/runtime-self-contained-ci.yml` + `integration_test/runtime_gate_test.dart`; PostgreSQL/Công Ty API/MCP API/S3-compatible storage/report-analysis adapter đều chạy trong CI isolation.
 - Runtime manual ngoài CI vẫn giữ tại `.github/workflows/runtime-integration-gate.yml` nhưng không được nhắm vào production.
-- Production MCP đã deploy/smoke exact SHA `1d8d78ae0121106b8153d32c42cfb33c3f81c1e7`; main sau đó chỉ tiến bởi diff Công Ty web, không đổi MCP backend/mobile contract.
+- Production MCP đã deploy/smoke exact SHA `bce7dad4e1e8dadb8498a5e4a69924ea7f9bad48`; đây là exact NPP `main` tại thời điểm deploy Lô 7.
 - Không đổi dòng runtime/business PARTIAL sang DONE chỉ vì gate code tồn tại; phải có exact-head run evidence thật.
 
 ## 5. Root-cause register cho lỗi đã quan sát
