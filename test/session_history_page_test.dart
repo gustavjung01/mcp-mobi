@@ -83,7 +83,7 @@ void main() {
     expect(find.byKey(const Key('session-history-session-2')), findsOneWidget);
     expect(find.text('Đã ghé: 4/5'), findsOneWidget);
     expect(find.text('Đơn: 2'), findsOneWidget);
-    expect(find.text('Theo dõi: 2'), findsOneWidget);
+    expect(find.text('Công việc: 2'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('session-history-status-filter')));
     await tester.pumpAndSettle();

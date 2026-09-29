@@ -36,6 +36,7 @@ import '../../features/orders/orders_page.dart';
 import '../../features/outlets/outlet_detail_page.dart';
 import '../../features/outlets/outlet_edit_page.dart';
 import '../../features/product_trials/product_trial_page.dart';
+import '../../features/reports/data_exports_page.dart';
 import '../../features/reports/field_activity_history_page.dart';
 import '../../features/reports/management_proposals_page.dart';
 import '../../features/reports/market_report_page.dart';
@@ -355,6 +356,9 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
 
   bool get _canCreateProductTrials =>
       widget.session?.permissions.contains('mcp.test.write') == true;
+
+  bool get _canCreateFollowups =>
+      widget.session?.permissions.contains('mcp.followup.write') == true;
 
   bool get _canManageReportSettings =>
       widget.session?.permissions.contains('mcp.report-setting.write') == true;
@@ -1303,7 +1307,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     final allowed = switch (kind) {
       FieldActivityKind.report => _canCreateReports,
       FieldActivityKind.productTrial => _canCreateProductTrials,
-      FieldActivityKind.followup => true,
+      FieldActivityKind.followup => _canCreateFollowups,
     };
     if (!allowed) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1460,7 +1464,10 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
 
     await Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
-        builder: (context) => SessionHistoryPage(client: client),
+        builder: (context) => SessionHistoryPage(
+          client: client,
+          canWriteReport: _canCreateReports,
+        ),
       ),
     );
   }
@@ -1582,7 +1589,8 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                   FieldActivityKind.productTrial,
                   line,
                 ),
-          onCreateFollowup: _fieldActivityClient == null
+          onCreateFollowup:
+              _fieldActivityClient == null || !_canCreateFollowups
               ? null
               : () => _openFieldActivity(FieldActivityKind.followup, line),
         ),
@@ -1858,6 +1866,24 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     );
   }
 
+  Future<void> _openDataExports() async {
+    final historyClient = _fieldHistoryClient;
+    final fieldDataClient = _fieldDataClient;
+    final orderDataClient = _orderDataClient;
+    if (historyClient == null || fieldDataClient == null || orderDataClient == null) {
+      return;
+    }
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (context) => DataExportsPage(
+          historyClient: historyClient,
+          fieldDataClient: fieldDataClient,
+          orderDataClient: orderDataClient,
+        ),
+      ),
+    );
+  }
+
   Future<void> _openReportSettings() async {
     final source = _fieldActivityClient;
     if (!_canManageReportSettings ||
@@ -2013,6 +2039,11 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
             _canManageReportSettings &&
                 _fieldActivityClient is FieldReportSettingsAdminClient
             ? _openReportSettings
+            : null,
+        onDataExports: _fieldHistoryClient != null &&
+                _fieldDataClient != null &&
+                _orderDataClient != null
+            ? _openDataExports
             : null,
         onTasks: _fieldHistoryClient == null ? null : _openTasks,
         onManagementProposals:

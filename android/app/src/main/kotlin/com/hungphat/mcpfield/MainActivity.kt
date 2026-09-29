@@ -1,6 +1,8 @@
 package com.hungphat.mcpfield
 
 import android.content.Intent
+import android.graphics.Paint
+import android.graphics.pdf.PdfDocument
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
@@ -21,6 +23,7 @@ class MainActivity : FlutterActivity() {
     private val updateChannel = "com.hungphat.mcpfield/app_update"
     private val navigationChannel = "com.hungphat.mcpfield/navigation"
     private val storageChannel = "com.hungphat.mcpfield/storage"
+    private val documentsChannel = "com.hungphat.mcpfield/documents"
     private val updateExecutor = Executors.newSingleThreadExecutor()
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -116,11 +119,127 @@ class MainActivity : FlutterActivity() {
             }
         }
 
+        MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            documentsChannel,
+        ).setMethodCallHandler { call, result ->
+            if (call.method != "shareTextDocument") {
+                result.notImplemented()
+                return@setMethodCallHandler
+            }
+
+            val rawName = call.argument<String>("fileName")?.trim().orEmpty()
+            val mimeType = call.argument<String>("mimeType")?.trim().orEmpty()
+            val content = call.argument<String>("content").orEmpty()
+            val renderPdf = call.argument<Boolean>("renderPdf") == true
+            val fileName = rawName
+                .replace(Regex("[^A-Za-z0-9._-]"), "-")
+                .trim('-')
+                .take(160)
+
+            if (fileName.isBlank() || mimeType.isBlank()) {
+                result.error(
+                    "DOCUMENT_INVALID",
+                    "Thông tin file cần chia sẻ chưa hợp lệ.",
+                    null,
+                )
+                return@setMethodCallHandler
+            }
+
+            try {
+                val directory = File(cacheDir, "exports")
+                if (!directory.exists() && !directory.mkdirs()) {
+                    throw IllegalStateException("Không chuẩn bị được nơi lưu file.")
+                }
+                val target = File(directory, fileName)
+                if (renderPdf) {
+                    writeTextPdf(target, content)
+                } else {
+                    target.writeText(content, Charsets.UTF_8)
+                }
+
+                val contentUri = FileProvider.getUriForFile(
+                    this,
+                    "$packageName.fileprovider",
+                    target,
+                )
+                val share = Intent(Intent.ACTION_SEND).apply {
+                    type = mimeType
+                    putExtra(Intent.EXTRA_STREAM, contentUri)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+                startActivity(Intent.createChooser(share, "Chia sẻ file"))
+                result.success(null)
+            } catch (error: Exception) {
+                result.error(
+                    "DOCUMENT_SHARE_FAILED",
+                    "Không mở được chức năng chia sẻ file.",
+                    null,
+                )
+            }
+        }
+
     }
 
     override fun onDestroy() {
         updateExecutor.shutdownNow()
         super.onDestroy()
+    }
+
+
+    private fun writeTextPdf(target: File, content: String) {
+        val document = PdfDocument()
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            textSize = 11f
+        }
+        val left = 36f
+        val top = 44f
+        val bottom = 800f
+        val lineHeight = 16f
+        var pageNumber = 0
+        var page: PdfDocument.Page? = null
+        var y = top
+
+        fun startPage() {
+            pageNumber += 1
+            page = document.startPage(
+                PdfDocument.PageInfo.Builder(595, 842, pageNumber).create(),
+            )
+            y = top
+        }
+
+        fun finishPage() {
+            page?.let(document::finishPage)
+            page = null
+        }
+
+        try {
+            startPage()
+            val sourceLines = content.replace("\r\n", "\n").split("\n")
+            for (source in sourceLines) {
+                val chunks = if (source.isEmpty()) {
+                    listOf("")
+                } else {
+                    source.chunked(88)
+                }
+                for (line in chunks) {
+                    if (y > bottom) {
+                        finishPage()
+                        startPage()
+                    }
+                    page?.canvas?.drawText(line, left, y, paint)
+                    y += lineHeight
+                }
+            }
+            finishPage()
+            FileOutputStream(target).use { output ->
+                document.writeTo(output)
+                output.fd.sync()
+            }
+        } finally {
+            if (page != null) finishPage()
+            document.close()
+        }
     }
 
     private fun canInstallPackages(): Boolean {

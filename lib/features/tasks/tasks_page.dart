@@ -424,6 +424,16 @@ class _TaskCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 3),
                 Text(
+                  item.sourceLabel,
+                  key: Key('task-source-${item.id}'),
+                  style: const TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
                   overdue
                       ? 'Quá hạn · ${_dateLabel(item.dueDate)}'
                       : "Hạn: ${_dateLabel(item.dueDate, empty: 'Chưa đặt')}",
@@ -496,7 +506,8 @@ class _TaskDetailSheet extends StatelessWidget {
             label: 'Phiên phát sinh',
             value: _dateLabel(item.sessionDate, empty: 'Chưa xác định'),
           ),
-          _DetailLine(label: 'Nguồn', value: _typeLabel(item.followupType)),
+          _DetailLine(label: 'Nguồn phát sinh', value: item.sourceLabel),
+          _DetailLine(label: 'Loại công việc', value: _typeLabel(item.followupType)),
           _DetailLine(label: 'Phụ trách', value: item.owner),
           _DetailLine(label: 'Ưu tiên', value: _priorityLabel(item.priority)),
           _DetailLine(label: 'Trạng thái', value: _statusLabel(item.status)),
