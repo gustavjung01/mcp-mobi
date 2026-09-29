@@ -55,6 +55,10 @@ class FieldActivityFailure implements Exception {
   final String code;
   final String message;
   final bool retryable;
+
+  @override
+  String toString() =>
+      'FieldActivityFailure(code: $code, message: $message, retryable: $retryable)';
 }
 
 class FieldActivityResult {

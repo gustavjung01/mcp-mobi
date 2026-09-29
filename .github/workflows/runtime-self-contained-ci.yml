@@ -67,7 +67,7 @@ jobs:
     env:
       DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/npp_e2e
       NPP_RUNTIME_DIR: ${{ github.workspace }}/_runtime/NPP-Platform
-      MCP_RUNTIME_API_BASE_URL: http://10.0.2.2:3001
+      MCP_RUNTIME_API_BASE_URL: http://127.0.0.1:3001
       MCP_RUNTIME_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}-android
 
     steps:
@@ -132,7 +132,10 @@ jobs:
           profile: pixel_6
           disable-animations: true
           script: |
+            adb reverse --remove-all || true
+            adb reverse tcp:3001 tcp:3001
             adb reverse tcp:9000 tcp:9000
+            adb reverse --list
             flutter test integration_test/runtime_gate_test.dart -d emulator-5554 --dart-define-from-file="$RUNTIME_CONFIG"
 
       - name: Upload runtime logs

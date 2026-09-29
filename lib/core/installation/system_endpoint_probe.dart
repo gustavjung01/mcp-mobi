@@ -13,6 +13,10 @@ class SystemEndpointFailure implements Exception {
   final String code;
   final String message;
   final bool retryable;
+
+  @override
+  String toString() =>
+      'SystemEndpointFailure(code: $code, message: $message, retryable: $retryable)';
 }
 
 abstract interface class SystemEndpointProbe {

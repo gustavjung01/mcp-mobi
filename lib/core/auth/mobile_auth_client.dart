@@ -37,6 +37,9 @@ class AuthFailure implements Exception {
   final String code;
   final String message;
   final bool retryable;
+
+  @override
+  String toString() => 'AuthFailure(code: $code, message: $message, retryable: $retryable)';
 }
 
 abstract interface class MobileAuthClient {
@@ -255,7 +258,7 @@ class HttpMobileAuthClient implements MobileAuthClient {
     required InstallationProfile profile,
     required String token,
   }) async {
-    final response = await _send(
+    Future<http.Response> sendMe() => _send(
       _client.get(
         _endpoint(profile, '/api/mobile-auth/me'),
         headers: {
@@ -265,6 +268,14 @@ class HttpMobileAuthClient implements MobileAuthClient {
         },
       ),
     );
+
+    http.Response response;
+    try {
+      response = await sendMe();
+    } on AuthFailure catch (error) {
+      if (!error.retryable) rethrow;
+      response = await sendMe();
+    }
     final decoded = _decode(response);
     if (response.statusCode >= 400) throw _failure(response, decoded);
     return _sessionFromMe(decoded, token);
