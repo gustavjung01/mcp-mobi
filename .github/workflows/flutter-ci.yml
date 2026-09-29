@@ -100,6 +100,9 @@ jobs:
           test/market_report_page_test.dart
           test/management_proposal_test.dart
           test/field_check_sync_test.dart
+          test/local_data_store_test.dart
+          test/legacy_secure_storage_migration_test.dart
+          test/local_catalog_order_data_client_test.dart
 
       - name: Compile iOS release without signing
         run: flutter build ios --release --no-codesign

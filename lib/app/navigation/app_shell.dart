@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../core/auth/mobile_auth_client.dart';
@@ -6,6 +8,7 @@ import '../../core/data/field_activity_client.dart';
 import '../../core/data/field_data_client.dart';
 import '../../core/data/field_history_client.dart';
 import '../../core/data/management_proposal_client.dart';
+import '../../core/data/local_catalog_order_data_client.dart';
 import '../../core/data/order_data_client.dart';
 import '../../core/installation/installation_profile.dart';
 import '../../core/location/external_navigation.dart';
@@ -21,6 +24,8 @@ import '../../core/sync/management_proposal_sync.dart';
 import '../../core/sync/mutation_queue.dart';
 import '../../core/sync/order_offline_store.dart';
 import '../../core/sync/route_mutation_sync.dart';
+import '../../core/storage/legacy_secure_storage_migration.dart';
+import '../../core/storage/local_data_store.dart';
 import '../../features/customers/customer_onboarding_page.dart';
 import '../../features/more/more_page.dart';
 import '../../features/orders/create_order_page.dart';
@@ -91,6 +96,9 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   FieldHistoryClient? _fieldHistoryClient;
   CustomerBoundaryClient? _customerBoundaryClient;
   ManagementProposalClient? _managementProposalClient;
+  LocalDataStore? _localDataStore;
+  LocalDataScope? _localDataScope;
+  LegacySecureStorageMigrator? _legacyMigrator;
   MutationQueueStore? _mutationQueueStore;
   RouteSelectionStore? _routeSelectionStore;
   OrderDataClient? _orderDataClient;
@@ -118,7 +126,9 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   bool _managementProposalSyncing = false;
   bool _mediaSyncing = false;
   bool _routeSelectionLoaded = false;
+  bool _localPersistenceReady = false;
   String? _fieldMessage;
+  String? _localPersistenceMessage;
   String? _outletMessage;
   String? _companyCustomerMessage;
   int _workspaceLoadGeneration = 0;
@@ -133,6 +143,27 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+
+    final profile = widget.profile;
+    final session = widget.session;
+    if (profile != null && session != null) {
+      _localDataStore = LocalDataStore.shared;
+      _localDataScope = LocalDataScope(
+        installationKey: profile.installationKey,
+        employeeId: session.employeeId,
+      );
+      final usesDefaultLegacyBusinessStorage =
+          widget.mutationQueueStore == null ||
+          widget.routeSelectionStore == null ||
+          widget.orderOfflineStore == null;
+      if (usesDefaultLegacyBusinessStorage) {
+        _legacyMigrator = LegacySecureStorageMigrator(
+          database: _localDataStore!,
+          scope: _localDataScope!,
+        );
+      }
+    }
+
     _fieldDataClient = widget.fieldDataClient ?? _defaultFieldDataClient();
     _fieldActivityClient =
         widget.fieldActivityClient ?? _defaultFieldActivityClient();
@@ -159,6 +190,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     _photoPendingStore =
         widget.outletPhotoPendingStore ??
         const DeviceOutletPhotoPendingStore();
+
     if (_fieldDataClient != null) {
       _loadingRoutes = true;
       _loadingOutlets = true;
@@ -169,14 +201,46 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       _loadingCompanyCustomers = true;
       _loadCompanyCustomers();
     }
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _syncPendingWork();
+      _initializeLocalPersistence();
     });
+  }
+
+  Future<void> _initializeLocalPersistence() async {
+    String? migrationWarning;
+    final migrator = _legacyMigrator;
+    if (migrator != null) {
+      try {
+        await migrator.run();
+      } on LegacyStorageMigrationFailure catch (failure) {
+        migrationWarning = failure.message;
+      }
+    }
+
+    _localPersistenceReady = migrationWarning == null;
+
+    if (!mounted) return;
+    if (migrationWarning != null) {
+      setState(() {
+        _localPersistenceMessage = migrationWarning;
+      });
+      return;
+    }
+    _syncPendingWork();
+    final orderClient = _orderDataClient;
+    if (orderClient is LocalCatalogOrderDataClient) {
+      unawaited(
+        orderClient.refreshCatalog().catchError((_) {
+          // The local catalog remains usable; next product search can retry.
+        }),
+      );
+    }
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
+    if (state == AppLifecycleState.resumed && _localPersistenceReady) {
       _syncPendingWork();
     }
   }
@@ -248,22 +312,22 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       widget.session?.permissions.contains('mcp.report.write') == true;
 
   MutationQueueStore? _defaultMutationQueueStore() {
-    final profile = widget.profile;
-    final session = widget.session;
-    if (profile == null || session == null) return null;
-    return SecureMutationQueueStore(
-      installationKey: profile.installationKey,
-      employeeId: session.employeeId,
+    final database = _localDataStore;
+    final scope = _localDataScope;
+    if (database == null || scope == null) return null;
+    return LocalMutationQueueStore(
+      database: database,
+      scope: scope,
     );
   }
 
   RouteSelectionStore? _defaultRouteSelectionStore() {
-    final profile = widget.profile;
-    final session = widget.session;
-    if (profile == null || session == null) return null;
-    return SecureRouteSelectionStore(
-      installationKey: profile.installationKey,
-      employeeId: session.employeeId,
+    final database = _localDataStore;
+    final scope = _localDataScope;
+    if (database == null || scope == null) return null;
+    return LocalRouteSelectionStore(
+      database: database,
+      scope: scope,
     );
   }
 
@@ -271,19 +335,27 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     final profile = widget.profile;
     final session = widget.session;
     if (profile == null || session == null) return null;
-    return HttpOrderDataClient(
+    final remote = HttpOrderDataClient(
       profile: profile,
       token: session.token,
+    );
+    final database = _localDataStore;
+    final scope = _localDataScope;
+    if (database == null || scope == null) return remote;
+    return LocalCatalogOrderDataClient(
+      remote: remote,
+      database: database,
+      scope: scope,
     );
   }
 
   OrderOfflineStore? _defaultOrderOfflineStore() {
-    final profile = widget.profile;
-    final session = widget.session;
-    if (profile == null || session == null) return null;
-    return SecureOrderOfflineStore(
-      installationKey: profile.installationKey,
-      employeeId: session.employeeId,
+    final database = _localDataStore;
+    final scope = _localDataScope;
+    if (database == null || scope == null) return null;
+    return LocalOrderOfflineStore(
+      database: database,
+      scope: scope,
       mutationQueueStore: _mutationQueueStore,
     );
   }
@@ -718,6 +790,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   }
 
   void _syncPendingWork() {
+    if (!_localPersistenceReady) return;
     _syncRouteMutations();
     _syncFieldActivities();
     _syncFieldChecks();
@@ -1446,7 +1519,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
         selectedRoute: _selectedRoute,
         workspace: _workspace,
         loading: loading,
-        message: _fieldMessage,
+        message: _localPersistenceMessage ?? _fieldMessage,
         onOpenRoutes: () => _openTab(1),
         onOpenRouteOutlet: (line) =>
             _openRouteOutlet(_customerForLine(line), line),
@@ -1457,7 +1530,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
         selectedRoute: _selectedRoute,
         workspace: _workspace,
         loading: loading,
-        message: _fieldMessage,
+        message: _localPersistenceMessage ?? _fieldMessage,
         routeActionBusy: _routeActionBusy,
         onSelectRoute: _selectRoute,
         onRefresh: _fieldDataClient == null ? null : _refreshFieldData,

@@ -63,6 +63,21 @@ class OrderCatalogItem {
     );
   }
 
+  Map<String, Object?> toJson() => {
+    'productId': productId,
+    'variantId': variantId,
+    'name': name,
+    if (brand != null) 'brand': brand,
+    if (category != null) 'category': category,
+    if (sku != null) 'sku': sku,
+    if (variantName != null) 'variantName': variantName,
+    if (sizeLabel != null) 'sizeLabel': sizeLabel,
+    if (sellUnit != null) 'sellUnit': sellUnit,
+    if (packUnit != null) 'packUnit': packUnit,
+    if (packQuantity != null) 'packQuantity': packQuantity,
+    if (price != null) 'price': price,
+  };
+
   String get purchaseUnitLabel {
     final unit = (sellUnit ?? '').trim().toLowerCase();
     if (RegExp(r'(^|\s)(thùng|thung|case|carton)(\s|$)').hasMatch(unit)) {
@@ -317,7 +332,11 @@ abstract interface class OrderDataClient {
   });
 }
 
-class HttpOrderDataClient implements OrderDataClient {
+abstract interface class CompleteOrderCatalogClient {
+  Future<List<OrderCatalogItem>> loadCompleteCatalog();
+}
+
+class HttpOrderDataClient implements OrderDataClient, CompleteOrderCatalogClient {
   HttpOrderDataClient({
     required this.profile,
     required this.token,
@@ -374,15 +393,21 @@ class HttpOrderDataClient implements OrderDataClient {
       '/api/core-sales/products/search',
       query: params,
     );
-    return _objects(data)
-        .map(OrderCatalogItem.fromJson)
-        .where(
-          (item) =>
-              item.productId.isNotEmpty &&
-              item.variantId.isNotEmpty &&
-              item.name.isNotEmpty,
-        )
-        .toList(growable: false);
+    return _catalogItems(data);
+  }
+
+  @override
+  Future<List<OrderCatalogItem>> loadCompleteCatalog() async {
+    final data = await _request(
+      'GET',
+      '/api/core-sales/products/search',
+      query: const {
+        'q': '',
+        'catalog': 'all',
+        'includePrice': 'true',
+      },
+    );
+    return _catalogItems(data);
   }
 
   @override
@@ -502,6 +527,18 @@ class HttpOrderDataClient implements OrderDataClient {
     }
     return payload['data'];
   }
+}
+
+List<OrderCatalogItem> _catalogItems(Object? data) {
+  return _objects(data)
+      .map(OrderCatalogItem.fromJson)
+      .where(
+        (item) =>
+            item.productId.isNotEmpty &&
+            item.variantId.isNotEmpty &&
+            item.name.isNotEmpty,
+      )
+      .toList(growable: false);
 }
 
 String _orderErrorMessage(
