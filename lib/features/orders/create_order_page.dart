@@ -203,9 +203,10 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
 
       final priceClient = widget.orderClient;
       if (priceClient is OrderCatalogPriceClient) {
+        final priceSource = priceClient as OrderCatalogPriceClient;
         setState(() => _refreshingPrices = true);
         try {
-          final prices = await priceClient.loadFreshPrices(
+          final prices = await priceSource.loadFreshPrices(
             query: _searchController.text,
             category: _category,
             brand: _brand,

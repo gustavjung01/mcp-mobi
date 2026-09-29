@@ -1067,8 +1067,13 @@ class _OrderVersionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AppCard(
-      padding: EdgeInsets.zero,
+    return Material(
+      color: AppColors.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        side: const BorderSide(color: AppColors.border),
+      ),
+      clipBehavior: Clip.antiAlias,
       child: ExpansionTile(
         key: Key('order-version-${version.versionNumber}'),
         tilePadding: const EdgeInsets.symmetric(

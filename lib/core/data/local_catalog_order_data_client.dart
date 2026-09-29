@@ -98,7 +98,8 @@ class LocalCatalogOrderDataClient implements OrderDataClient, OrderCatalogPriceC
   }) async {
     final source = remote;
     if (source is OrderCatalogPriceClient) {
-      return source.loadFreshPrices(
+      final priceSource = source as OrderCatalogPriceClient;
+      return priceSource.loadFreshPrices(
         query: query,
         category: category,
         brand: brand,
