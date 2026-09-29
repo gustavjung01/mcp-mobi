@@ -7,6 +7,7 @@ on:
       - 'lib/**'
       - 'integration_test/**'
       - 'tool/runtime/**'
+      - 'tool/ci/**'
       - 'android/**'
       - 'ios/**'
       - 'pubspec.yaml'
@@ -19,6 +20,7 @@ on:
       - 'lib/**'
       - 'integration_test/**'
       - 'tool/runtime/**'
+      - 'tool/ci/**'
       - 'android/**'
       - 'ios/**'
       - 'pubspec.yaml'
@@ -30,7 +32,7 @@ permissions:
 
 concurrency:
   group: runtime-self-contained-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   runtime-source:
@@ -119,6 +121,7 @@ jobs:
         run: |
           dart format --output=none --set-exit-if-changed integration_test
           bash -n tool/runtime/start_test_installation.sh
+          bash -n tool/ci/run_android_emulator_gate.sh
           node --check tool/runtime/report_agent_test_server.mjs
 
       - name: Prepare isolated test installation
@@ -126,18 +129,16 @@ jobs:
         run: bash tool/runtime/start_test_installation.sh
 
       - name: Run Android app -> MCP -> Công Ty gate
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 35
-          arch: x86_64
-          profile: pixel_6
-          disable-animations: true
-          script: |
+        shell: bash
+        run: |
+          bash tool/ci/run_android_emulator_gate.sh bash -lc '
+            set -euo pipefail
             adb reverse --remove-all || true
             adb reverse tcp:3001 tcp:3001
             adb reverse tcp:9000 tcp:9000
             adb reverse --list
             flutter test integration_test/runtime_gate_test.dart -d emulator-5554 --dart-define-from-file="$RUNTIME_CONFIG"
+          '
 
       - name: Upload runtime logs
         if: always()

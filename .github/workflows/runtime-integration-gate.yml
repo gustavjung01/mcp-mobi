@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - ".github/workflows/runtime-integration-gate.yml"
+      - "tool/ci/**"
       - "integration_test/runtime_gate_test.dart"
   workflow_dispatch:
     inputs:
@@ -130,14 +131,17 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
+      - name: Validate Android emulator harness
+        shell: bash
+        run: bash -n tool/ci/run_android_emulator_gate.sh
+
       - name: Run Android runtime integration gate
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 35
-          arch: x86_64
-          profile: pixel_6
-          disable-animations: true
-          script: flutter test integration_test/runtime_gate_test.dart -d emulator-5554 --dart-define-from-file="$RUNTIME_CONFIG"
+        shell: bash
+        run: >-
+          bash tool/ci/run_android_emulator_gate.sh
+          flutter test integration_test/runtime_gate_test.dart
+          -d emulator-5554
+          --dart-define-from-file="$RUNTIME_CONFIG"
 
   ios-runtime:
     if: ${{ github.event_name == 'workflow_dispatch' && (inputs.platform == 'both' || inputs.platform == 'ios') }}

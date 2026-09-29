@@ -7,6 +7,10 @@ on:
     branches:
       - main
 
+concurrency:
+  group: device-foundation-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   android-device:
     runs-on: ubuntu-latest
@@ -34,14 +38,16 @@ jobs:
       - name: Check integration-test formatting
         run: dart format --output=none --set-exit-if-changed integration_test
 
+      - name: Validate Android emulator harness
+        shell: bash
+        run: bash -n tool/ci/run_android_emulator_gate.sh
+
       - name: Run Android device foundation gate
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 35
-          arch: x86_64
-          profile: pixel_6
-          disable-animations: true
-          script: flutter test integration_test/device_foundation_test.dart -d emulator-5554
+        shell: bash
+        run: >-
+          bash tool/ci/run_android_emulator_gate.sh
+          flutter test integration_test/device_foundation_test.dart
+          -d emulator-5554
 
   ios-device:
     # Owner decision 2026-09-30: iOS is deferred while Android is the active release target.
