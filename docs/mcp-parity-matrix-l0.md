@@ -64,45 +64,45 @@ Mobile không được tự suy ra quyền từ UI. Backend là authority.
 | 3 | Đăng xuất | `/api/mobile-auth/logout` | authenticated | Có | Xóa token/session | DONE | Không được xóa nhầm business queue khi refactor |
 | 4 | Tổng quan/Hôm nay | MCP dashboard/local read | read scope | Có tuyến, tiến độ, đơn, test, follow-up | Cache read model | PARTIAL | Thiếu cảnh báo/ưu tiên/runtime health tương đương MCP gốc |
 | 5 | Danh sách tuyến cố định | `/api/local-read/mcp-shell` | read scope | Có | Cache tuyến | PARTIAL | Chưa có local DB/cache chuẩn |
-| 6 | Chọn tuyến | local UI + route workspace | read | Có | Persist theo installation+employee | BROKEN | Selection đang ở secure storage, sai tầng |
-| 7 | Tạo tuyến | `POST /api/routes` | `mcp.route.write` | Không | Queue nếu hỗ trợ offline | MISSING | Web MCP có thật |
-| 8 | Sửa tuyến | `PATCH /api/routes/:id` | `mcp.route.write` | Không | Queue | MISSING | Web MCP có thật |
-| 9 | Archive/xóa tuyến | `POST /api/routes/:id/archive` | `mcp.route.write` | Không | Online + confirmation | MISSING | Web MCP có thật |
-| 10 | Xem membership điểm bán trong tuyến | shell/read model | read | Có một phần | Cache | PARTIAL | Mobile không có màn quản trị membership đầy đủ |
-| 11 | Thêm điểm bán vào tuyến cố định | `POST /api/route-customers` | `mcp.route-customer.write` | Chỉ có thêm trong phiên | Queue | PARTIAL | Thiếu route-only flow rõ ràng |
-| 12 | Sửa điểm bán | `PATCH /api/route-customers/:id` | `mcp.route-customer.write` | Chỉ cập nhật GPS | Queue | MISSING | Thiếu tên/SĐT/khu vực/địa chỉ/thứ tự/trạng thái/ghi chú |
-| 13 | Archive/xóa điểm bán | `POST /api/route-customers/:id/archive` | `mcp.route-customer.write` | Không | Online + confirmation | MISSING | Web MCP có thật |
+| 6 | Chọn tuyến | local UI + route workspace | read | Có | Persist theo installation+employee | PARTIAL | Đã chuyển sang SQLite theo installation+employee; chờ runtime evidence thiết bị |
+| 7 | Tạo tuyến | `POST /api/routes` | `mcp.route.write` | Có theo quyền | Queue SQLite | PARTIAL | Đã có form + canonical queue; chờ runtime evidence |
+| 8 | Sửa tuyến | `PATCH /api/routes/:id` | `mcp.route.write` | Có theo quyền | Queue SQLite | PARTIAL | Đã có sửa tuyến + retry cùng key; chờ runtime evidence |
+| 9 | Archive/xóa tuyến | `POST /api/routes/:id/archive` | `mcp.route.write` | Có theo quyền | Queue SQLite + xác nhận | PARTIAL | Đã có ngừng sử dụng tuyến; chờ runtime evidence |
+| 10 | Xem membership điểm bán trong tuyến | shell/read model | read | Có + quản trị theo quyền | Cache | PARTIAL | Đã có quản trị membership; read cache tuyến vẫn cần hoàn thiện |
+| 11 | Thêm điểm bán vào tuyến cố định | `POST /api/route-customers` | `mcp.route-customer.write` | Có route-only + active-session option | Queue SQLite | PARTIAL | Đã có canonical flow; chờ runtime evidence |
+| 12 | Sửa điểm bán | `PATCH /api/route-customers/:id` | `mcp.route-customer.write` | Có tên/SĐT/khu vực/địa chỉ/thứ tự/ghi chú + GPS | Queue SQLite | PARTIAL | Full edit đã có; chờ runtime evidence |
+| 13 | Archive/xóa điểm bán | `POST /api/route-customers/:id/archive` | `mcp.route-customer.write` | Có theo quyền | Queue SQLite + xác nhận | PARTIAL | Đã có loại khỏi tuyến; chờ runtime evidence |
 | 14 | Preview tuyến trước phiên | shell + route customer read | read | Có tuyến cố định/preview cơ bản | Cache | PARTIAL | Chưa chung state với route management |
-| 15 | Mở phiên | `POST /api/mcp-day/open-session` | `mcp.session.write` | Có | Durable intent | PARTIAL | Queue phụ thuộc secure storage |
-| 16 | Tiếp tục phiên active | `/api/mcp-day/data` | read | Có | Cache active session | PARTIAL | State local chưa transactional |
-| 17 | Kết thúc/chốt phiên | `PATCH /api/mcp-sessions/:id` | `mcp.session.write` | Có status done | Durable intent | PARTIAL | Chưa mô hình hóa đầy đủ các transition |
-| 18 | Hủy/chỉnh phiên | `PATCH /api/mcp-sessions/:id` | `mcp.session.write` | Không | Durable intent | MISSING | MCP gốc hỗ trợ status/update |
-| 19 | Xóa phiên rỗng | `DELETE /api/mcp-sessions/:id` | `mcp.session.write` | Không | Online | MISSING | MCP gốc có contract |
-| 20 | Single-active-session conflict recovery | session lifecycle contract | `mcp.session.write` | Chỉ hiển thị lỗi server | State refresh | BROKEN | Chưa có recovery UX/capability state; dễ lặp 409 |
-| 21 | Check-in | `POST /api/mcp-day/session-customer/checkin` | `mcp.session-customer.write` | Có | Queue + GPS | PARTIAL | Queue sai tầng |
+| 15 | Mở phiên | `POST /api/mcp-day/open-session` | `mcp.session.write` | Có, khóa theo quyền | Durable SQLite intent | PARTIAL | Queue đúng tầng; chờ runtime evidence |
+| 16 | Tiếp tục phiên active | `/api/mcp-day/data` | read | Có | SQLite selection + server state | PARTIAL | Luồng tiếp tục rõ theo trạng thái; chờ runtime evidence |
+| 17 | Kết thúc/chốt phiên | `PATCH /api/mcp-sessions/:id` | `mcp.session.write` | Có status done, khóa theo quyền | Durable SQLite intent | PARTIAL | Đã chung state với hủy/xóa rỗng; chờ runtime evidence |
+| 18 | Hủy/chỉnh phiên | `PATCH /api/mcp-sessions/:id` | `mcp.session.write` | Có hủy phiên | Durable SQLite intent | PARTIAL | Hủy phiên đã có; chỉnh ngày/note nâng cao chưa surfaced |
+| 19 | Xóa phiên rỗng | `DELETE /api/mcp-sessions/:id` | `mcp.session.write` | Có khi phiên chưa phát sinh tác nghiệp | Durable SQLite intent | PARTIAL | Đã có guard UI + backend authority; chờ runtime evidence |
+| 20 | Single-active-session conflict recovery | session lifecycle contract | `mcp.session.write` | Có business message + đổi tuyến/refresh | State refresh | PARTIAL | Không còn generic 409 cho conflict chính; chờ runtime evidence |
+| 21 | Check-in | `POST /api/mcp-day/session-customer/checkin` | `mcp.session-customer.write` | Có, khóa theo quyền | Queue SQLite + GPS | PARTIAL | Persistence/quyền đã sửa; chờ runtime evidence |
 | 22 | Hoàn tác check-in | cùng contract `checkedIn=false` | `mcp.session-customer.write` | Có | Queue | PARTIAL | Cần runtime test thật |
 | 23 | Bỏ qua + lý do | `POST /api/mcp-day/session-customer/status` | `mcp.session-customer.write` | Có | Queue | PARTIAL | Cần canonical reason/settings parity |
-| 24 | Thêm điểm bán phát sinh vào phiên | `POST /api/mcp-day/session-customer/add` | `mcp.session-customer.write` | Có | Queue | PARTIAL | Persistence sai tầng |
+| 24 | Thêm điểm bán phát sinh vào phiên | `POST /api/mcp-day/session-customer/add` | `mcp.session-customer.write` | Có, khóa theo quyền | Queue SQLite | PARTIAL | Persistence/quyền đã sửa; chờ runtime evidence |
 | 25 | Danh bạ điểm bán | shell/customer read | read | Có | Local searchable cache | PARTIAL | Chưa local DB/index |
-| 26 | Danh bạ khách Công Ty | `GET /api/core-customers` | authenticated/scoped | Có card | Cache | PARTIAL | Card chưa là hồ sơ thao tác đầy đủ |
-| 27 | Hồ sơ điểm bán | outlet/customer read | read | Có | Cache | PARTIAL | Thiếu full edit + capability theo quyền |
-| 28 | GPS điểm bán | route-customer update | `mcp.route-customer.write` | Có lấy/cập nhật vị trí | Queue | PARTIAL | Queue sai tầng; cần stale/conflict recovery |
+| 26 | Danh bạ khách Công Ty | `GET /api/core-customers` | authenticated/scoped | Có card + hồ sơ chi tiết + ra đơn | Cache | PARTIAL | Hồ sơ thao tác đã có; cache danh bạ còn cần hoàn thiện |
+| 27 | Hồ sơ điểm bán | outlet/customer read | read | Có + full edit/archive theo quyền | Cache | PARTIAL | Nghiệp vụ quản lý đã có; chờ runtime evidence |
+| 28 | GPS điểm bán | route-customer update | `mcp.route-customer.write` | Có lấy/cập nhật vị trí | Queue SQLite | PARTIAL | Queue đúng tầng; cần runtime conflict evidence |
 | 29 | Mở Maps | location URL | read | Có | Không | DONE | Native external navigation phù hợp |
 | 30 | Ảnh điểm bán: xem | `GET /api/outlet-media/customer-profile` | scoped | Có | Cache metadata | PARTIAL | Cần runtime verify production thật |
 | 31 | Ảnh điểm bán: upload | upload-init/finalize | route/customer scope | Có | Pending file store | PARTIAL | Kiến trúc file pending tốt hơn queue JSON nhưng cần device E2E |
 | 32 | Ảnh điểm bán: xóa | `POST /api/outlet-media/delete` | scoped | Có | Online/retry | PARTIAL | Chưa real integration gate |
 | 33 | Mở/liên kết mã khách | customer verification submit | boundary contract | Có | Queue | PARTIAL | Queue sai tầng; cần end-to-end approval/link evidence |
 | 34 | Đồng bộ trạng thái mở/liên kết mã | `POST /api/customer-verifications/sync` | boundary contract | Có | Queue/read refresh | PARTIAL | Cần runtime evidence |
-| 35 | Catalog SKU Công Ty | `GET /api/core-sales/products/search` | `mcp.sales-order.read` + warehouse scope | API search có | **Local catalog bắt buộc** | BROKEN | Không có local SKU cache/index |
+| 35 | Catalog SKU Công Ty | `GET /api/core-sales/products/search` | `mcp.sales-order.read` + warehouse scope | Có local catalog sync | **Local catalog bắt buộc** | PARTIAL | SQLite catalog/index đã có; chờ real API/device evidence |
 | 36 | Variant/unit | `GET /api/core-sales/products/:id/variants` | `mcp.sales-order.read` | Model có một phần | Local cache | PARTIAL | Mobile chưa parity variant/unit UX MCP web |
 | 37 | Giá bán canonical | core-sales price resolution | `mcp.sales-order.read/create` | Hiển thị giá API | Cache chỉ tham khảo | PARTIAL | Không được coi giá local là authority |
-| 38 | Tìm SKU nhanh | web có `mcp-product-local-cache.ts` | read | Mobile gọi API trực tiếp | Local indexed search | MISSING | Đây là yêu cầu bắt buộc của app |
+| 38 | Tìm SKU nhanh | web có `mcp-product-local-cache.ts` | read | Tìm SQLite local sau catalog sync | Local indexed search | PARTIAL | Đã có local indexed search; chờ device evidence |
 | 39 | Chọn khách để tạo đơn | core customers + address | read | Có picker | Cache | PARTIAL | Chưa dùng local indexed directory |
 | 40 | Thêm SKU vào giỏ | order workflow | create later | Có cart trong cùng page | Draft local | PARTIAL | Luồng chưa tách Sản phẩm -> Giỏ rõ |
 | 41 | Giỏ hàng riêng/rà đơn | MCP order create UX | create | Có section cart nhưng không phải workflow rõ | Draft local | PARTIAL | Cần bước Giỏ/Rà đơn rõ, không submit trực tiếp từ chọn SP |
 | 42 | Tạo đơn về Công Ty | `POST /api/core-sales/orders` | `mcp.sales-order.create` + warehouse scope | Có | Durable mutation | BROKEN | Runtime user đang gặp gửi lỗi/409; cần root-cause mapping xuyên MCP -> Công Ty |
 | 43 | Idempotent retry đơn | canonical key contract | create | Có canonical key | Durable queue | PARTIAL | Queue sai tầng; phải giữ key qua crash/reinstall policy rõ |
-| 44 | Đơn chờ gửi | local queue | create | Có | Transactional local DB | BROKEN | Secure storage không phù hợp |
+| 44 | Đơn chờ gửi | local queue | create | Có | Transactional SQLite | PARTIAL | Đã chuyển khỏi secure storage; chờ device recovery evidence |
 | 45 | Danh sách đơn | `GET /api/core-sales/orders` | `mcp.sales-order.read` | Có | Read cache | PARTIAL | Filter/detail chưa parity |
 | 46 | Chi tiết đơn + dòng hàng + version | core sales read model | read | Có card/detail hạn chế | Cache | PARTIAL | Thiếu line/version đầy đủ |
 | 47 | Báo cáo thị trường | session-customer report | `mcp.report.write` | Có | Draft/queue | PARTIAL | Local persistence sai tầng |
@@ -127,9 +127,9 @@ Mobile không được tự suy ra quyền từ UI. Backend là authority.
 | 66 | Capability-state theo quyền/cấu hình | access + backend readiness | permission-dependent | Rời rạc | Local session capability map | BROKEN | Không có registry canonical |
 | 67 | Menu/action khi capability null | mobile More/AppShell | n/a | Một số menu luôn render | n/a | BROKEN | Có thể bấm không phản hồi |
 | 68 | Canonical error mapping | API contract | n/a | Mỗi client tự map | Persist error code | BROKEN | 404/409/503 dễ bị gom thông báo chung |
-| 69 | Mutation queue | shared canonical queue | n/a | Có | Transactional local DB | BROKEN | Đang dùng secure storage |
-| 70 | Order draft | local draft | n/a | Có | Transactional local DB | BROKEN | Đang dùng secure storage |
-| 71 | Route selection persistence | local selection | n/a | Có | Local prefs/DB | BROKEN | Đang dùng secure storage |
+| 69 | Mutation queue | shared canonical queue | n/a | Có | Transactional SQLite | PARTIAL | SQLite + reopen tests xanh; chờ device evidence |
+| 70 | Order draft | local draft | n/a | Có | Transactional SQLite | PARTIAL | SQLite + reopen tests xanh; chờ device evidence |
+| 71 | Route selection persistence | local selection | n/a | Có | Transactional SQLite | PARTIAL | SQLite + restart tests xanh; chờ device evidence |
 | 72 | Pending photo binary | private app files | n/a | Có | Private file store | PARTIAL | Hướng đúng; cần metadata transactional |
 | 73 | Background sync | replay services | permissions | Có | DB queue | PARTIAL | Nhiều `catch (_)` nuốt lỗi; thiếu global sync center |
 | 74 | Trạng thái sync người dùng hiểu được | waiting/sending/error/synced | n/a | Có cục bộ | DB queue | PARTIAL | Chưa thống nhất toàn app |

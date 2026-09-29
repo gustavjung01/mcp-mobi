@@ -23,6 +23,7 @@ class OutletsPage extends StatefulWidget {
     this.companyMessage,
     this.onRefresh,
     this.onOpenOutlet,
+    this.onOpenCompanyCustomer,
   });
 
   final List<FieldOutlet> outlets;
@@ -33,6 +34,7 @@ class OutletsPage extends StatefulWidget {
   final String? companyMessage;
   final Future<void> Function()? onRefresh;
   final void Function(FieldOutlet outlet)? onOpenOutlet;
+  final void Function(CompanyCustomer customer)? onOpenCompanyCustomer;
 
   @override
   State<OutletsPage> createState() => _OutletsPageState();
@@ -209,7 +211,12 @@ class _OutletsPageState extends State<OutletsPage> {
             ...visibleCompany.map(
               (customer) => Padding(
                 padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                child: _CompanyCustomerCard(customer: customer),
+                child: _CompanyCustomerCard(
+                  customer: customer,
+                  onTap: widget.onOpenCompanyCustomer == null
+                      ? null
+                      : () => widget.onOpenCompanyCustomer!(customer),
+                ),
               ),
             ),
         ],
@@ -376,15 +383,25 @@ class _OutletRow extends StatelessWidget {
 }
 
 class _CompanyCustomerCard extends StatelessWidget {
-  const _CompanyCustomerCard({required this.customer});
+  const _CompanyCustomerCard({
+    required this.customer,
+    this.onTap,
+  });
 
   final CompanyCustomer customer;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     return AppCard(
-      key: Key('company-customer-${customer.id}'),
-      child: Column(
+      padding: EdgeInsets.zero,
+      child: InkWell(
+        key: Key('company-customer-${customer.id}'),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.md),
+          child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
@@ -429,6 +446,8 @@ class _CompanyCustomerCard extends StatelessWidget {
             ),
           ),
         ],
+          ),
+        ),
       ),
     );
   }
