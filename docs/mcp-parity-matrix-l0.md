@@ -120,19 +120,19 @@ Mobile không được tự suy ra quyền từ UI. Backend là authority.
 | 59 | Lịch sử phiên | local read/sessions | read | Có filter route/status/days + mở chi tiết phiên | Cache | PARTIAL | Không còn card cụt; chờ runtime evidence lịch sử thật |
 | 60 | Chi tiết báo cáo phiên | session report read | read | Có điểm bán/đơn/thử sản phẩm/báo cáo/công việc/bỏ qua | Cache | PARTIAL | Mobile đã gom chi tiết phiên và export từ cùng read model; chờ runtime evidence |
 | 61 | Snapshot báo cáo phiên | `POST /api/mcp-session-report` | `mcp.report.write` | Có tạo/cập nhật bản chốt từ chi tiết phiên | Online idempotent mutation | PARTIAL | Dùng canonical key; chờ runtime evidence |
-| 62 | AI phân tích báo cáo phiên | `/api/mcp-session-report/analyze` + ai-result | `mcp.report.write` | Có sau khi có bản chốt | Online idempotent mutation | PARTIAL | MCP backend boundary mới, không gọi route web/cookie; chờ backend PR + runtime evidence |
+| 62 | AI phân tích báo cáo phiên | `/api/mcp-session-report/analyze` + ai-result | `mcp.report.write` | Có sau khi có bản chốt | Online idempotent mutation | PARTIAL | MCP backend boundary đã vào main, không gọi route web/cookie; chờ runtime evidence |
 | 63 | Xuất báo cáo phiên Word/Excel/PDF/export | session report read model + native share | read | Có Word/Excel/PDF/Markdown/JSON | Local render + native share | PARTIAL | Không phụ thuộc cookie web; Android/iOS build là gate code, chờ device share evidence |
 | 64 | CSV exports: phiên/đơn/điểm bán/report/test/follow-up | canonical mobile read models | read | Có trung tâm Xuất dữ liệu 6 CSV + xuất theo từng phiên | Local render + native share | PARTIAL | Không gọi route web/cookie; chờ device share/runtime evidence |
 | 65 | Đề xuất quản lý | `/api/management-proposals` | `mcp.report.write` | Có role-gated | SQLite queue | PARTIAL | Submit/list/resubmit đã đúng canonical queue; chờ integration thật |
-| 66 | Capability-state theo quyền/cấu hình | access + backend readiness | permission-dependent | Rời rạc | Local session capability map | BROKEN | Không có registry canonical |
-| 67 | Menu/action khi capability null | mobile More/AppShell | n/a | Một số menu luôn render | n/a | BROKEN | Có thể bấm không phản hồi |
-| 68 | Canonical error mapping | API contract | n/a | Mỗi client tự map | Persist error code | BROKEN | 404/409/503 dễ bị gom thông báo chung |
+| 66 | Capability-state theo quyền/cấu hình | access + backend readiness | permission-dependent | Có registry dùng chung cho permission + runtime readiness | Local session capability map | PARTIAL | Registry đã khóa một nguồn quyết định; chờ runtime evidence Lô 7 |
+| 67 | Menu/action khi capability null | mobile More/AppShell | n/a | Menu chỉ render khi action/capability sẵn sàng | n/a | PARTIAL | Không còn mục Thêm bấm rỗng; chờ runtime evidence Lô 7 |
+| 68 | Canonical error mapping | API contract | n/a | Có mapper dùng chung cho 401/403/404/409/422/429/5xx + business override | Persist error code | PARTIAL | Thông báo văn phòng và retryability đã chuẩn hóa; chờ runtime matrix Lô 7 |
 | 69 | Mutation queue | shared canonical queue | n/a | Có | Transactional SQLite | PARTIAL | SQLite + reopen tests xanh; chờ device evidence |
 | 70 | Order draft | local draft | n/a | Có | Transactional SQLite | PARTIAL | SQLite + reopen tests xanh; chờ device evidence |
 | 71 | Route selection persistence | local selection | n/a | Có | Transactional SQLite | PARTIAL | SQLite + restart tests xanh; chờ device evidence |
 | 72 | Pending photo binary | private app files | n/a | Có | Private file store | PARTIAL | Hướng đúng; cần metadata transactional |
-| 73 | Background sync | replay services | permissions | Có | DB queue | PARTIAL | Nhiều `catch (_)` nuốt lỗi; thiếu global sync center |
-| 74 | Trạng thái sync người dùng hiểu được | waiting/sending/error/synced | n/a | Có cục bộ | DB queue | PARTIAL | Chưa thống nhất toàn app |
+| 73 | Background sync | replay services | permissions | Có coordinator chung, không nuốt lỗi nền ở AppShell | DB queue | PARTIAL | Queue vẫn giữ nguyên idempotency; chờ device restart/replay evidence Lô 7 |
+| 74 | Trạng thái sync người dùng hiểu được | waiting/sending/error/synced | n/a | Có trạng thái chung tại mục Thêm + Đồng bộ lại | DB queue | PARTIAL | Đã gom waiting/sending/error/synced từ queue/đơn/ảnh; chờ runtime evidence Lô 7 |
 | 75 | Cài đặt native/update app | mobile Settings | n/a | Có | Local | PLATFORM-EQUIVALENT | PWA install không áp dụng native; native update là tương đương |
 | 76 | Real Android E2E | app -> MCP -> Công Ty | all | Chưa có CI gate | Test environment | MISSING | CI xanh hiện không chứng minh production-like flow |
 | 77 | iOS flow gate | app -> MCP | all | Compile + widget | Test environment | PARTIAL | Chưa integration tương đương Android |

@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+import '../errors/mobile_error_mapper.dart';
 import '../installation/installation_profile.dart';
 
 enum FieldActivityKind {
@@ -547,7 +548,11 @@ class HttpFieldActivityClient
           serverMessage: serverMessage,
           statusCode: response.statusCode,
         ),
-        retryable: response.statusCode >= 500 || error['retryable'] == true,
+        retryable: CanonicalApiErrorMapper.isRetryable(
+          code: code,
+          statusCode: response.statusCode,
+          backendRetryable: error['retryable'] == true,
+        ),
       );
     }
 
@@ -568,7 +573,7 @@ String _activityErrorMessage(
   required String serverMessage,
   required int statusCode,
 }) {
-  switch (code.toLowerCase()) {
+  switch (code.trim().toLowerCase()) {
     case 'session_customer_id_required':
     case 'session_customer_not_found':
     case 'session_not_found':
@@ -605,15 +610,16 @@ String _activityErrorMessage(
     case 'invalid_idempotency_key':
       return 'Phiên gửi dữ liệu chưa hợp lệ. Vui lòng thử lại.';
   }
-  if (statusCode == 401) return 'Phiên đăng nhập không còn hiệu lực.';
-  if (statusCode == 403) {
-    return serverMessage.isNotEmpty
-        ? serverMessage
-        : 'Tài khoản chưa được cấp quyền thực hiện thao tác này.';
-  }
-  return serverMessage.isNotEmpty
-      ? serverMessage
-      : 'Không lưu được dữ liệu. Vui lòng thử lại.';
+  return CanonicalApiErrorMapper.message(
+    code: code,
+    statusCode: statusCode,
+    serverMessage: serverMessage,
+    fallbackMessage: 'Không lưu được dữ liệu. Vui lòng thử lại.',
+    notFoundMessage: 'Dữ liệu tác nghiệp không còn sẵn sàng. Cập nhật lại rồi thử.',
+    conflictMessage: 'Dữ liệu tác nghiệp đã thay đổi. Cập nhật lại rồi tiếp tục.',
+    validationMessage: 'Nội dung tác nghiệp chưa hợp lệ. Kiểm tra lại trước khi lưu.',
+    unavailableMessage: 'Chức năng tác nghiệp đang tạm thời chưa sẵn sàng. Vui lòng thử lại.',
+  );
 }
 
 Map<String, dynamic> _object(Object? value) {

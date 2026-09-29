@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+import '../errors/mobile_error_mapper.dart';
 import '../installation/installation_profile.dart';
 
 class FieldHistoryFailure implements Exception {
@@ -846,7 +847,11 @@ class HttpFieldHistoryClient implements FieldHistoryClient, SessionReportActionC
           serverMessage: serverMessage,
           statusCode: response.statusCode,
         ),
-        retryable: response.statusCode >= 500 || error['retryable'] == true,
+        retryable: CanonicalApiErrorMapper.isRetryable(
+          code: code,
+          statusCode: response.statusCode,
+          backendRetryable: error['retryable'] == true,
+        ),
       );
     }
 
@@ -930,7 +935,7 @@ String _historyErrorMessage(
   required String serverMessage,
   required int statusCode,
 }) {
-  switch (code.toLowerCase()) {
+  switch (code.trim().toLowerCase()) {
     case 'session_id_required':
       return 'Chưa xác định được phiên cần xem.';
     case 'route_customer_id_required':
@@ -960,15 +965,15 @@ String _historyErrorMessage(
     case 'idempotency_key_invalid':
       return 'Lần cập nhật chưa có mã gửi hợp lệ. Vui lòng thử lại.';
   }
-  if (statusCode == 401) return 'Phiên đăng nhập không còn hiệu lực.';
-  if (statusCode == 403) {
-    return serverMessage.isNotEmpty
-        ? serverMessage
-        : 'Tài khoản chưa được cấp quyền xem hoặc cập nhật dữ liệu này.';
-  }
-  return serverMessage.isNotEmpty
-      ? serverMessage
-      : 'Không xử lý được dữ liệu. Vui lòng thử lại.';
+  return CanonicalApiErrorMapper.message(
+    code: code,
+    statusCode: statusCode,
+    serverMessage: serverMessage,
+    fallbackMessage: 'Không xử lý được dữ liệu. Vui lòng thử lại.',
+    notFoundMessage: 'Dữ liệu lịch sử không còn sẵn sàng. Cập nhật lại rồi thử.',
+    conflictMessage: 'Dữ liệu lịch sử đã thay đổi. Cập nhật lại rồi tiếp tục.',
+    unavailableMessage: 'Dữ liệu lịch sử đang tạm thời chưa sẵn sàng. Vui lòng thử lại.',
+  );
 }
 
 Map<String, dynamic> _object(Object? value) {

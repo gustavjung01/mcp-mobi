@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../app/theme/app_theme.dart';
+import '../../core/sync/sync_status.dart';
 import '../../shared/widgets/app_card.dart';
 import '../../shared/widgets/screen_header.dart';
 import '../settings/settings_page.dart';
@@ -17,6 +18,8 @@ class MorePage extends StatelessWidget {
     this.onTasks,
     this.onManagementProposals,
     this.onCustomerOnboarding,
+    this.syncStatus = const AppSyncStatus.synced(),
+    this.onRetrySync,
     this.onLogout,
   });
 
@@ -29,25 +32,34 @@ class MorePage extends StatelessWidget {
   final VoidCallback? onTasks;
   final VoidCallback? onManagementProposals;
   final VoidCallback? onCustomerOnboarding;
+  final AppSyncStatus syncStatus;
+  final VoidCallback? onRetrySync;
   final Future<void> Function()? onLogout;
 
   @override
   Widget build(BuildContext context) {
     final items = <_MoreItem>[
-      const _MoreItem(Icons.route_outlined, 'Tuyến cố định'),
-      const _MoreItem(Icons.history, 'Lịch sử phiên'),
-      const _MoreItem(Icons.assignment_outlined, 'Báo cáo'),
-      const _MoreItem(Icons.science_outlined, 'Kết quả thử sản phẩm'),
+      if (onFixedRoutes != null)
+        const _MoreItem(Icons.route_outlined, 'Tuyến cố định'),
+      if (onSessionHistory != null)
+        const _MoreItem(Icons.history, 'Lịch sử phiên'),
+      if (onReports != null)
+        const _MoreItem(Icons.assignment_outlined, 'Báo cáo'),
+      if (onProductTrials != null)
+        const _MoreItem(Icons.science_outlined, 'Kết quả thử sản phẩm'),
       if (onDataExports != null)
         const _MoreItem(Icons.file_download_outlined, 'Xuất dữ liệu'),
       if (onReportSettings != null)
         const _MoreItem(Icons.tune_rounded, 'Thiết lập báo cáo thị trường'),
-      const _MoreItem(Icons.task_alt_outlined, 'Kế hoạch & Công việc'),
+      if (onTasks != null)
+        const _MoreItem(Icons.task_alt_outlined, 'Kế hoạch & Công việc'),
       if (onManagementProposals != null)
         const _MoreItem(Icons.lightbulb_outline_rounded, 'Đề xuất'),
-      const _MoreItem(Icons.qr_code_scanner, 'Mở hoặc liên kết mã khách'),
+      if (onCustomerOnboarding != null)
+        const _MoreItem(Icons.qr_code_scanner, 'Mở hoặc liên kết mã khách'),
       const _MoreItem(Icons.settings_outlined, 'Thiết lập'),
     ];
+
     return SafeArea(
       key: const Key('more-screen'),
       child: ListView(
@@ -58,7 +70,29 @@ class MorePage extends StatelessWidget {
             title: 'Thêm',
             subtitle: 'Các nghiệp vụ và thiết lập khác',
           ),
-          const SizedBox(height: AppSpacing.xl),
+          const SizedBox(height: AppSpacing.lg),
+          AppCard(
+            key: const Key('sync-status-card'),
+            padding: EdgeInsets.zero,
+            child: Material(
+              color: Colors.transparent,
+              child: ListTile(
+                onTap: syncStatus.canRetry ? onRetrySync : null,
+                leading: _SyncStatusIcon(status: syncStatus),
+                title: const Text('Đồng bộ dữ liệu'),
+                subtitle: Text(syncStatus.message),
+                trailing: syncStatus.canRetry && onRetrySync != null
+                    ? IconButton(
+                        key: const Key('sync-retry-button'),
+                        tooltip: 'Đồng bộ lại',
+                        onPressed: onRetrySync,
+                        icon: const Icon(Icons.sync_rounded),
+                      )
+                    : null,
+              ),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
           AppCard(
             padding: EdgeInsets.zero,
             child: Column(
@@ -106,6 +140,34 @@ class MorePage extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+class _SyncStatusIcon extends StatelessWidget {
+  const _SyncStatusIcon({required this.status});
+
+  final AppSyncStatus status;
+
+  @override
+  Widget build(BuildContext context) {
+    return switch (status.phase) {
+      AppSyncPhase.syncing => const SizedBox.square(
+          dimension: 22,
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+      AppSyncPhase.waiting => const Icon(
+          Icons.schedule_send_outlined,
+          color: AppColors.textSecondary,
+        ),
+      AppSyncPhase.error => Icon(
+          Icons.sync_problem_rounded,
+          color: Theme.of(context).colorScheme.error,
+        ),
+      AppSyncPhase.synced => const Icon(
+          Icons.cloud_done_outlined,
+          color: AppColors.primaryDark,
+        ),
+    };
   }
 }
 
