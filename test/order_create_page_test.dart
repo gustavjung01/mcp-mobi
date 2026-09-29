@@ -121,22 +121,39 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const Key('order-add-variant-1')));
+    final addProduct = find.byKey(const Key('order-add-variant-1'));
+    await tester.ensureVisible(addProduct);
+    await tester.tap(addProduct);
     await tester.pumpAndSettle();
 
-    final submit = find.byKey(const Key('order-submit'));
-    await tester.tap(submit);
+    final primary = find.byKey(const Key('order-primary-action'));
+    await tester.tap(primary);
+    await tester.pumpAndSettle();
+    await tester.tap(primary);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('order-review-panel')), findsOneWidget);
+
+    await tester.tap(primary);
     await tester.pumpAndSettle();
 
+    expect(find.byKey(const Key('order-result-failed')), findsOneWidget);
     expect(find.byKey(const Key('create-order-screen')), findsOneWidget);
     expect(client.keys, hasLength(1));
     expect(client.keys.single, startsWith('mcp.sales-order.create-'));
 
-    await tester.tap(submit);
+    await tester.tap(primary);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('order-review-panel')), findsOneWidget);
+
+    await tester.tap(primary);
     await tester.pumpAndSettle();
 
+    expect(find.byKey(const Key('order-result-created')), findsOneWidget);
     expect(client.keys, hasLength(2));
     expect(client.keys[1], client.keys[0]);
+
+    await tester.tap(primary);
+    await tester.pumpAndSettle();
     expect(find.byKey(const Key('create-order-screen')), findsNothing);
   });
 
@@ -156,17 +173,29 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const Key('order-add-variant-1')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('order-submit')));
+    final addProduct = find.byKey(const Key('order-add-variant-1'));
+    await tester.ensureVisible(addProduct);
+    await tester.tap(addProduct);
     await tester.pumpAndSettle();
 
+    final primary = find.byKey(const Key('order-primary-action'));
+    await tester.tap(primary);
+    await tester.pumpAndSettle();
+    await tester.tap(primary);
+    await tester.pumpAndSettle();
+    await tester.tap(primary);
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('order-result-queued')), findsOneWidget);
     expect(client.keys, hasLength(1));
     final queued = store.mutations.values.single;
     expect(queued.idempotencyKey, client.keys.single);
     expect(queued.state, OrderQueueState.failed);
     expect(queued.retryable, isTrue);
     expect(queued.retryCount, 1);
+
+    await tester.tap(primary);
+    await tester.pumpAndSettle();
     expect(find.byKey(const Key('create-order-screen')), findsNothing);
   });
 }

@@ -159,8 +159,10 @@ void main() {
       expect(find.byKey(const Key('order-add-variant-1')), findsOneWidget);
       expect(find.byKey(const Key('order-add-variant-2')), findsOneWidget);
 
-      await tester.tap(find.byKey(const Key('order-add-variant-1')));
-      await tester.pump();
+      final addProduct = find.byKey(const Key('order-add-variant-1'));
+      await tester.ensureVisible(addProduct);
+      await tester.tap(addProduct);
+      await tester.pumpAndSettle();
       expect(find.text('Xem giỏ (1)'), findsOneWidget);
 
       await tester.tap(find.byKey(const Key('order-primary-action')));
@@ -199,8 +201,10 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.byKey(const Key('order-add-variant-1')));
-      await tester.pump();
+      final addProduct = find.byKey(const Key('order-add-variant-1'));
+      await tester.ensureVisible(addProduct);
+      await tester.tap(addProduct);
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('order-primary-action')));
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('order-primary-action')));

@@ -182,9 +182,10 @@ void main() {
     expect(find.text('Trà đào'), findsOneWidget);
     expect(find.text('2 Chai × 62.500 đ'), findsOneWidget);
     expect(find.text('125.000 đ'), findsWidgets);
-    await tester.drag(
-      find.byKey(const Key('order-detail-sheet')),
-      const Offset(0, -520),
+    await tester.scrollUntilVisible(
+      find.text('Lịch sử phiên bản'),
+      260,
+      scrollable: find.byType(Scrollable).last,
     );
     await tester.pumpAndSettle();
     expect(find.text('Lịch sử phiên bản'), findsOneWidget);

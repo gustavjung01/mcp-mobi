@@ -1095,7 +1095,7 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
         children: [
           NavyPageHeader(
             title: 'Tạo đơn hàng',
-            subtitle: widget.outlet.name,
+            subtitle: 'Khách đã chọn',
             leading: IconButton(
               key: const Key('create-order-back'),
               onPressed: _saving ? null : _handleBack,
