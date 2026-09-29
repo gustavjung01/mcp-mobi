@@ -1,18 +1,22 @@
 name: Runtime Integration Gate
 
 on:
+  pull_request:
+    paths:
+      - ".github/workflows/runtime-integration-gate.yml"
+      - "integration_test/runtime_gate_test.dart"
   workflow_dispatch:
     inputs:
       environment_name:
-        description: 'Tên installation test, bắt buộc bắt đầu bằng test-'
+        description: "Tên installation test, bắt buộc bắt đầu bằng test-"
         required: true
         type: string
       api_base_url:
-        description: 'HTTPS MCP API origin của installation test'
+        description: "HTTPS MCP API origin của installation test"
         required: true
         type: string
       platform:
-        description: 'Nền tảng cần chạy'
+        description: "Nền tảng cần chạy"
         required: true
         default: both
         type: choice
@@ -21,7 +25,7 @@ on:
           - android
           - ios
       guard:
-        description: 'Nhập APPROVED_TEST_INSTALLATION_ONLY'
+        description: "Nhập APPROVED_TEST_INSTALLATION_ONLY"
         required: true
         type: string
 
@@ -29,27 +33,30 @@ permissions:
   contents: read
 
 concurrency:
-  group: runtime-integration-gate-${{ inputs.environment_name }}
+  group: runtime-integration-gate-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
+  workflow-contract:
+    if: ${{ github.event_name == 'pull_request' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Confirm runtime gate sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f .github/workflows/runtime-integration-gate.yml
+          test -f integration_test/runtime_gate_test.dart
+          grep -Fq 'APPROVED_TEST_INSTALLATION_ONLY' .github/workflows/runtime-integration-gate.yml
+          grep -Fq 'integration_test/runtime_gate_test.dart' .github/workflows/runtime-integration-gate.yml
+
   android-runtime:
-    if: inputs.platform == 'both' || inputs.platform == 'android'
+    if: ${{ github.event_name == 'workflow_dispatch' && (inputs.platform == 'both' || inputs.platform == 'android') }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    env:
-      RUNTIME_CONFIG: ${{ runner.temp }}/mcp-runtime-gate.json
-      MCP_RUNTIME_GUARD: ${{ inputs.guard }}
-      MCP_RUNTIME_ENVIRONMENT: ${{ inputs.environment_name }}
-      MCP_RUNTIME_API_BASE_URL: ${{ inputs.api_base_url }}
-      MCP_RUNTIME_LOGIN_NAME: ${{ secrets.MCP_RUNTIME_LOGIN_NAME }}
-      MCP_RUNTIME_PASSWORD: ${{ secrets.MCP_RUNTIME_PASSWORD }}
-      MCP_RUNTIME_OWNER_CODE: ${{ secrets.MCP_RUNTIME_OWNER_CODE }}
-      MCP_RUNTIME_ORDER_CUSTOMER_ID: ${{ secrets.MCP_RUNTIME_ORDER_CUSTOMER_ID }}
-      MCP_RUNTIME_ORDER_CUSTOMER_ADDRESS_ID: ${{ secrets.MCP_RUNTIME_ORDER_CUSTOMER_ADDRESS_ID }}
-      MCP_RUNTIME_ORDER_VARIANT_ID: ${{ secrets.MCP_RUNTIME_ORDER_VARIANT_ID }}
-      MCP_RUNTIME_ONBOARDING_ROUTE_CUSTOMER_ID: ${{ secrets.MCP_RUNTIME_ONBOARDING_ROUTE_CUSTOMER_ID }}
-      MCP_RUNTIME_MEDIA_ROUTE_CUSTOMER_ID: ${{ secrets.MCP_RUNTIME_MEDIA_ROUTE_CUSTOMER_ID }}
 
     steps:
       - name: Checkout
@@ -57,6 +64,10 @@ jobs:
 
       - name: Validate test-installation guard
         shell: bash
+        env:
+          MCP_RUNTIME_GUARD: ${{ inputs.guard }}
+          MCP_RUNTIME_ENVIRONMENT: ${{ inputs.environment_name }}
+          MCP_RUNTIME_API_BASE_URL: ${{ inputs.api_base_url }}
         run: |
           set -euo pipefail
           test "$MCP_RUNTIME_GUARD" = 'APPROVED_TEST_INSTALLATION_ONLY'
@@ -66,9 +77,23 @@ jobs:
       - name: Prepare runtime configuration
         shell: bash
         env:
+          MCP_RUNTIME_GUARD: ${{ inputs.guard }}
+          MCP_RUNTIME_ENVIRONMENT: ${{ inputs.environment_name }}
+          MCP_RUNTIME_API_BASE_URL: ${{ inputs.api_base_url }}
+          MCP_RUNTIME_LOGIN_NAME: ${{ secrets.MCP_RUNTIME_LOGIN_NAME }}
+          MCP_RUNTIME_PASSWORD: ${{ secrets.MCP_RUNTIME_PASSWORD }}
+          MCP_RUNTIME_OWNER_CODE: ${{ secrets.MCP_RUNTIME_OWNER_CODE }}
+          MCP_RUNTIME_ORDER_CUSTOMER_ID: ${{ secrets.MCP_RUNTIME_ORDER_CUSTOMER_ID }}
+          MCP_RUNTIME_ORDER_CUSTOMER_ADDRESS_ID: ${{ secrets.MCP_RUNTIME_ORDER_CUSTOMER_ADDRESS_ID }}
+          MCP_RUNTIME_ORDER_VARIANT_ID: ${{ secrets.MCP_RUNTIME_ORDER_VARIANT_ID }}
+          MCP_RUNTIME_ONBOARDING_ROUTE_CUSTOMER_ID: ${{ secrets.MCP_RUNTIME_ONBOARDING_ROUTE_CUSTOMER_ID }}
+          MCP_RUNTIME_MEDIA_ROUTE_CUSTOMER_ID: ${{ secrets.MCP_RUNTIME_MEDIA_ROUTE_CUSTOMER_ID }}
           MCP_RUNTIME_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
         run: |
           set -euo pipefail
+          runtime_config="$RUNNER_TEMP/mcp-runtime-gate.json"
+          export RUNTIME_CONFIG="$runtime_config"
+          echo "RUNTIME_CONFIG=$runtime_config" >> "$GITHUB_ENV"
           python3 - <<'PY'
           import json, os
           names = [
@@ -98,7 +123,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: "17"
 
       - name: Install Flutter 3.47.2
         shell: bash
@@ -119,22 +144,9 @@ jobs:
           script: flutter test integration_test/runtime_gate_test.dart -d emulator-5554 --dart-define-from-file="$RUNTIME_CONFIG"
 
   ios-runtime:
-    if: inputs.platform == 'both' || inputs.platform == 'ios'
+    if: ${{ github.event_name == 'workflow_dispatch' && (inputs.platform == 'both' || inputs.platform == 'ios') }}
     runs-on: macos-latest
     timeout-minutes: 45
-    env:
-      RUNTIME_CONFIG: ${{ runner.temp }}/mcp-runtime-gate.json
-      MCP_RUNTIME_GUARD: ${{ inputs.guard }}
-      MCP_RUNTIME_ENVIRONMENT: ${{ inputs.environment_name }}
-      MCP_RUNTIME_API_BASE_URL: ${{ inputs.api_base_url }}
-      MCP_RUNTIME_LOGIN_NAME: ${{ secrets.MCP_RUNTIME_LOGIN_NAME }}
-      MCP_RUNTIME_PASSWORD: ${{ secrets.MCP_RUNTIME_PASSWORD }}
-      MCP_RUNTIME_OWNER_CODE: ${{ secrets.MCP_RUNTIME_OWNER_CODE }}
-      MCP_RUNTIME_ORDER_CUSTOMER_ID: ${{ secrets.MCP_RUNTIME_ORDER_CUSTOMER_ID }}
-      MCP_RUNTIME_ORDER_CUSTOMER_ADDRESS_ID: ${{ secrets.MCP_RUNTIME_ORDER_CUSTOMER_ADDRESS_ID }}
-      MCP_RUNTIME_ORDER_VARIANT_ID: ${{ secrets.MCP_RUNTIME_ORDER_VARIANT_ID }}
-      MCP_RUNTIME_ONBOARDING_ROUTE_CUSTOMER_ID: ${{ secrets.MCP_RUNTIME_ONBOARDING_ROUTE_CUSTOMER_ID }}
-      MCP_RUNTIME_MEDIA_ROUTE_CUSTOMER_ID: ${{ secrets.MCP_RUNTIME_MEDIA_ROUTE_CUSTOMER_ID }}
 
     steps:
       - name: Checkout
@@ -142,6 +154,10 @@ jobs:
 
       - name: Validate test-installation guard
         shell: bash
+        env:
+          MCP_RUNTIME_GUARD: ${{ inputs.guard }}
+          MCP_RUNTIME_ENVIRONMENT: ${{ inputs.environment_name }}
+          MCP_RUNTIME_API_BASE_URL: ${{ inputs.api_base_url }}
         run: |
           set -euo pipefail
           test "$MCP_RUNTIME_GUARD" = 'APPROVED_TEST_INSTALLATION_ONLY'
@@ -151,9 +167,23 @@ jobs:
       - name: Prepare runtime configuration
         shell: bash
         env:
+          MCP_RUNTIME_GUARD: ${{ inputs.guard }}
+          MCP_RUNTIME_ENVIRONMENT: ${{ inputs.environment_name }}
+          MCP_RUNTIME_API_BASE_URL: ${{ inputs.api_base_url }}
+          MCP_RUNTIME_LOGIN_NAME: ${{ secrets.MCP_RUNTIME_LOGIN_NAME }}
+          MCP_RUNTIME_PASSWORD: ${{ secrets.MCP_RUNTIME_PASSWORD }}
+          MCP_RUNTIME_OWNER_CODE: ${{ secrets.MCP_RUNTIME_OWNER_CODE }}
+          MCP_RUNTIME_ORDER_CUSTOMER_ID: ${{ secrets.MCP_RUNTIME_ORDER_CUSTOMER_ID }}
+          MCP_RUNTIME_ORDER_CUSTOMER_ADDRESS_ID: ${{ secrets.MCP_RUNTIME_ORDER_CUSTOMER_ADDRESS_ID }}
+          MCP_RUNTIME_ORDER_VARIANT_ID: ${{ secrets.MCP_RUNTIME_ORDER_VARIANT_ID }}
+          MCP_RUNTIME_ONBOARDING_ROUTE_CUSTOMER_ID: ${{ secrets.MCP_RUNTIME_ONBOARDING_ROUTE_CUSTOMER_ID }}
+          MCP_RUNTIME_MEDIA_ROUTE_CUSTOMER_ID: ${{ secrets.MCP_RUNTIME_MEDIA_ROUTE_CUSTOMER_ID }}
           MCP_RUNTIME_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
         run: |
           set -euo pipefail
+          runtime_config="$RUNNER_TEMP/mcp-runtime-gate.json"
+          export RUNTIME_CONFIG="$runtime_config"
+          echo "RUNTIME_CONFIG=$runtime_config" >> "$GITHUB_ENV"
           python3 - <<'PY'
           import json, os
           names = [
