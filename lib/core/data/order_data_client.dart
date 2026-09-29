@@ -111,6 +111,23 @@ class OrderCatalogItem {
   }
 
   String get secondaryLabel => '$purchaseUnitLabel · $purchaseUnitDetail';
+
+  OrderCatalogItem withPrice(double? value) {
+    return OrderCatalogItem(
+      productId: productId,
+      variantId: variantId,
+      name: name,
+      brand: brand,
+      category: category,
+      sku: sku,
+      variantName: variantName,
+      sizeLabel: sizeLabel,
+      sellUnit: sellUnit,
+      packUnit: packUnit,
+      packQuantity: packQuantity,
+      price: value,
+    );
+  }
 }
 
 class OrderLineInput {
@@ -336,7 +353,16 @@ abstract interface class CompleteOrderCatalogClient {
   Future<List<OrderCatalogItem>> loadCompleteCatalog();
 }
 
-class HttpOrderDataClient implements OrderDataClient, CompleteOrderCatalogClient {
+abstract interface class OrderCatalogPriceClient {
+  Future<Map<String, double?>> loadFreshPrices({
+    required String query,
+    String? category,
+    String? brand,
+  });
+}
+
+class HttpOrderDataClient
+    implements OrderDataClient, CompleteOrderCatalogClient, OrderCatalogPriceClient {
   HttpOrderDataClient({
     required this.profile,
     required this.token,
@@ -408,6 +434,28 @@ class HttpOrderDataClient implements OrderDataClient, CompleteOrderCatalogClient
       },
     );
     return _catalogItems(data);
+  }
+
+  @override
+  Future<Map<String, double?>> loadFreshPrices({
+    required String query,
+    String? category,
+    String? brand,
+  }) async {
+    final data = await _request(
+      'GET',
+      '/api/core-sales/products/search',
+      query: {
+        'q': query.trim(),
+        'limit': '50',
+        'includePrice': 'true',
+        if ((category ?? '').trim().isNotEmpty) 'category': category!.trim(),
+        if ((brand ?? '').trim().isNotEmpty) 'brand': brand!.trim(),
+      },
+    );
+    return {
+      for (final item in _catalogItems(data)) item.variantId: item.price,
+    };
   }
 
   @override
@@ -546,30 +594,84 @@ String _orderErrorMessage(
   required String serverMessage,
   required int statusCode,
 }) {
-  switch (code) {
-    case 'core_customer_reference_required':
+  final normalizedServer = serverMessage.trim().toLowerCase();
+  final genericConflict =
+      normalizedServer.contains('xung đột với trạng thái hiện tại') ||
+      normalizedServer.contains('conflict with current state');
+  switch (code.trim().toUpperCase()) {
+    case 'CORE_CUSTOMER_REFERENCE_REQUIRED':
       return 'Điểm bán chưa liên kết đủ thông tin khách Công Ty để ra đơn.';
-    case 'core_customer_not_owned':
+    case 'CORE_CUSTOMER_NOT_OWNED':
       return 'Khách hàng không còn thuộc phạm vi phụ trách của nhân viên.';
-    case 'core_customer_address_not_available':
-      return 'Khách hàng chưa có địa chỉ giao hàng đang hoạt động.';
-    case 'order_lines_required':
+    case 'CORE_CUSTOMER_ADDRESS_NOT_AVAILABLE':
+      return 'Khách hàng chưa có địa chỉ giao hàng đang hoạt động. Cập nhật khách rồi thử lại.';
+    case 'ORDER_LINES_REQUIRED':
       return 'Chọn ít nhất một sản phẩm.';
-    case 'invalid_order_quantity':
-      return 'Số lượng sản phẩm không hợp lệ.';
-    case 'invalid_order_payload':
-      return 'Thông tin đơn hàng chưa hợp lệ.';
-    case 'browser_commercial_authority_forbidden':
+    case 'INVALID_ORDER_QUANTITY':
+      return 'Số lượng sản phẩm không hợp lệ. Kiểm tra lại giỏ hàng.';
+    case 'INVALID_ORDER_PAYLOAD':
+      return 'Thông tin đơn hàng chưa hợp lệ. Rà lại khách, sản phẩm và số lượng.';
+    case 'BROWSER_COMMERCIAL_AUTHORITY_FORBIDDEN':
       return 'Giá và chính sách thương mại do Công Ty xác định.';
-    case 'idempotency_key_required':
-    case 'invalid_idempotency_key':
-      return 'Phiên gửi đơn chưa hợp lệ. Vui lòng thử lại.';
+    case 'IDEMPOTENCY_KEY_REQUIRED':
+    case 'INVALID_IDEMPOTENCY_KEY':
+    case 'CORE_SALES_IDEMPOTENCY_KEY_REQUIRED':
+      return 'Phiên gửi đơn chưa hợp lệ. Vui lòng gửi lại từ màn rà đơn.';
+    case 'BASE_PRICE_NOT_FOUND':
+      return 'Sản phẩm chưa có giá bán áp dụng tại Công Ty. Cập nhật danh mục hoặc liên hệ người phụ trách giá trước khi gửi lại.';
+    case 'SALES_PRICE_CHANGED':
+      return 'Giá bán tại Công Ty vừa thay đổi. Cập nhật sản phẩm và rà đơn trước khi gửi lại.';
+    case 'VARIANT_NOT_FOUND':
+    case 'VARIANT_INACTIVE':
+      return 'Sản phẩm hoặc đơn vị bán không còn khả dụng. Cập nhật danh mục và chọn lại sản phẩm.';
+    case 'VARIANT_NOT_PRICEABLE':
+    case 'VARIANT_UNIT_MISSING':
+      return 'Sản phẩm chưa đủ điều kiện bán tại Công Ty. Chọn sản phẩm khác hoặc liên hệ người phụ trách.';
+    case 'CUSTOMER_NOT_FOUND':
+    case 'CUSTOMER_INACTIVE':
+      return 'Khách Công Ty không còn hoạt động. Cập nhật danh sách khách rồi thử lại.';
+    case 'WAREHOUSE_SCOPE_DENIED':
+      return 'Tài khoản chưa được cấp phạm vi kho để ra đơn.';
+    case 'TRUSTED_EMPLOYEE_REQUIRED':
+    case 'CORE_SALES_EMPLOYEE_CONTEXT_REQUIRED':
+    case 'CORE_SALES_EMPLOYEE_CONTEXT_INVALID':
+      return 'Cần đăng nhập lại bằng tài khoản nhân viên.';
+    case 'EMPLOYEE_INACTIVE':
+      return 'Tài khoản nhân viên không còn hoạt động.';
+    case 'CORE_SALES_NOT_CONFIGURED':
+      return 'Kết nối bán hàng Công Ty chưa được thiết lập.';
+    case 'CORE_SALES_TIMEOUT':
+      return 'Công Ty phản hồi quá thời gian. Đơn có thể gửi lại an toàn.';
+    case 'CORE_SALES_UNAVAILABLE':
+    case 'CORE_SALES_RESPONSE_INVALID':
+    case 'CORE_SALES_REQUEST_FAILED':
+      return serverMessage.isNotEmpty
+          ? serverMessage
+          : 'Dịch vụ bán hàng Công Ty đang gián đoạn. Vui lòng thử lại.';
   }
   if (statusCode == 401) return 'Phiên đăng nhập không còn hiệu lực.';
   if (statusCode == 403) {
     return serverMessage.isNotEmpty
         ? serverMessage
-        : 'Tài khoản chưa được cấp quyền tạo đơn hàng.';
+        : 'Tài khoản chưa được cấp quyền xử lý đơn hàng.';
+  }
+  if (statusCode == 404) {
+    return serverMessage.isNotEmpty
+        ? serverMessage
+        : 'Dữ liệu khách hoặc sản phẩm đã thay đổi. Cập nhật lại rồi thử.';
+  }
+  if (statusCode == 409 || statusCode == 422) {
+    return serverMessage.isNotEmpty && !genericConflict
+        ? serverMessage
+        : 'Đơn chưa phù hợp với dữ liệu hiện tại. Rà lại khách và sản phẩm.';
+  }
+  if (statusCode == 429) {
+    return 'Hệ thống đang nhận nhiều yêu cầu. Vui lòng thử lại sau ít phút.';
+  }
+  if (statusCode >= 500) {
+    return serverMessage.isNotEmpty
+        ? serverMessage
+        : 'Dịch vụ bán hàng Công Ty đang gián đoạn. Vui lòng thử lại.';
   }
   return serverMessage.isNotEmpty
       ? serverMessage

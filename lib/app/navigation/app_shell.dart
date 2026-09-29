@@ -349,6 +349,13 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   bool get _canManageProposals =>
       widget.session?.permissions.contains('mcp.report.write') == true;
 
+  bool get _canReadOrders =>
+      widget.session?.permissions.contains('mcp.sales-order.read') == true;
+
+  bool get _canCreateOrders =>
+      _canReadOrders &&
+      widget.session?.permissions.contains('mcp.sales-order.create') == true;
+
   MutationQueueStore? _defaultMutationQueueStore() {
     final database = _localDataStore;
     final scope = _localDataScope;
@@ -1525,7 +1532,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
               _canManageSessionCustomers && _routeMutationSubmissionService != null
               ? _skipRouteOutlet
               : null,
-          onCreateOrder: _orderDataClient == null
+          onCreateOrder: _orderDataClient == null || !_canCreateOrders
               ? null
               : () => _openCreateOrder(line),
           onCustomerOnboarding: _customerBoundaryClient == null
@@ -1614,7 +1621,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                     customerName: outlet.name,
                   )
               : null,
-          onCreateOrder: _orderDataClient == null
+          onCreateOrder: _orderDataClient == null || !_canCreateOrders
               ? null
               : () => _openOrderForOutlet(outlet),
           onCustomerOnboarding: _customerBoundaryClient == null
@@ -1632,7 +1639,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       MaterialPageRoute<void>(
         builder: (context) => CompanyCustomerDetailPage(
           customer: customer,
-          onCreateOrder: _orderDataClient == null
+          onCreateOrder: _orderDataClient == null || !_canCreateOrders
               ? null
               : () => _openOrderForCompanyCustomer(customer),
         ),
@@ -1673,7 +1680,14 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
 
   Future<void> _openOrderForOutlet(FieldOutlet outlet) async {
     final client = _orderDataClient;
-    if (client == null) return;
+    if (client == null || !_canCreateOrders) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Tài khoản chưa được cấp quyền tạo đơn hàng.'),
+        ),
+      );
+      return;
+    }
 
     var current = _outletForRouteCustomerId(outlet.id) ?? outlet;
     if (!_canOrderForOutlet(current)) {
@@ -1750,7 +1764,14 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     CompanyCustomer customer,
   ) async {
     final client = _orderDataClient;
-    if (client == null) return;
+    if (client == null || !_canCreateOrders) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Tài khoản chưa được cấp quyền tạo đơn hàng.'),
+        ),
+      );
+      return;
+    }
 
     final addressId = (customer.defaultAddressId ?? '').trim();
     if (customer.status.trim().toLowerCase() != 'active' || addressId.isEmpty) {
@@ -1920,7 +1941,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
         orderClient: _orderDataClient,
         offlineStore: _orderOfflineStore,
         companyCustomers: _companyCustomers,
-        onCreateOrder: _orderDataClient == null
+        onCreateOrder: _orderDataClient == null || !_canCreateOrders
             ? null
             : _openOrderForCompanyCustomer,
         onCustomerOnboarding: _customerBoundaryClient == null

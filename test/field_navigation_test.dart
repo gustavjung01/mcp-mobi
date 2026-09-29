@@ -200,7 +200,12 @@ const session = MobileSession(
   loginName: 'staff.test',
   displayName: 'Nguyễn Văn A',
   expiresAt: null,
-  permissions: ['mcp.session.write', 'mcp.session-customer.write'],
+  permissions: [
+    'mcp.session.write',
+    'mcp.session-customer.write',
+    'mcp.sales-order.read',
+    'mcp.sales-order.create',
+  ],
 );
 
 const proposalSession = MobileSession(

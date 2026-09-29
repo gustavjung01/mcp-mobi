@@ -93,6 +93,9 @@ jobs:
           test/route_mutation_sync_test.dart
           test/customer_onboarding_page_test.dart
           test/order_offline_store_test.dart
+          test/order_data_client_test.dart
+          test/order_workflow_test.dart
+          test/orders_page_test.dart
           test/field_activity_sync_test.dart
           test/field_activity_history_page_test.dart
           test/field_history_client_test.dart

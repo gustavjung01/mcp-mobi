@@ -59,6 +59,26 @@ FieldOrder detailedOrder({
     total: 125000,
     versions: const [
       FieldOrderVersion(
+        versionNumber: '1',
+        status: 'superseded',
+        subtotal: 100000,
+        total: 100000,
+        createdAt: '2026-09-27T08:00:00Z',
+        lines: [
+          FieldOrderLine(
+            id: 'line-old',
+            variantId: 'variant-1',
+            itemName: 'Trà đào',
+            sku: 'TD01',
+            unitCode: 'CHAI',
+            unitName: 'Chai',
+            quantity: 1,
+            unitPrice: 100000,
+            lineTotal: 100000,
+          ),
+        ],
+      ),
+      FieldOrderVersion(
         versionNumber: '2',
         status: 'confirmed',
         subtotal: 125000,
@@ -162,6 +182,15 @@ void main() {
     expect(find.text('Trà đào'), findsOneWidget);
     expect(find.text('2 Chai × 62.500 đ'), findsOneWidget);
     expect(find.text('125.000 đ'), findsWidgets);
+    await tester.scrollUntilVisible(
+      find.text('Lịch sử phiên bản'),
+      260,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Lịch sử phiên bản'), findsOneWidget);
+    expect(find.text('Phiên bản 2 · Hiện tại'), findsOneWidget);
+    expect(find.text('Phiên bản 1'), findsOneWidget);
   });
 
   testWidgets('orders tab routes missing customer setup to onboarding', (

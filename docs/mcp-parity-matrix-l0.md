@@ -93,18 +93,18 @@ Mobile không được tự suy ra quyền từ UI. Backend là authority.
 | 32 | Ảnh điểm bán: xóa | `POST /api/outlet-media/delete` | scoped | Có | Online/retry | PARTIAL | Chưa real integration gate |
 | 33 | Mở/liên kết mã khách | customer verification submit | boundary contract | Có | Queue | PARTIAL | Queue sai tầng; cần end-to-end approval/link evidence |
 | 34 | Đồng bộ trạng thái mở/liên kết mã | `POST /api/customer-verifications/sync` | boundary contract | Có | Queue/read refresh | PARTIAL | Cần runtime evidence |
-| 35 | Catalog SKU Công Ty | `GET /api/core-sales/products/search` | `mcp.sales-order.read` + warehouse scope | Có local catalog sync | **Local catalog bắt buộc** | PARTIAL | SQLite catalog/index đã có; chờ real API/device evidence |
-| 36 | Variant/unit | `GET /api/core-sales/products/:id/variants` | `mcp.sales-order.read` | Model có một phần | Local cache | PARTIAL | Mobile chưa parity variant/unit UX MCP web |
-| 37 | Giá bán canonical | core-sales price resolution | `mcp.sales-order.read/create` | Hiển thị giá API | Cache chỉ tham khảo | PARTIAL | Không được coi giá local là authority |
+| 35 | Catalog SKU Công Ty | `GET /api/core-sales/products/search` | `mcp.sales-order.read` + warehouse scope | Có local catalog sync + refresh giá hiển thị | **Local catalog bắt buộc** | PARTIAL | Catalog SQLite dùng local-first; giá màn tạo đơn được refresh từ Công Ty, chờ runtime evidence |
+| 36 | Variant/unit | `GET /api/core-sales/products/:id/variants` | `mcp.sales-order.read` | Nhóm theo sản phẩm, hiển thị từng quy cách/đơn vị bán | Local cache | PARTIAL | UI đã tách product → variant/unit đúng catalog; chờ device/runtime evidence |
+| 37 | Giá bán canonical | core-sales price resolution | `mcp.sales-order.read/create` | Local SKU + fresh price overlay; submit không gửi giá | Cache chỉ tham khảo | PARTIAL | Công Ty vẫn là authority; mobile không gửi price/discount/tax, chờ runtime evidence |
 | 38 | Tìm SKU nhanh | web có `mcp-product-local-cache.ts` | read | Tìm SQLite local sau catalog sync | Local indexed search | PARTIAL | Đã có local indexed search; chờ device evidence |
 | 39 | Chọn khách để tạo đơn | core customers + address | read | Có picker | Cache | PARTIAL | Chưa dùng local indexed directory |
-| 40 | Thêm SKU vào giỏ | order workflow | create later | Có cart trong cùng page | Draft local | PARTIAL | Luồng chưa tách Sản phẩm -> Giỏ rõ |
-| 41 | Giỏ hàng riêng/rà đơn | MCP order create UX | create | Có section cart nhưng không phải workflow rõ | Draft local | PARTIAL | Cần bước Giỏ/Rà đơn rõ, không submit trực tiếp từ chọn SP |
-| 42 | Tạo đơn về Công Ty | `POST /api/core-sales/orders` | `mcp.sales-order.create` + warehouse scope | Có | Durable mutation | BROKEN | Runtime user đang gặp gửi lỗi/409; cần root-cause mapping xuyên MCP -> Công Ty |
-| 43 | Idempotent retry đơn | canonical key contract | create | Có canonical key | Durable queue | PARTIAL | Queue sai tầng; phải giữ key qua crash/reinstall policy rõ |
-| 44 | Đơn chờ gửi | local queue | create | Có | Transactional SQLite | PARTIAL | Đã chuyển khỏi secure storage; chờ device recovery evidence |
+| 40 | Thêm SKU vào giỏ | order workflow | create later | Có bước Sản phẩm riêng → Giỏ hàng | Draft local | PARTIAL | Add/remove/quantity + draft SQLite đã nối theo variant; chờ device evidence |
+| 41 | Giỏ hàng riêng/rà đơn | MCP order create UX | create | Tách Giỏ hàng → Rà đơn → Gửi | Draft local | PARTIAL | Không còn submit trực tiếp từ màn chọn sản phẩm; chờ runtime evidence |
+| 42 | Tạo đơn về Công Ty | `POST /api/core-sales/orders` | `mcp.sales-order.create` + warehouse scope | Có result created/queued/failed + business error recovery | Durable mutation | PARTIAL | Contract/payload đã khớp MCP gốc; chưa được nâng DONE trước real MCP → Công Ty runtime evidence |
+| 43 | Idempotent retry đơn | canonical key contract | create | Canonical key theo fingerprint; retry reuse exact key | Durable SQLite queue | PARTIAL | SQLite/retry contract có regression test; chờ device/runtime no-duplicate evidence |
+| 44 | Đơn chờ gửi | local queue | create | Có trạng thái Chờ gửi + gửi lại | Transactional SQLite | PARTIAL | Kết quả queued không tạo intent mới; chờ device recovery evidence |
 | 45 | Danh sách đơn | `GET /api/core-sales/orders` | `mcp.sales-order.read` | Có | Read cache | PARTIAL | Filter/detail chưa parity |
-| 46 | Chi tiết đơn + dòng hàng + version | core sales read model | read | Có card/detail hạn chế | Cache | PARTIAL | Thiếu line/version đầy đủ |
+| 46 | Chi tiết đơn + dòng hàng + version | core sales read model | read | Có current detail + lịch sử mọi version/line | Cache | PARTIAL | UI lịch sử phiên bản đã có; chờ runtime evidence với đơn thật nhiều version |
 | 47 | Báo cáo thị trường | session-customer report | `mcp.report.write` | Có | Draft/queue | PARTIAL | Local persistence sai tầng |
 | 48 | Đối thủ | report settings + report payload | `mcp.report.write` | Có setting selection | Cache settings | PARTIAL | Cần parity grouping/UI MCP gốc |
 | 49 | SP khách đang dùng | report settings groups | `mcp.report.write` | Có generic settings | Cache settings | PARTIAL | Cần group rõ theo nghiệp vụ |
@@ -210,10 +210,10 @@ Mobile không được tự suy ra quyền từ UI. Backend là authority.
 - 409 có thể đến từ business conflict/idempotency/customer/address/catalog state.
 
 **Root cause**
-- Không phải endpoint giả; lỗi nằm ở combination dữ liệu/runtime + error mapping chưa đủ. Cần test xuyên MCP -> Công Ty để xác định từng code thật.
+- Không phải endpoint giả; canonical payload đã khóa ở khách + địa chỉ + variant + số lượng + ghi chú. Lỗi còn lại phụ thuộc dữ liệu/runtime và business code Công Ty.
 
 **Owner tầng sửa**
-- Lô 3 order integration + Lô 6 canonical error map. Chỉ sửa backend nếu integration test chứng minh contract/backend sai.
+- Lô 3 đã tách workflow và map các lỗi order/integration chính thành hành động cụ thể. Chỉ sửa backend nếu real integration chứng minh contract/backend sai; Lô 7 vẫn phải chứng minh MCP -> Công Ty trên runtime thật.
 
 ### RC-07 — “Tài nguyên không sẵn sàng”, mục bấm không chạy
 
