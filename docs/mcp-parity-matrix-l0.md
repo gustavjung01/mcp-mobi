@@ -105,15 +105,15 @@ Mobile không được tự suy ra quyền từ UI. Backend là authority.
 | 44 | Đơn chờ gửi | local queue | create | Có trạng thái Chờ gửi + gửi lại | Transactional SQLite | PARTIAL | Kết quả queued không tạo intent mới; chờ device recovery evidence |
 | 45 | Danh sách đơn | `GET /api/core-sales/orders` | `mcp.sales-order.read` | Có | Read cache | PARTIAL | Filter/detail chưa parity |
 | 46 | Chi tiết đơn + dòng hàng + version | core sales read model | read | Có current detail + lịch sử mọi version/line | Cache | PARTIAL | UI lịch sử phiên bản đã có; chờ runtime evidence với đơn thật nhiều version |
-| 47 | Báo cáo thị trường | session-customer report | `mcp.report.write` | Có | Draft/queue | PARTIAL | Local persistence sai tầng |
-| 48 | Đối thủ | report settings + report payload | `mcp.report.write` | Có setting selection | Cache settings | PARTIAL | Cần parity grouping/UI MCP gốc |
-| 49 | SP khách đang dùng | report settings groups | `mcp.report.write` | Có generic settings | Cache settings | PARTIAL | Cần group rõ theo nghiệp vụ |
-| 50 | Cấu hình nhóm mẫu báo cáo | `POST/PATCH /api/mcp-report-setting-groups` | `mcp.report-setting.write` | Không | Cache + online mutation | MISSING | Web MCP có capability quản lý |
-| 51 | Cấu hình item mẫu báo cáo | `POST/PATCH /api/mcp-report-settings` | `mcp.report-setting.write` | Chỉ đọc | Cache + online mutation | MISSING | Mobile không được tự loại là web-only |
-| 52 | Report templates | `GET /api/mcp-report-templates` | read | Không | Cache | MISSING | MCP gốc có contract |
-| 53 | Thử sản phẩm tại điểm bán | session-customer test | `mcp.test.write` | Có | Queue | PARTIAL | Product name đang free-text; chưa catalog/file parity |
-| 54 | Phiếu/file thử sản phẩm + sản phẩm trong phiếu | test_files/test_file_products | read | Không | Cache | MISSING | MCP data model có thật |
-| 55 | Hậu kiểm thử SP | `POST /api/field-checks/result` | `mcp.test.write` | Có normal/opportunity/risk | Queue | PARTIAL | Cần device/API integration |
+| 47 | Báo cáo thị trường | session-customer report | `mcp.report.write` | Có form cấu trúc + mẫu dùng sẵn | SQLite queue | PARTIAL | Payload/retry đã bám canonical contract; chờ device/runtime evidence |
+| 48 | Đối thủ | report settings + report payload | `mcp.report.write` | Có khu vực Đối thủ theo group/item canonical | Cache settings | PARTIAL | Grouping/payload đã parity MCP gốc; chờ runtime evidence |
+| 49 | SP khách đang dùng | report settings groups | `mcp.report.write` | Có khu vực Sản phẩm khách đang dùng theo từng nhóm | Cache settings | PARTIAL | UI nghiệp vụ đã tách rõ; chờ runtime evidence |
+| 50 | Cấu hình nhóm mẫu báo cáo | `POST/PATCH /api/mcp-report-setting-groups` | `mcp.report-setting.write` | Có thêm/sửa/bật-tắt theo quyền | Cache + online mutation | PARTIAL | Dùng canonical Idempotency-Key và retry cùng intent; chờ runtime evidence |
+| 51 | Cấu hình item mẫu báo cáo | `POST/PATCH /api/mcp-report-settings` | `mcp.report-setting.write` | Có thêm/sửa/bật-tắt theo nhóm | Cache + online mutation | PARTIAL | Mobile đã có entry point quản trị; chờ runtime evidence |
+| 52 | Report templates | `GET /api/mcp-report-templates` | read | Có chọn mẫu và đổ nội dung vào báo cáo | Cache | PARTIAL | Canonical template read đã nối; chờ runtime evidence |
+| 53 | Thử sản phẩm tại điểm bán | session-customer test | `mcp.test.write` | Có chọn phiếu/sản phẩm hoặc nhập tay fallback | SQLite queue | PARTIAL | Payload fileId/productId/name bám canonical contract; chờ runtime evidence |
+| 54 | Phiếu/file thử sản phẩm + sản phẩm trong phiếu | `GET /api/mcp-day/test-options` | read | Có picker phiếu và sản phẩm trong phiếu | Cache | PARTIAL | Read model đã nối đúng test_files/test_file_products; chờ runtime evidence |
+| 55 | Hậu kiểm thử SP | `POST /api/field-checks/result` | `mcp.test.write` | Có Bình thường/Cơ hội/Rủi ro + lịch sử | SQLite queue | PARTIAL | Retry cùng canonical key đã có regression test; chờ device/API integration |
 | 56 | Tạo follow-up | session-customer followup | `mcp.followup.write` | Có | Queue | PARTIAL | Queue sai tầng |
 | 57 | Danh sách Kế hoạch/Công việc | followup read | read | Có | Cache | PARTIAL | Cần local searchable/filter parity |
 | 58 | Priority/owner/due/overdue/source | followup model | read/write | Có phần lớn | Cache | PARTIAL | Chưa gate đủ dữ liệu qua nhiều phiên |
@@ -290,7 +290,7 @@ Thêm
   - Thiết lập
 ```
 
-Mobile chưa có entry point quản trị cho route CRUD, full outlet edit/archive, report-setting CRUD, report template/export/AI.
+Mobile đã có entry point quản trị tuyến/điểm bán và report-setting CRUD; report template đã dùng trong form báo cáo. Export/AI vẫn thuộc các lô sau.
 
 ## 7. Lỗ hổng test Lô 0 khóa lại
 

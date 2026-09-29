@@ -139,4 +139,183 @@ void main() {
       ],
     );
   });
+
+  test(
+    'field activity client reads templates/test files and manages settings',
+    () async {
+      final seen = <String>[];
+      final mutationKeys = <String>[];
+      final client = HttpFieldActivityClient(
+        profile: InstallationProfile(
+          name: 'Hưng Phát',
+          baseUrl: Uri.parse('https://mcp.example.vn'),
+        ),
+        token: 'mobile-token',
+        client: MockClient((request) async {
+          seen.add('${request.method} ${request.url.path}');
+          if (request.url.path == '/api/mcp-report-templates') {
+            return jsonResponse(
+              {
+                'data': {
+                  'templates': [
+                    {
+                      'id': 'template-1',
+                      'title': 'Khảo sát thị trường',
+                      'reportType': 'general',
+                      'demandSummary': 'Có nhu cầu',
+                    },
+                  ],
+                },
+              },
+              200,
+            );
+          }
+          if (request.url.path == '/api/mcp-day/test-options') {
+            return jsonResponse(
+              {
+                'data': {
+                  'files': [
+                    {
+                      'id': 'file-1',
+                      'title': 'Phiếu trà',
+                      'testDate': '2026-09-28',
+                      'products': [
+                        {
+                          'id': 'test-product-1',
+                          'productName': 'Trà đào',
+                        },
+                      ],
+                    },
+                  ],
+                },
+              },
+              200,
+            );
+          }
+          if (request.method == 'GET' &&
+              request.url.path == '/api/mcp-report-settings') {
+            expect(request.url.queryParameters['includeInactive'], '1');
+            return jsonResponse(
+              {
+                'data': {
+                  'groups': [
+                    {
+                      'id': 'group-1',
+                      'key': 'competitor',
+                      'title': 'Đối thủ',
+                      'status': 'active',
+                      'sortOrder': 1,
+                      'items': [
+                        {
+                          'id': 'item-1',
+                          'key': 'brand-a',
+                          'label': 'Nhãn A',
+                          'value': 'Nhãn A',
+                          'status': 'inactive',
+                          'sortOrder': 2,
+                        },
+                      ],
+                    },
+                  ],
+                },
+              },
+              200,
+            );
+          }
+
+          mutationKeys.add(request.headers['idempotency-key'] ?? '');
+          final body = jsonDecode(request.body) as Map<String, dynamic>;
+          if (request.url.path == '/api/mcp-report-setting-groups') {
+            expect(body['title'], 'Đối thủ');
+            return jsonResponse(
+              {
+                'data': {'id': body['groupId'] ?? 'group-new'},
+              },
+              200,
+            );
+          }
+          if (request.url.path == '/api/mcp-report-settings') {
+            expect(body['label'], 'Nhãn A');
+            return jsonResponse(
+              {
+                'data': {'id': body['itemId'] ?? 'item-new'},
+              },
+              200,
+            );
+          }
+          return jsonResponse(
+            {
+              'error': {'code': 'NOT_FOUND'},
+            },
+            404,
+          );
+        }),
+      );
+
+      final reference = client as FieldActivityReferenceClient;
+      final templates = await reference.loadReportTemplates();
+      final files = await reference.loadTestFiles();
+      expect(templates.single.demandSummary, 'Có nhu cầu');
+      expect(files.single.products.single.productName, 'Trà đào');
+
+      final admin = client as FieldReportSettingsAdminClient;
+      final groups = await admin.loadReportSettingGroups();
+      expect(groups.single.sortOrder, 1);
+      expect(groups.single.items.single.status, 'inactive');
+
+      await admin.saveReportSettingGroup(
+        title: 'Đối thủ',
+        description: 'Theo dõi đối thủ',
+        sortOrder: 1,
+        idempotencyKey: 'mcp.report-setting-group.create-test',
+      );
+      await admin.saveReportSettingGroup(
+        groupId: 'group-1',
+        title: 'Đối thủ',
+        description: 'Theo dõi đối thủ',
+        sortOrder: 1,
+        status: 'inactive',
+        idempotencyKey: 'mcp.report-setting-group.update-test',
+      );
+      await admin.saveReportSettingItem(
+        groupId: 'group-1',
+        label: 'Nhãn A',
+        value: 'Nhãn A',
+        category: 'Trà',
+        brandName: 'Nhãn A',
+        productId: '',
+        sortOrder: 1,
+        idempotencyKey: 'mcp.report-setting-item.create-test',
+      );
+      await admin.saveReportSettingItem(
+        itemId: 'item-1',
+        groupId: 'group-1',
+        label: 'Nhãn A',
+        value: 'Nhãn A',
+        category: 'Trà',
+        brandName: 'Nhãn A',
+        productId: '',
+        sortOrder: 1,
+        status: 'inactive',
+        idempotencyKey: 'mcp.report-setting-item.update-test',
+      );
+
+      expect(
+        seen,
+        containsAll([
+          'GET /api/mcp-report-templates',
+          'GET /api/mcp-day/test-options',
+          'GET /api/mcp-report-settings',
+          'POST /api/mcp-report-setting-groups',
+          'PATCH /api/mcp-report-setting-groups',
+          'POST /api/mcp-report-settings',
+          'PATCH /api/mcp-report-settings',
+        ]),
+      );
+      for (final key in mutationKeys) {
+        expect(key, matches(RegExp(r'^[A-Za-z0-9._-]+$')));
+      }
+    },
+  );
+
 }
