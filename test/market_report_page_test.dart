@@ -161,20 +161,26 @@ void main() {
     expect(find.text('Đối thủ A'), findsOneWidget);
 
     await tester.scrollUntilVisible(
-      find.text('SP khách đang dùng'),
+      find.text('Sản phẩm khách đang dùng'),
       300,
+      scrollable: find.byType(Scrollable).first,
     );
-    expect(find.text('SP khách đang dùng'), findsOneWidget);
+    expect(find.text('Sản phẩm khách đang dùng'), findsOneWidget);
     expect(find.text('SP đang dùng · Trà'), findsOneWidget);
     expect(find.text('Trà A'), findsOneWidget);
     expect(find.text('Không render chip field'), findsNothing);
 
-    await tester.tap(
-      find.byKey(const Key('market-report-setting-competitor-a')),
+    final competitor = find.byKey(
+      const Key('market-report-setting-competitor-a'),
     );
-    await tester.tap(
-      find.byKey(const Key('market-report-setting-used-tea-a')),
+    await tester.ensureVisible(competitor);
+    await tester.tap(competitor);
+
+    final usedProduct = find.byKey(
+      const Key('market-report-setting-used-tea-a'),
     );
+    await tester.ensureVisible(usedProduct);
+    await tester.tap(usedProduct);
     await tester.pump();
 
     await tester.tap(find.byKey(const Key('market-report-submit')));
@@ -231,10 +237,13 @@ void main() {
     await tester.tap(template);
     await tester.pump();
 
-    final demand = tester.widget<TextField>(
-      find.widgetWithText(TextField, 'Nhu cầu').first,
+    final demand = find.byWidgetPredicate(
+      (widget) =>
+          widget is TextField &&
+          widget.controller?.text == 'Khách cần bổ sung hàng tuần',
+      description: 'Nhu cầu được điền từ mẫu báo cáo',
     );
-    expect(demand.controller?.text, 'Khách cần bổ sung hàng tuần');
+    expect(demand, findsOneWidget);
 
     await tester.tap(find.byKey(const Key('market-report-submit')));
     await tester.pumpAndSettle();
