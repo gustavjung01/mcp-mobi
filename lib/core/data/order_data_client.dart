@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+import '../errors/mobile_error_mapper.dart';
 import '../installation/installation_profile.dart';
 
 class OrderDataFailure implements Exception {
@@ -562,7 +563,11 @@ class HttpOrderDataClient
           serverMessage: serverMessage,
           statusCode: response.statusCode,
         ),
-        retryable: response.statusCode >= 500 || error['retryable'] == true,
+        retryable: CanonicalApiErrorMapper.isRetryable(
+          code: code,
+          statusCode: response.statusCode,
+          backendRetryable: error['retryable'] == true,
+        ),
       );
     }
 
@@ -594,10 +599,6 @@ String _orderErrorMessage(
   required String serverMessage,
   required int statusCode,
 }) {
-  final normalizedServer = serverMessage.trim().toLowerCase();
-  final genericConflict =
-      normalizedServer.contains('xung đột với trạng thái hiện tại') ||
-      normalizedServer.contains('conflict with current state');
   switch (code.trim().toUpperCase()) {
     case 'CORE_CUSTOMER_REFERENCE_REQUIRED':
       return 'Điểm bán chưa liên kết đủ thông tin khách Công Ty để ra đơn.';
@@ -645,37 +646,19 @@ String _orderErrorMessage(
     case 'CORE_SALES_UNAVAILABLE':
     case 'CORE_SALES_RESPONSE_INVALID':
     case 'CORE_SALES_REQUEST_FAILED':
-      return serverMessage.isNotEmpty
-          ? serverMessage
-          : 'Dịch vụ bán hàng Công Ty đang gián đoạn. Vui lòng thử lại.';
+      return 'Dịch vụ bán hàng Công Ty đang gián đoạn. Vui lòng thử lại.';
   }
-  if (statusCode == 401) return 'Phiên đăng nhập không còn hiệu lực.';
-  if (statusCode == 403) {
-    return serverMessage.isNotEmpty
-        ? serverMessage
-        : 'Tài khoản chưa được cấp quyền xử lý đơn hàng.';
-  }
-  if (statusCode == 404) {
-    return serverMessage.isNotEmpty
-        ? serverMessage
-        : 'Dữ liệu khách hoặc sản phẩm đã thay đổi. Cập nhật lại rồi thử.';
-  }
-  if (statusCode == 409 || statusCode == 422) {
-    return serverMessage.isNotEmpty && !genericConflict
-        ? serverMessage
-        : 'Đơn chưa phù hợp với dữ liệu hiện tại. Rà lại khách và sản phẩm.';
-  }
-  if (statusCode == 429) {
-    return 'Hệ thống đang nhận nhiều yêu cầu. Vui lòng thử lại sau ít phút.';
-  }
-  if (statusCode >= 500) {
-    return serverMessage.isNotEmpty
-        ? serverMessage
-        : 'Dịch vụ bán hàng Công Ty đang gián đoạn. Vui lòng thử lại.';
-  }
-  return serverMessage.isNotEmpty
-      ? serverMessage
-      : 'Không xử lý được đơn hàng. Vui lòng thử lại.';
+  return CanonicalApiErrorMapper.message(
+    code: code,
+    statusCode: statusCode,
+    serverMessage: serverMessage,
+    fallbackMessage: 'Không xử lý được đơn hàng. Vui lòng thử lại.',
+    forbiddenMessage: 'Tài khoản chưa được cấp quyền xử lý đơn hàng.',
+    notFoundMessage: 'Dữ liệu khách hoặc sản phẩm đã thay đổi. Cập nhật lại rồi thử.',
+    conflictMessage: 'Đơn chưa phù hợp với dữ liệu hiện tại. Rà lại khách và sản phẩm.',
+    validationMessage: 'Thông tin đơn hàng chưa hợp lệ. Rà lại khách, sản phẩm và số lượng.',
+    unavailableMessage: 'Dịch vụ bán hàng Công Ty đang gián đoạn. Vui lòng thử lại.',
+  );
 }
 
 double? _orderTotal(Map<String, dynamic> json) {

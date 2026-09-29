@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+import '../errors/mobile_error_mapper.dart';
 import '../installation/installation_profile.dart';
 
 class FieldDataFailure implements Exception {
@@ -514,20 +515,6 @@ class HttpFieldDataClient implements FieldDataClient, FieldActionClient {
       final error = _object(payload['error']);
       final code = _text(error['code'], fallback: 'REQUEST_FAILED');
       final serverMessage = _text(error['message']);
-      if (response.statusCode == 401) {
-        throw FieldDataFailure(
-          code: code,
-          message: 'Phiên đăng nhập không còn hiệu lực.',
-        );
-      }
-      if (response.statusCode == 403) {
-        throw FieldDataFailure(
-          code: code,
-          message: serverMessage.isNotEmpty
-              ? serverMessage
-              : 'Tài khoản chưa được cấp quyền thực hiện thao tác này.',
-        );
-      }
       throw FieldDataFailure(
         code: code,
         message: _fieldBusinessMessage(
@@ -535,7 +522,11 @@ class HttpFieldDataClient implements FieldDataClient, FieldActionClient {
           serverMessage: serverMessage,
           statusCode: response.statusCode,
         ),
-        retryable: response.statusCode >= 500 || error['retryable'] == true,
+        retryable: CanonicalApiErrorMapper.isRetryable(
+          code: code,
+          statusCode: response.statusCode,
+          backendRetryable: error['retryable'] == true,
+        ),
       );
     }
 
@@ -890,7 +881,7 @@ String _fieldBusinessMessage(
   required String serverMessage,
   required int statusCode,
 }) {
-  switch (code) {
+  switch (code.trim().toLowerCase()) {
     case 'route_active_session_exists':
       return 'Đang có một phiên tuyến khác hoạt động. Hãy mở tuyến đó để tiếp tục hoặc kết thúc phiên trước.';
     case 'route_active_session_ambiguous':
@@ -903,12 +894,15 @@ String _fieldBusinessMessage(
     case 'route_customer_not_found':
       return 'Điểm bán không còn trong tuyến.';
   }
-  if (statusCode == 409 && serverMessage.isEmpty) {
-    return 'Trạng thái dữ liệu đã thay đổi. Tải lại để tiếp tục.';
-  }
-  return serverMessage.isNotEmpty
-      ? serverMessage
-      : 'Không xử lý được yêu cầu. Vui lòng thử lại.';
+  return CanonicalApiErrorMapper.message(
+    code: code,
+    statusCode: statusCode,
+    serverMessage: serverMessage,
+    fallbackMessage: 'Không xử lý được yêu cầu. Vui lòng thử lại.',
+    notFoundMessage: 'Dữ liệu tuyến hoặc điểm bán không còn sẵn sàng. Cập nhật lại rồi thử.',
+    conflictMessage: 'Trạng thái dữ liệu đã thay đổi. Cập nhật lại để tiếp tục.',
+    unavailableMessage: 'Dữ liệu tuyến đang tạm thời chưa sẵn sàng. Vui lòng thử lại.',
+  );
 }
 
 Map<String, dynamic> _object(Object? value) {

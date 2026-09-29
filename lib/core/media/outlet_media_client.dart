@@ -4,6 +4,7 @@ import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 
+import '../errors/mobile_error_mapper.dart';
 import '../installation/installation_profile.dart';
 
 const outletMediaMaxPhotos = 3;
@@ -303,7 +304,11 @@ class HttpOutletMediaClient implements OutletMediaClient {
           serverMessage: serverMessage,
           statusCode: response.statusCode,
         ),
-        retryable: response.statusCode >= 500 || error['retryable'] == true,
+        retryable: CanonicalApiErrorMapper.isRetryable(
+          code: code,
+          statusCode: response.statusCode,
+          backendRetryable: error['retryable'] == true,
+        ),
       );
     }
 
@@ -339,22 +344,23 @@ String _mediaErrorMessage(
       return 'Điểm bán chưa liên kết đúng hồ sơ khách hàng. Vui lòng đồng bộ lại.';
     case 'linked_customer_inactive':
       return 'Hồ sơ khách hàng của điểm bán đã ngừng sử dụng.';
-    case 'INTERNAL_ERROR':
+    case 'internal_error':
       return 'Hệ thống ảnh đang bận. Vui lòng thử lại sau.';
     case 'r2_not_configured':
       return 'Kho ảnh của hệ thống chưa được cấu hình.';
     case 'r2_object_not_found':
       return 'Ảnh chưa được kho lưu trữ xác nhận. Vui lòng thử lại.';
   }
-  if (statusCode == 401) return 'Phiên đăng nhập không còn hiệu lực.';
-  if (statusCode == 403) {
-    return serverMessage.isNotEmpty
-        ? serverMessage
-        : 'Tài khoản chưa được cấp quyền quản lý ảnh điểm bán.';
-  }
-  return serverMessage.isNotEmpty
-      ? serverMessage
-      : 'Không xử lý được ảnh điểm bán. Vui lòng thử lại.';
+  return CanonicalApiErrorMapper.message(
+    code: code,
+    statusCode: statusCode,
+    serverMessage: serverMessage,
+    fallbackMessage: 'Không xử lý được ảnh điểm bán. Vui lòng thử lại.',
+    forbiddenMessage: 'Tài khoản chưa được cấp quyền quản lý ảnh điểm bán.',
+    notFoundMessage: 'Ảnh hoặc điểm bán không còn sẵn sàng. Cập nhật lại rồi thử.',
+    conflictMessage: 'Thông tin ảnh điểm bán đã thay đổi. Cập nhật lại rồi tiếp tục.',
+    unavailableMessage: 'Hệ thống ảnh đang tạm thời chưa sẵn sàng. Vui lòng thử lại.',
+  );
 }
 
 Map<String, dynamic> _object(Object? value) {

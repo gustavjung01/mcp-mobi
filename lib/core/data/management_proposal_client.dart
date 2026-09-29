@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+import '../errors/mobile_error_mapper.dart';
 import '../installation/installation_profile.dart';
 
 class ManagementProposalFailure implements Exception {
@@ -295,17 +296,25 @@ class HttpManagementProposalClient implements ManagementProposalClient {
       final error = _object(payload['error']);
       final code = _text(error['code'], fallback: 'REQUEST_FAILED');
       final serverMessage = _text(error['message']);
-      final message = response.statusCode == 403
-          ? 'Tài khoản chưa được cấp quyền gửi Đề xuất.'
-          : response.statusCode == 401
-          ? 'Phiên đăng nhập không còn hiệu lực.'
-          : serverMessage.isNotEmpty
-          ? serverMessage
-          : 'Không xử lý được Đề xuất. Vui lòng thử lại.';
+      final message = CanonicalApiErrorMapper.message(
+        code: code,
+        statusCode: response.statusCode,
+        serverMessage: serverMessage,
+        fallbackMessage: 'Không xử lý được Đề xuất. Vui lòng thử lại.',
+        forbiddenMessage: 'Tài khoản chưa được cấp quyền gửi Đề xuất.',
+        notFoundMessage: 'Đề xuất không còn tồn tại. Cập nhật lại danh sách rồi thử.',
+        conflictMessage: 'Đề xuất đã thay đổi. Cập nhật lại rồi tiếp tục.',
+        validationMessage: 'Nội dung Đề xuất chưa hợp lệ. Kiểm tra lại trước khi gửi.',
+        unavailableMessage: 'Chức năng Đề xuất đang tạm thời chưa sẵn sàng. Vui lòng thử lại.',
+      );
       throw ManagementProposalFailure(
         code: code,
         message: message,
-        retryable: response.statusCode >= 500 || error['retryable'] == true,
+        retryable: CanonicalApiErrorMapper.isRetryable(
+          code: code,
+          statusCode: response.statusCode,
+          backendRetryable: error['retryable'] == true,
+        ),
       );
     }
 

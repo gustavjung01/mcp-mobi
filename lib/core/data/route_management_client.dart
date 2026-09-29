@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+import '../errors/mobile_error_mapper.dart';
 import '../installation/installation_profile.dart';
 import 'field_data_client.dart';
 
@@ -176,10 +177,11 @@ class HttpRouteManagementClient implements RouteManagementClient {
           serverMessage: serverMessage,
           statusCode: response.statusCode,
         ),
-        retryable:
-            response.statusCode >= 500 ||
-            error['retryable'] == true ||
-            code == 'NETWORK_TIMEOUT',
+        retryable: CanonicalApiErrorMapper.isRetryable(
+          code: code,
+          statusCode: response.statusCode,
+          backendRetryable: error['retryable'] == true,
+        ),
       );
     }
 
@@ -358,7 +360,7 @@ String _businessMessage(
   required String serverMessage,
   required int statusCode,
 }) {
-  switch (code) {
+  switch (code.trim().toLowerCase()) {
     case 'route_active_session_exists':
       return 'Đang có một phiên tuyến khác hoạt động. Kết thúc hoặc hủy phiên đó trước.';
     case 'route_active_session_ambiguous':
@@ -380,15 +382,15 @@ String _businessMessage(
     case 'customer_name_required':
       return 'Cần nhập tên điểm bán.';
   }
-  if (statusCode == 401) return 'Phiên đăng nhập không còn hiệu lực.';
-  if (statusCode == 403) {
-    return serverMessage.isNotEmpty
-        ? serverMessage
-        : 'Tài khoản chưa được cấp quyền thực hiện thao tác này.';
-  }
-  return serverMessage.isNotEmpty
-      ? serverMessage
-      : 'Không xử lý được yêu cầu. Vui lòng thử lại.';
+  return CanonicalApiErrorMapper.message(
+    code: code,
+    statusCode: statusCode,
+    serverMessage: serverMessage,
+    fallbackMessage: 'Không xử lý được yêu cầu. Vui lòng thử lại.',
+    notFoundMessage: 'Tuyến, phiên hoặc điểm bán không còn sẵn sàng. Cập nhật lại rồi thử.',
+    conflictMessage: 'Trạng thái tuyến hoặc phiên đã thay đổi. Cập nhật lại rồi tiếp tục.',
+    unavailableMessage: 'Quản lý tuyến đang tạm thời chưa sẵn sàng. Vui lòng thử lại.',
+  );
 }
 
 Map<String, dynamic> _object(Object? value) {

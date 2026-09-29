@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../core/auth/mobile_auth_client.dart';
+import '../../core/capabilities/mobile_capability_registry.dart';
 import '../../core/data/customer_boundary_client.dart';
 import '../../core/data/field_activity_client.dart';
 import '../../core/data/field_data_client.dart';
@@ -26,6 +27,7 @@ import '../../core/sync/mutation_queue.dart';
 import '../../core/sync/order_offline_store.dart';
 import '../../core/sync/route_mutation_sync.dart';
 import '../../core/sync/route_management_sync.dart';
+import '../../core/sync/sync_status.dart';
 import '../../core/storage/legacy_secure_storage_migration.dart';
 import '../../core/storage/local_data_store.dart';
 import '../../features/customers/company_customer_detail_page.dart';
@@ -135,6 +137,8 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   bool _orderSyncing = false;
   bool _managementProposalSyncing = false;
   bool _mediaSyncing = false;
+  final AppSyncTracker _syncTracker = AppSyncTracker();
+  AppSyncStatus _syncStatus = const AppSyncStatus.synced();
   bool _routeSelectionLoaded = false;
   bool _localPersistenceReady = false;
   String? _fieldMessage;
@@ -243,8 +247,12 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     final orderClient = _orderDataClient;
     if (orderClient is LocalCatalogOrderDataClient) {
       unawaited(
-        orderClient.refreshCatalog().catchError((_) {
-          // The local catalog remains usable; next product search can retry.
+        orderClient.refreshCatalog().catchError((Object error) {
+          _publishSyncStatus(
+            _syncTracker.recordError(
+              _syncFailureMessage(error, 'danh mục sản phẩm'),
+            ),
+          );
         }),
       );
     }
@@ -333,42 +341,71 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     );
   }
 
+  MobileCapabilityRegistry get _capabilities => MobileCapabilityRegistry(
+    permissions: widget.session?.permissions ?? const <String>[],
+    runtimeAvailability: {
+      MobileCapability.fixedRoutes: _fieldDataClient != null,
+      MobileCapability.sessionHistory: _fieldHistoryClient != null,
+      MobileCapability.reportHistory: _fieldActivityClient != null,
+      MobileCapability.productTrialHistory: _fieldActivityClient != null,
+      MobileCapability.reportSettings:
+          _fieldActivityClient is FieldReportSettingsAdminClient,
+      MobileCapability.dataExports:
+          _fieldHistoryClient != null &&
+          _fieldDataClient != null &&
+          _orderDataClient != null,
+      MobileCapability.tasks: _fieldHistoryClient != null,
+      MobileCapability.managementProposals:
+          _managementProposalClient != null && _mutationQueueStore != null,
+      MobileCapability.customerOnboarding: _customerBoundaryClient != null,
+      MobileCapability.manageRoutes: _routeManagementClient != null,
+      MobileCapability.manageRouteCustomers: _routeManagementClient != null,
+      MobileCapability.updateOutletLocation: _fieldActions != null,
+      MobileCapability.manageSessions:
+          _fieldActions != null || _routeManagementClient != null,
+      MobileCapability.manageSessionCustomers: _fieldActions != null,
+      MobileCapability.createReports: _fieldActivityClient != null,
+      MobileCapability.createProductTrials: _fieldActivityClient != null,
+      MobileCapability.createFollowups: _fieldActivityClient != null,
+      MobileCapability.readOrders: _orderDataClient != null,
+      MobileCapability.createOrders: _orderDataClient != null,
+    },
+  );
+
   bool get _canManageRoutes =>
-      widget.session?.permissions.contains('mcp.route.write') == true;
+      _capabilities.can(MobileCapability.manageRoutes);
 
   bool get _canManageRouteCustomers =>
-      widget.session?.permissions.contains('mcp.route-customer.write') == true;
+      _capabilities.can(MobileCapability.manageRouteCustomers);
 
   bool get _canManageSessions =>
-      widget.session?.permissions.contains('mcp.session.write') == true;
+      _capabilities.can(MobileCapability.manageSessions);
 
   bool get _canManageSessionCustomers =>
-      widget.session?.permissions.contains('mcp.session-customer.write') == true;
+      _capabilities.can(MobileCapability.manageSessionCustomers);
 
   bool get _canUpdateOutletLocation =>
-      widget.session?.permissions.contains('mcp.route-customer.write') == true;
+      _capabilities.can(MobileCapability.updateOutletLocation);
 
   bool get _canManageProposals =>
-      widget.session?.permissions.contains('mcp.report.write') == true;
+      _capabilities.can(MobileCapability.managementProposals);
 
   bool get _canCreateReports =>
-      widget.session?.permissions.contains('mcp.report.write') == true;
+      _capabilities.can(MobileCapability.createReports);
 
   bool get _canCreateProductTrials =>
-      widget.session?.permissions.contains('mcp.test.write') == true;
+      _capabilities.can(MobileCapability.createProductTrials);
 
   bool get _canCreateFollowups =>
-      widget.session?.permissions.contains('mcp.followup.write') == true;
+      _capabilities.can(MobileCapability.createFollowups);
 
   bool get _canManageReportSettings =>
-      widget.session?.permissions.contains('mcp.report-setting.write') == true;
+      _capabilities.can(MobileCapability.reportSettings);
 
-  bool get _canReadOrders =>
-      widget.session?.permissions.contains('mcp.sales-order.read') == true;
+  bool get _canReadOrders => _capabilities.can(MobileCapability.readOrders);
 
   bool get _canCreateOrders =>
-      _canReadOrders &&
-      widget.session?.permissions.contains('mcp.sales-order.create') == true;
+      _capabilities.can(MobileCapability.createOrders);
 
   MutationQueueStore? _defaultMutationQueueStore() {
     final database = _localDataStore;
@@ -1071,16 +1108,107 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     ]);
   }
 
+  bool get _hasSyncInProgress =>
+      _routeMutationSyncing ||
+      _routeManagementSyncing ||
+      _fieldActivitySyncing ||
+      _fieldCheckSyncing ||
+      _customerBoundarySyncing ||
+      _orderSyncing ||
+      _managementProposalSyncing ||
+      _mediaSyncing;
+
+  void _publishSyncStatus(AppSyncStatus status) {
+    _syncStatus = status;
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  String _syncFailureMessage(Object error, String label) {
+    if (error is FieldDataFailure) return error.message;
+    if (error is FieldActivityFailure) return error.message;
+    if (error is FieldHistoryFailure) return error.message;
+    if (error is CustomerBoundaryFailure) return error.message;
+    if (error is OrderDataFailure) return error.message;
+    if (error is ManagementProposalFailure) return error.message;
+    if (error is OutletMediaFailure) return error.message;
+    if (error is OutletPhotoPendingFailure) return error.message;
+    if (error is LocalDataFailure) return error.message;
+    return 'Chưa đồng bộ được $label. Chọn Đồng bộ lại để thử lại.';
+  }
+
+  Future<void> _runSyncJob(
+    String label,
+    Future<void> Function() job,
+  ) async {
+    _publishSyncStatus(_syncTracker.begin());
+    try {
+      await job();
+    } catch (error) {
+      _publishSyncStatus(
+        _syncTracker.recordError(_syncFailureMessage(error, label)),
+      );
+    } finally {
+      _publishSyncStatus(_syncTracker.complete());
+      if (!_syncTracker.isActive) {
+        await _refreshSyncSummary();
+      }
+    }
+  }
+
+  Future<void> _refreshSyncSummary() async {
+    var waiting = 0;
+    var failed = 0;
+    try {
+      final queue = _mutationQueueStore;
+      if (queue != null) {
+        final rows = await queue.load();
+        final outstanding = rows.where((item) => item.isOutstanding).toList();
+        waiting += outstanding.length;
+        failed += outstanding
+            .where((item) => item.state == MutationQueueState.failed)
+            .length;
+      }
+
+      final orderStore = _orderOfflineStore;
+      if (orderStore != null) {
+        final rows = await orderStore.loadMutations();
+        final outstanding = rows.where((item) => item.isOutstanding).toList();
+        waiting += outstanding.length;
+        failed += outstanding
+            .where((item) => item.state == OrderQueueState.failed)
+            .length;
+      }
+
+      if (_outletMediaClient != null) {
+        final media = await _photoPendingStore.load();
+        waiting += media.length;
+      }
+
+      _publishSyncStatus(
+        _syncTracker.summarize(waiting: waiting, failed: failed),
+      );
+    } catch (error) {
+      _publishSyncStatus(
+        _syncTracker.recordError(
+          _syncFailureMessage(error, 'dữ liệu chờ gửi trên thiết bị'),
+        ),
+      );
+    }
+  }
+
   void _syncPendingWork() {
-    if (!_localPersistenceReady) return;
-    _syncRouteMutations();
-    _syncRouteManagement();
-    _syncFieldActivities();
-    _syncFieldChecks();
-    _syncCustomerBoundary();
-    _syncOrders();
-    _syncManagementProposals();
-    _syncPendingMedia();
+    if (!_localPersistenceReady || _hasSyncInProgress) return;
+    _syncTracker.startCycle();
+    unawaited(_runSyncJob('dữ liệu tuyến', _syncRouteMutations));
+    unawaited(_runSyncJob('quản lý tuyến', _syncRouteManagement));
+    unawaited(_runSyncJob('tác nghiệp thị trường', _syncFieldActivities));
+    unawaited(_runSyncJob('kết quả thử sản phẩm', _syncFieldChecks));
+    unawaited(_runSyncJob('khách hàng', _syncCustomerBoundary));
+    unawaited(_runSyncJob('đơn hàng', _syncOrders));
+    unawaited(_runSyncJob('Đề xuất', _syncManagementProposals));
+    unawaited(_runSyncJob('ảnh điểm bán', _syncPendingMedia));
   }
 
   Future<void> _syncRouteMutations() async {
@@ -1128,7 +1256,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
         if (route != null) await _loadWorkspace(route);
       }
     } catch (_) {
-      // Đồng bộ nền không chặn người dùng tiếp tục làm việc.
+      rethrow;
     } finally {
       _routeManagementSyncing = false;
     }
@@ -1165,7 +1293,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     try {
       await FieldCheckSyncService(client: client, queue: queue).syncPending();
     } catch (_) {
-      // Đồng bộ nền không chặn người dùng tiếp tục làm việc.
+      rethrow;
     } finally {
       _fieldCheckSyncing = false;
     }
@@ -1189,7 +1317,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
         ]);
       }
     } catch (_) {
-      // Đồng bộ nền không chặn người dùng tiếp tục làm việc.
+      rethrow;
     } finally {
       _customerBoundarySyncing = false;
     }
@@ -1214,7 +1342,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
         if (route != null) await _loadWorkspace(route);
       }
     } catch (_) {
-      // Đồng bộ nền không chặn người dùng tiếp tục làm việc.
+      rethrow;
     } finally {
       _orderSyncing = false;
     }
@@ -1251,7 +1379,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
         await _loadOutlets();
       }
     } on OutletPhotoPendingFailure {
-      // Đồng bộ nền không chặn người dùng tiếp tục làm việc.
+      rethrow;
     } finally {
       _mediaSyncing = false;
     }
@@ -1274,7 +1402,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
         queue: queue,
       ).syncPending();
     } catch (_) {
-      // Đồng bộ nền không chặn người dùng tiếp tục làm việc.
+      rethrow;
     } finally {
       _managementProposalSyncing = false;
     }
@@ -2053,6 +2181,8 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
         onCustomerOnboarding: _customerBoundaryClient == null
             ? null
             : () => _openCustomerOnboarding(),
+        syncStatus: _syncStatus,
+        onRetrySync: _localPersistenceReady ? _syncPendingWork : null,
         onLogout: widget.onLogout,
       ),
     ];

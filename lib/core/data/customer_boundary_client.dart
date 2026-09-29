@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+import '../errors/mobile_error_mapper.dart';
 import '../installation/installation_profile.dart';
 
 class CustomerBoundaryFailure implements Exception {
@@ -332,7 +333,11 @@ class HttpCustomerBoundaryClient implements CustomerBoundaryClient {
           serverMessage: serverMessage,
           statusCode: response.statusCode,
         ),
-        retryable: response.statusCode >= 500 || error['retryable'] == true,
+        retryable: CanonicalApiErrorMapper.isRetryable(
+          code: code,
+          statusCode: response.statusCode,
+          backendRetryable: error['retryable'] == true,
+        ),
       );
     }
 
@@ -353,7 +358,7 @@ String _customerBoundaryErrorMessage(
   required String serverMessage,
   required int statusCode,
 }) {
-  switch (code.toLowerCase()) {
+  switch (code.trim().toLowerCase()) {
     case 'route_customer_id_required':
       return 'Chưa xác định được điểm bán cần xử lý.';
     case 'route_customer_not_found':
@@ -377,15 +382,17 @@ String _customerBoundaryErrorMessage(
     case 'employee_inactive':
       return 'Tài khoản nhân viên không còn hoạt động.';
   }
-  if (statusCode == 401) return 'Phiên đăng nhập không còn hiệu lực.';
-  if (statusCode == 403) {
-    return serverMessage.isNotEmpty
-        ? serverMessage
-        : 'Tài khoản chưa được cấp quyền xử lý khách hàng.';
-  }
-  return serverMessage.isNotEmpty
-      ? serverMessage
-      : 'Không xử lý được khách hàng. Vui lòng thử lại.';
+  return CanonicalApiErrorMapper.message(
+    code: code,
+    statusCode: statusCode,
+    serverMessage: serverMessage,
+    fallbackMessage: 'Không xử lý được khách hàng. Vui lòng thử lại.',
+    forbiddenMessage: 'Tài khoản chưa được cấp quyền xử lý khách hàng.',
+    notFoundMessage: 'Thông tin điểm bán hoặc khách hàng không còn sẵn sàng. Cập nhật lại rồi thử.',
+    conflictMessage: 'Thông tin khách hàng đã thay đổi. Cập nhật lại rồi tiếp tục.',
+    validationMessage: 'Thông tin khách hàng chưa hợp lệ. Kiểm tra lại trước khi gửi.',
+    unavailableMessage: 'Kết nối dữ liệu khách hàng đang tạm thời gián đoạn. Vui lòng thử lại.',
+  );
 }
 
 Map<String, dynamic> _object(Object? value) {
