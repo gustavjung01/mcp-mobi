@@ -96,6 +96,7 @@ void main() {
     expect(find.byKey(const Key('task-task-overdue')), findsOneWidget);
     expect(find.byKey(const Key('task-task-done')), findsOneWidget);
     expect(find.text('Quá hạn · 27/09/2026'), findsOneWidget);
+    expect(find.text('Từ đơn hàng'), findsOneWidget);
 
     await tester.scrollUntilVisible(
       find.byKey(const Key('task-task-blocked')),
@@ -121,6 +122,9 @@ void main() {
 
     await tester.tap(find.byKey(const Key('task-task-overdue')));
     await tester.pumpAndSettle();
+    expect(find.text('Nguồn phát sinh'), findsOneWidget);
+    expect(find.text('Từ đơn hàng'), findsWidgets);
+    expect(find.text('Loại công việc'), findsOneWidget);
     expect(find.text('Đơn hàng'), findsOneWidget);
     expect(find.text('Khách cần xác nhận số lượng'), findsOneWidget);
   });

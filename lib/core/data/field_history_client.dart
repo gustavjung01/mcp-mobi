@@ -116,6 +116,23 @@ class FieldTaskItem {
     );
   }
 
+  String get source {
+    final type = followupType.trim().toLowerCase();
+    if (type == 'order') return 'order';
+    if (const {'test', 'report', 'field_check'}.contains(type)) {
+      return 'field_check';
+    }
+    if ((sessionId ?? '').trim().isNotEmpty) return 'session';
+    return 'manual';
+  }
+
+  String get sourceLabel => switch (source) {
+    'order' => 'Từ đơn hàng',
+    'field_check' => 'Từ tác nghiệp thị trường',
+    'session' => 'Từ phiên đi tuyến',
+    _ => 'Tạo thủ công',
+  };
+
   bool isOverdue(DateTime now) {
     if (status == 'done') return false;
     final due = DateTime.tryParse((dueDate ?? '').trim());
@@ -371,6 +388,7 @@ class SessionReportDetail {
     required this.marketReports,
     required this.tests,
     required this.followups,
+    this.snapshotId,
   });
 
   final SessionReportSummary session;
@@ -378,6 +396,9 @@ class SessionReportDetail {
   final List<SessionMarketReportFact> marketReports;
   final List<SessionTestFact> tests;
   final List<SessionFollowupFact> followups;
+  final String? snapshotId;
+
+  bool get hasSnapshot => (snapshotId ?? '').trim().isNotEmpty;
 
   factory SessionReportDetail.fromJson(Map<String, dynamic> json) {
     final sessionJson = _object(json['session']);
@@ -402,8 +423,64 @@ class SessionReportDetail {
       followups: _objects(json['followups'])
           .map(SessionFollowupFact.fromJson)
           .toList(growable: false),
+      snapshotId: _nullableText(snapshot['id']),
     );
   }
+}
+
+
+class SessionReportAiResult {
+  const SessionReportAiResult({
+    required this.summary,
+    this.marketInsights = const [],
+    this.productInsights = const [],
+    this.customerActions = const [],
+    this.sampleRequests = const [],
+    this.followups = const [],
+    this.orderOpportunities = const [],
+    this.risks = const [],
+    this.nextSteps = const [],
+    this.analyzedAt,
+  });
+
+  final String summary;
+  final List<String> marketInsights;
+  final List<String> productInsights;
+  final List<String> customerActions;
+  final List<String> sampleRequests;
+  final List<String> followups;
+  final List<String> orderOpportunities;
+  final List<String> risks;
+  final List<String> nextSteps;
+  final String? analyzedAt;
+
+  factory SessionReportAiResult.fromJson(Map<String, dynamic> json) {
+    final result = _object(json['result']);
+    return SessionReportAiResult(
+      summary: _text(result['summary'], fallback: 'Đã hoàn tất phân tích.'),
+      marketInsights: _displayStrings(result['market_insights']),
+      productInsights: _displayStrings(result['product_insights']),
+      customerActions: _displayStrings(result['customer_actions']),
+      sampleRequests: _displayStrings(result['sample_requests']),
+      followups: _displayStrings(result['follow_up_list']),
+      orderOpportunities: _displayStrings(result['order_opportunities']),
+      risks: _displayStrings(result['risks']),
+      nextSteps: _displayStrings(result['next_steps']),
+      analyzedAt: _nullableText(json['aiAnalyzedAt']),
+    );
+  }
+}
+
+abstract interface class SessionReportActionClient {
+  Future<void> createSessionReportSnapshot({
+    required String sessionId,
+    required String idempotencyKey,
+  });
+
+  Future<SessionReportAiResult> analyzeSessionReport({
+    required String sessionId,
+    required String idempotencyKey,
+  });
 }
 
 class OutletHistoryItem {
@@ -499,7 +576,7 @@ abstract interface class FieldHistoryClient {
   });
 }
 
-class HttpFieldHistoryClient implements FieldHistoryClient {
+class HttpFieldHistoryClient implements FieldHistoryClient, SessionReportActionClient {
   HttpFieldHistoryClient({
     required this.profile,
     required this.token,
@@ -625,6 +702,37 @@ class HttpFieldHistoryClient implements FieldHistoryClient {
   }
 
   @override
+  Future<void> createSessionReportSnapshot({
+    required String sessionId,
+    required String idempotencyKey,
+  }) async {
+    await _request(
+      'POST',
+      '/api/mcp-session-report',
+      body: {
+        'sessionId': sessionId.trim(),
+        'source': 'mobile_manual_snapshot',
+      },
+      idempotencyKey: idempotencyKey,
+    );
+  }
+
+  @override
+  Future<SessionReportAiResult> analyzeSessionReport({
+    required String sessionId,
+    required String idempotencyKey,
+  }) async {
+    final data = await _request(
+      'POST',
+      '/api/mcp-session-report/analyze',
+      body: {'sessionId': sessionId.trim()},
+      idempotencyKey: idempotencyKey,
+      requestTimeout: const Duration(seconds: 60),
+    );
+    return SessionReportAiResult.fromJson(data);
+  }
+
+  @override
   Future<List<FieldCheckItem>> loadFieldChecks({
     String? status,
     String? search,
@@ -677,6 +785,7 @@ class HttpFieldHistoryClient implements FieldHistoryClient {
     Map<String, String>? query,
     Map<String, Object?>? body,
     String? idempotencyKey,
+    Duration? requestTimeout,
   }) async {
     http.Response response;
     try {
@@ -692,8 +801,10 @@ class HttpFieldHistoryClient implements FieldHistoryClient {
                 ),
                 body: jsonEncode(body ?? const <String, Object?>{}),
               )
-              .timeout(timeout),
-        _ => await _client.get(uri, headers: _headers()).timeout(timeout),
+              .timeout(requestTimeout ?? timeout),
+        _ => await _client
+            .get(uri, headers: _headers())
+            .timeout(requestTimeout ?? timeout),
       };
     } on TimeoutException {
       throw const FieldHistoryFailure(
@@ -836,6 +947,15 @@ String _historyErrorMessage(
       return 'Kết quả thử sản phẩm chưa có tên sản phẩm.';
     case 'field_check_status_invalid':
       return 'Trạng thái hậu kiểm không hợp lệ.';
+    case 'session_report_snapshot_required':
+      return 'Cần tạo bản chốt báo cáo phiên trước khi phân tích.';
+    case 'report_agent_not_configured':
+      return 'Chức năng phân tích báo cáo chưa được cấu hình.';
+    case 'report_agent_timeout':
+      return 'Phân tích báo cáo quá thời gian chờ. Có thể thử lại.';
+    case 'report_agent_unavailable':
+    case 'report_agent_rejected':
+      return 'Chức năng phân tích báo cáo đang tạm thời chưa sẵn sàng.';
     case 'idempotency_key_required':
     case 'idempotency_key_invalid':
       return 'Lần cập nhật chưa có mã gửi hợp lệ. Vui lòng thử lại.';
@@ -863,6 +983,29 @@ List<Map<String, dynamic>> _objects(Object? value) {
   if (value is! List) return const [];
   return value
       .map(_object)
+      .where((item) => item.isNotEmpty)
+      .toList(growable: false);
+}
+
+
+List<String> _displayStrings(Object? value) {
+  if (value is! List) return const [];
+  return value
+      .map((item) {
+        if (item is String) return item.trim();
+        if (item is Map) {
+          final row = _object(item);
+          return _text(
+            row['action'] ??
+                row['summary'] ??
+                row['title'] ??
+                row['reason'] ??
+                row['customerName'] ??
+                row['productName'],
+          );
+        }
+        return _text(item);
+      })
       .where((item) => item.isNotEmpty)
       .toList(growable: false);
 }

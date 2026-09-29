@@ -5,16 +5,19 @@ import '../../core/data/field_history_client.dart';
 import '../../shared/widgets/app_card.dart';
 import '../../shared/widgets/empty_state.dart';
 import '../../shared/widgets/navy_page_header.dart';
+import 'session_report_detail_page.dart';
 
 class SessionHistoryPage extends StatefulWidget {
   const SessionHistoryPage({
     required this.client,
     super.key,
     this.now,
+    this.canWriteReport = false,
   });
 
   final FieldHistoryClient client;
   final DateTime? now;
+  final bool canWriteReport;
 
   @override
   State<SessionHistoryPage> createState() => _SessionHistoryPageState();
@@ -74,6 +77,18 @@ class _SessionHistoryPageState extends State<SessionHistoryPage> {
           return true;
         })
         .toList(growable: false);
+  }
+
+  Future<void> _openDetail(FieldSessionHistoryItem item) async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (context) => SessionReportDetailPage(
+          client: widget.client,
+          sessionId: item.id,
+          canWriteReport: widget.canWriteReport,
+        ),
+      ),
+    );
   }
 
   @override
@@ -141,7 +156,10 @@ class _SessionHistoryPageState extends State<SessionHistoryPage> {
                     ...items.map(
                       (item) => Padding(
                         padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                        child: _SessionCard(item: item),
+                        child: _SessionCard(
+                          item: item,
+                          onTap: () => _openDetail(item),
+                        ),
                       ),
                     ),
                 ],
@@ -230,9 +248,10 @@ class _FiltersCard extends StatelessWidget {
 }
 
 class _SessionCard extends StatelessWidget {
-  const _SessionCard({required this.item});
+  const _SessionCard({required this.item, required this.onTap});
 
   final FieldSessionHistoryItem item;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -243,76 +262,77 @@ class _SessionCard extends StatelessWidget {
         ? AppColors.danger
         : AppColors.success;
 
-    return AppCard(
+    return InkWell(
       key: Key('session-history-${item.id}'),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  item.routeName,
-                  style: const TextStyle(
-                    color: AppColors.textPrimary,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w900,
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(AppRadius.lg),
+      child: AppCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    item.routeName,
+                    style: const TextStyle(
+                      color: AppColors.textPrimary,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w900,
+                    ),
                   ),
                 ),
-              ),
-              StatusPill(
-                label: status,
-                backgroundColor: item.status == 'active'
-                    ? AppColors.primarySoft
-                    : item.status == 'cancelled'
-                    ? AppColors.dangerSoft
-                    : AppColors.successSoft,
-                foregroundColor: statusColor,
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Text(
-            [
-              _dateLabel(item.sessionDate),
-              item.salesOwner,
-            ].where((value) => value.isNotEmpty).join(' · '),
-            style: const TextStyle(
-              color: AppColors.textSecondary,
-              fontSize: 10,
+                StatusPill(
+                  label: status,
+                  backgroundColor: item.status == 'active'
+                      ? AppColors.primarySoft
+                      : item.status == 'cancelled'
+                      ? AppColors.dangerSoft
+                      : AppColors.successSoft,
+                  foregroundColor: statusColor,
+                ),
+                const SizedBox(width: 4),
+                const Icon(Icons.chevron_right_rounded, color: AppColors.textSecondary),
+              ],
             ),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          Wrap(
-            spacing: AppSpacing.sm,
-            runSpacing: AppSpacing.xs,
-            children: [
-              _Metric(
-                label: 'Đã ghé',
-                value: '${item.visited}/${item.planned}',
-              ),
-              _Metric(label: 'Đơn', value: item.orders.toString()),
-              _Metric(label: 'Thử SP', value: item.tests.toString()),
-              _Metric(label: 'Báo cáo', value: item.reports.toString()),
-              _Metric(label: 'Theo dõi', value: item.followups.toString()),
-            ],
-          ),
-          if ((item.note ?? '').isNotEmpty) ...[
-            const SizedBox(height: AppSpacing.sm),
+            const SizedBox(height: 4),
             Text(
-              item.note!,
+              [_dateLabel(item.sessionDate), item.salesOwner]
+                  .where((value) => value.isNotEmpty)
+                  .join(' · '),
               style: const TextStyle(
                 color: AppColors.textSecondary,
-                fontSize: 11,
+                fontSize: 10,
               ),
             ),
+            const SizedBox(height: AppSpacing.sm),
+            Wrap(
+              spacing: AppSpacing.sm,
+              runSpacing: AppSpacing.xs,
+              children: [
+                _Metric(label: 'Đã ghé', value: '${item.visited}/${item.planned}'),
+                _Metric(label: 'Đơn', value: item.orders.toString()),
+                _Metric(label: 'Thử sản phẩm', value: item.tests.toString()),
+                _Metric(label: 'Báo cáo', value: item.reports.toString()),
+                _Metric(label: 'Công việc', value: item.followups.toString()),
+              ],
+            ),
+            if ((item.note ?? '').isNotEmpty) ...[
+              const SizedBox(height: AppSpacing.sm),
+              Text(
+                item.note!,
+                style: const TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 11,
+                ),
+              ),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }
 }
-
 class _Metric extends StatelessWidget {
   const _Metric({required this.label, required this.value});
 

@@ -227,6 +227,43 @@ void main() {
           );
         }
 
+        if (request.url.path == '/api/mcp-session-report') {
+          expect(request.method, 'POST');
+          expect(
+            request.headers['idempotency-key'],
+            'mcp.session-report.snapshot-test',
+          );
+          return jsonResponse(
+            {
+              'data': {
+                'row': {'id': 'session-report-2'},
+              },
+            },
+            200,
+          );
+        }
+
+        if (request.url.path == '/api/mcp-session-report/analyze') {
+          expect(request.method, 'POST');
+          expect(
+            request.headers['idempotency-key'],
+            'mcp.session-report.analyze-test',
+          );
+          return jsonResponse(
+            {
+              'data': {
+                'result': {
+                  'summary': 'Phiên ổn',
+                  'risks': ['Cần theo dõi tồn'],
+                  'next_steps': ['Gọi lại khách'],
+                },
+                'aiAnalyzedAt': '2026-09-29T05:00:00.000Z',
+              },
+            },
+            200,
+          );
+        }
+
         if (request.url.path == '/api/field-checks/result') {
           expect(request.method, 'POST');
           expect(
@@ -260,6 +297,8 @@ void main() {
     expect(tasks.single.title, 'Gọi lại chốt đơn');
     expect(tasks.single.status, 'todo');
     expect(tasks.single.priority, 'high');
+    expect(tasks.single.source, 'order');
+    expect(tasks.single.sourceLabel, 'Từ đơn hàng');
 
     final reports = await client.loadSessionReports();
     expect(reports.single.sessionId, 'session-1');
@@ -269,6 +308,8 @@ void main() {
     expect(detail.marketReports.single.customerName, 'Điểm bán B');
     expect(detail.tests.single.status, 'opportunity');
     expect(detail.customers.single.visitStatus, 'skipped');
+    expect(detail.hasSnapshot, isTrue);
+    expect(detail.snapshotId, 'session-report-1');
 
     final outletHistory = await client.loadOutletHistory('route-customer-1');
     expect(outletHistory.single.sessionId, 'session-2');
@@ -278,6 +319,19 @@ void main() {
 
     final checks = await client.loadFieldChecks();
     expect(checks.single.status, 'opportunity');
+
+    final actions = client as SessionReportActionClient;
+    await actions.createSessionReportSnapshot(
+      sessionId: 'session-1',
+      idempotencyKey: 'mcp.session-report.snapshot-test',
+    );
+    final analysis = await actions.analyzeSessionReport(
+      sessionId: 'session-1',
+      idempotencyKey: 'mcp.session-report.analyze-test',
+    );
+    expect(analysis.summary, 'Phiên ổn');
+    expect(analysis.risks, ['Cần theo dõi tồn']);
+    expect(analysis.nextSteps, ['Gọi lại khách']);
 
     await client.updateFieldCheck(
       resultId: 'result-1',
@@ -296,6 +350,8 @@ void main() {
         'GET /api/local-read/mcp-session-report',
         'GET /api/local-read/mcp-outlet-history',
         'GET /api/market-checks/data',
+        'POST /api/mcp-session-report',
+        'POST /api/mcp-session-report/analyze',
         'POST /api/field-checks/result',
       ],
     );

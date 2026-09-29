@@ -113,17 +113,17 @@ Mobile không được tự suy ra quyền từ UI. Backend là authority.
 | 52 | Report templates | `GET /api/mcp-report-templates` | read | Có chọn mẫu và đổ nội dung vào báo cáo | Cache | PARTIAL | Canonical template read đã nối; chờ runtime evidence |
 | 53 | Thử sản phẩm tại điểm bán | session-customer test | `mcp.test.write` | Có chọn phiếu/sản phẩm hoặc nhập tay fallback | SQLite queue | PARTIAL | Payload fileId/productId/name bám canonical contract; chờ runtime evidence |
 | 54 | Phiếu/file thử sản phẩm + sản phẩm trong phiếu | `GET /api/mcp-day/test-options` | read | Có picker phiếu và sản phẩm trong phiếu | Cache | PARTIAL | Read model đã nối đúng test_files/test_file_products; chờ runtime evidence |
-| 55 | Hậu kiểm thử SP | `POST /api/field-checks/result` | `mcp.test.write` | Có Bình thường/Cơ hội/Rủi ro + lịch sử | SQLite queue | PARTIAL | Retry cùng canonical key đã có regression test; chờ device/API integration |
-| 56 | Tạo follow-up | session-customer followup | `mcp.followup.write` | Có | Queue | PARTIAL | Queue sai tầng |
-| 57 | Danh sách Kế hoạch/Công việc | followup read | read | Có | Cache | PARTIAL | Cần local searchable/filter parity |
-| 58 | Priority/owner/due/overdue/source | followup model | read/write | Có phần lớn | Cache | PARTIAL | Chưa gate đủ dữ liệu qua nhiều phiên |
-| 59 | Lịch sử phiên | local read/sessions | read | Có filter route/status/days | Cache | PARTIAL | Cần chi tiết transition/action parity |
-| 60 | Chi tiết báo cáo phiên | session report read | read | Có | Cache | PARTIAL | Cần kiểm toàn dữ liệu orders/tests/reports/followups/skips |
-| 61 | Snapshot báo cáo phiên | `POST /api/mcp-session-report` | `mcp.report.write` | Không chủ động tạo | Queue | MISSING | MCP backend có contract |
-| 62 | AI phân tích báo cáo phiên | `/api/mcp-session-report/analyze` + ai-result | `mcp.report.write` | Không | Online only | MISSING | User-facing MCP capability |
-| 63 | Xuất báo cáo phiên Word/Excel/PDF/export | session report export routes | read | Không | Online | MISSING | User-facing capability MCP web |
-| 64 | CSV exports: phiên/đơn/điểm bán/report/test/follow-up | export routes | read | Không | Online | MISSING | User-facing capability MCP web |
-| 65 | Đề xuất quản lý | `/api/management-proposals` | `mcp.report.write` | Có role-gated | Queue | PARTIAL | Có submit/list/resubmit; cần integration thật |
+| 55 | Hậu kiểm thử sản phẩm | `POST /api/field-checks/result` | `mcp.test.write` | Có Bình thường/Cơ hội/Rủi ro + lịch sử | SQLite queue | PARTIAL | Retry cùng canonical key đã có regression test; chờ device/API integration |
+| 56 | Tạo follow-up | session-customer followup | `mcp.followup.write` | Có + khóa đúng quyền | SQLite queue | PARTIAL | Canonical key/retry đã đúng tầng; chờ device/runtime evidence |
+| 57 | Danh sách Kế hoạch/Công việc | followup read | read | Có tìm kiếm + lọc trạng thái/ưu tiên/phụ trách/hạn xử lý | Cache | PARTIAL | Workflow đọc đã đủ cho mobile; chờ runtime evidence nhiều phiên |
+| 58 | Priority/owner/due/overdue/source | followup model | read/write | Có đầy đủ + nguồn phát sinh hiểu được | Cache | PARTIAL | Source lineage suy ra từ canonical type/session; chờ runtime evidence |
+| 59 | Lịch sử phiên | local read/sessions | read | Có filter route/status/days + mở chi tiết phiên | Cache | PARTIAL | Không còn card cụt; chờ runtime evidence lịch sử thật |
+| 60 | Chi tiết báo cáo phiên | session report read | read | Có điểm bán/đơn/thử sản phẩm/báo cáo/công việc/bỏ qua | Cache | PARTIAL | Mobile đã gom chi tiết phiên và export từ cùng read model; chờ runtime evidence |
+| 61 | Snapshot báo cáo phiên | `POST /api/mcp-session-report` | `mcp.report.write` | Có tạo/cập nhật bản chốt từ chi tiết phiên | Online idempotent mutation | PARTIAL | Dùng canonical key; chờ runtime evidence |
+| 62 | AI phân tích báo cáo phiên | `/api/mcp-session-report/analyze` + ai-result | `mcp.report.write` | Có sau khi có bản chốt | Online idempotent mutation | PARTIAL | MCP backend boundary mới, không gọi route web/cookie; chờ backend PR + runtime evidence |
+| 63 | Xuất báo cáo phiên Word/Excel/PDF/export | session report read model + native share | read | Có Word/Excel/PDF/Markdown/JSON | Local render + native share | PARTIAL | Không phụ thuộc cookie web; Android/iOS build là gate code, chờ device share evidence |
+| 64 | CSV exports: phiên/đơn/điểm bán/report/test/follow-up | session report read model | read | Có 6 CSV theo phiên | Local render + native share | PARTIAL | Xuất từ cùng canonical detail, chờ device evidence |
+| 65 | Đề xuất quản lý | `/api/management-proposals` | `mcp.report.write` | Có role-gated | SQLite queue | PARTIAL | Submit/list/resubmit đã đúng canonical queue; chờ integration thật |
 | 66 | Capability-state theo quyền/cấu hình | access + backend readiness | permission-dependent | Rời rạc | Local session capability map | BROKEN | Không có registry canonical |
 | 67 | Menu/action khi capability null | mobile More/AppShell | n/a | Một số menu luôn render | n/a | BROKEN | Có thể bấm không phản hồi |
 | 68 | Canonical error mapping | API contract | n/a | Mỗi client tự map | Persist error code | BROKEN | 404/409/503 dễ bị gom thông báo chung |

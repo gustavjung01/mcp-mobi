@@ -356,6 +356,9 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   bool get _canCreateProductTrials =>
       widget.session?.permissions.contains('mcp.test.write') == true;
 
+  bool get _canCreateFollowups =>
+      widget.session?.permissions.contains('mcp.followup.write') == true;
+
   bool get _canManageReportSettings =>
       widget.session?.permissions.contains('mcp.report-setting.write') == true;
 
@@ -1303,7 +1306,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     final allowed = switch (kind) {
       FieldActivityKind.report => _canCreateReports,
       FieldActivityKind.productTrial => _canCreateProductTrials,
-      FieldActivityKind.followup => true,
+      FieldActivityKind.followup => _canCreateFollowups,
     };
     if (!allowed) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1460,7 +1463,10 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
 
     await Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
-        builder: (context) => SessionHistoryPage(client: client),
+        builder: (context) => SessionHistoryPage(
+          client: client,
+          canWriteReport: _canCreateReports,
+        ),
       ),
     );
   }
@@ -1582,7 +1588,8 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                   FieldActivityKind.productTrial,
                   line,
                 ),
-          onCreateFollowup: _fieldActivityClient == null
+          onCreateFollowup:
+              _fieldActivityClient == null || !_canCreateFollowups
               ? null
               : () => _openFieldActivity(FieldActivityKind.followup, line),
         ),
