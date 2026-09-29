@@ -48,20 +48,34 @@ void main() {
       _requirePermissions(current.permissions);
 
       final field = HttpFieldDataClient(profile: profile, token: current.token);
-      final routes =
-          HttpRouteManagementClient(profile: profile, token: current.token);
-      final activities =
-          HttpFieldActivityClient(profile: profile, token: current.token);
-      final history =
-          HttpFieldHistoryClient(profile: profile, token: current.token);
-      final customers =
-          HttpCustomerBoundaryClient(profile: profile, token: current.token);
-      final orders =
-          HttpOrderDataClient(profile: profile, token: current.token);
-      final media =
-          HttpOutletMediaClient(profile: profile, token: current.token);
-      final proposals =
-          HttpManagementProposalClient(profile: profile, token: current.token);
+      final routes = HttpRouteManagementClient(
+        profile: profile,
+        token: current.token,
+      );
+      final activities = HttpFieldActivityClient(
+        profile: profile,
+        token: current.token,
+      );
+      final history = HttpFieldHistoryClient(
+        profile: profile,
+        token: current.token,
+      );
+      final customers = HttpCustomerBoundaryClient(
+        profile: profile,
+        token: current.token,
+      );
+      final orders = HttpOrderDataClient(
+        profile: profile,
+        token: current.token,
+      );
+      final media = HttpOutletMediaClient(
+        profile: profile,
+        token: current.token,
+      );
+      final proposals = HttpManagementProposalClient(
+        profile: profile,
+        token: current.token,
+      );
 
       await field.loadRoutes();
       await field.loadOutlets();
@@ -95,7 +109,9 @@ void main() {
       if (session != null) {
         try {
           await auth.logout(profile: profile, token: session.token);
-        } on Object {}
+        } on Object {
+          // Cleanup failure must not replace the primary gate result.
+        }
       }
     }
   });
@@ -115,8 +131,9 @@ Future<void> _reportSettings(
       'mcp.report-setting-group.runtime-create',
     ),
   );
-  final group = (await client.loadReportSettingGroups())
-      .firstWhere((item) => item.title == title);
+  final group = (await client.loadReportSettingGroups()).firstWhere(
+    (item) => item.title == title,
+  );
   await client.saveReportSettingItem(
     groupId: group.id,
     label: label,
@@ -129,8 +146,9 @@ Future<void> _reportSettings(
       'mcp.report-setting-item.runtime-create',
     ),
   );
-  final refreshed = (await client.loadReportSettingGroups())
-      .firstWhere((item) => item.id == group.id);
+  final refreshed = (await client.loadReportSettingGroups()).firstWhere(
+    (item) => item.id == group.id,
+  );
   final item = refreshed.items.firstWhere((item) => item.label == label);
   await client.saveReportSettingItem(
     itemId: item.id,
@@ -211,7 +229,7 @@ Future<void> _orderReplay(
 ) async {
   final database = LocalDataStore();
   final scope = LocalDataScope(
-    installationKey: 'l7-runtime-' + config.runId,
+    installationKey: 'l7-runtime-${config.runId}',
     employeeId: session.employeeId,
   );
   final queue = LocalMutationQueueStore(database: database, scope: scope);
@@ -236,17 +254,20 @@ Future<void> _orderReplay(
         outletName: 'Điểm bán runtime',
         customerId: config.orderCustomerId,
         customerAddressId: config.orderCustomerAddressId,
-        note: 'L7 runtime gate ' + config.runId,
+        note: 'L7 runtime gate ${config.runId}',
         lines: lines,
         createdAt: DateTime.now().toUtc(),
       ),
     );
-    final sync = await OrderSyncService(client: client, store: store)
-        .syncPending(idempotencyKey: key);
+    final sync = await OrderSyncService(
+      client: client,
+      store: store,
+    ).syncPending(idempotencyKey: key);
     expect(sync.sent, 1);
     expect(sync.failed, 0);
-    final queued = (await store.loadMutations())
-        .firstWhere((item) => item.idempotencyKey == key);
+    final queued = (await store.loadMutations()).firstWhere(
+      (item) => item.idempotencyKey == key,
+    );
     expect(queued.state, OrderQueueState.acknowledged);
     expect(queued.serverOrderId, isNotEmpty);
 
@@ -255,10 +276,13 @@ Future<void> _orderReplay(
       customerAddressId: config.orderCustomerAddressId,
       lines: lines,
       idempotencyKey: key,
-      note: 'L7 runtime gate ' + config.runId,
+      note: 'L7 runtime gate ${config.runId}',
     );
     expect(replay.id, queued.serverOrderId);
-    expect((await client.loadOrders()).any((item) => item.id == replay.id), isTrue);
+    expect(
+      (await client.loadOrders()).any((item) => item.id == replay.id),
+      isTrue,
+    );
   } finally {
     await store.removeMutation(key);
     await database.dispose();
@@ -289,15 +313,20 @@ Future<void> _routeSessionChain({
       routeName: routeName,
       area: 'Runtime Gate',
       note: 'Tuyến tạm cho kiểm thử L7',
-      idempotencyKey: CanonicalIdempotencyKey.create('mcp.route.runtime-create'),
+      idempotencyKey: CanonicalIdempotencyKey.create(
+        'mcp.route.runtime-create',
+      ),
     );
-    final route = (await field.loadRoutes())
-        .firstWhere((item) => item.name == routeName);
+    final route = (await field.loadRoutes()).firstWhere(
+      (item) => item.name == routeName,
+    );
     routeId = route.id;
     await routes.updateRoute(
       routeId: route.id,
       note: 'Đã xác nhận cập nhật runtime L7',
-      idempotencyKey: CanonicalIdempotencyKey.create('mcp.route.runtime-update'),
+      idempotencyKey: CanonicalIdempotencyKey.create(
+        'mcp.route.runtime-update',
+      ),
     );
 
     await field.openRouteSession(
@@ -336,8 +365,9 @@ Future<void> _routeSessionChain({
       ),
     );
     workspace = await field.loadRouteWorkspace(route: route, date: today);
-    final customer = workspace.customers
-        .firstWhere((item) => item.accountName == outletName);
+    final customer = workspace.customers.firstWhere(
+      (item) => item.accountName == outletName,
+    );
     routeCustomerId = customer.id;
     await routes.updateRouteCustomer(
       routeCustomerId: customer.id,
@@ -360,12 +390,15 @@ Future<void> _routeSessionChain({
       routeId: route.id,
       date: today,
       owner: session.displayName,
-      idempotencyKey: CanonicalIdempotencyKey.create('mcp.session.runtime-open'),
+      idempotencyKey: CanonicalIdempotencyKey.create(
+        'mcp.session.runtime-open',
+      ),
     );
     workspace = await field.loadRouteWorkspace(route: route, date: today);
     activeSessionId = workspace.day.run.id;
-    final line = workspace.day.lines
-        .firstWhere((item) => item.routeCustomerId == customer.id);
+    final line = workspace.day.lines.firstWhere(
+      (item) => item.routeCustomerId == customer.id,
+    );
     final sessionCustomerId = line.sessionCustomerId;
     if (sessionCustomerId == null || sessionCustomerId.isEmpty) {
       throw StateError('runtime_gate_session_customer_missing');
@@ -412,7 +445,9 @@ Future<void> _routeSessionChain({
           'routeCustomerId': customer.id,
         },
       },
-      idempotencyKey: CanonicalIdempotencyKey.create('mcp.report.runtime-create'),
+      idempotencyKey: CanonicalIdempotencyKey.create(
+        'mcp.report.runtime-create',
+      ),
     );
     final trial = await activities.submit(
       kind: FieldActivityKind.productTrial,
@@ -476,12 +511,15 @@ Future<void> _routeSessionChain({
     );
 
     expect(
-      (await history.loadSessionHistory())
-          .any((item) => item.id == activeSessionId),
+      (await history.loadSessionHistory()).any(
+        (item) => item.id == activeSessionId,
+      ),
       isTrue,
     );
     expect(
-      (await history.loadTasks()).any((item) => item.id == followup.referenceId),
+      (await history.loadTasks()).any(
+        (item) => item.id == followup.referenceId,
+      ),
       isTrue,
     );
     final check = (await history.loadFieldChecks(search: testProduct))
@@ -533,50 +571,61 @@ Future<void> _routeSessionChain({
         'mcp.management-proposal.runtime-create',
       ),
     );
-    expect((await proposals.load()).any((item) => item.id == proposal.id), isTrue);
+    expect(
+      (await proposals.load()).any((item) => item.id == proposal.id),
+      isTrue,
+    );
     activeSessionId = null;
   } finally {
-    if (activeSessionId != null && activeSessionId!.isNotEmpty) {
+    if (activeSessionId != null && activeSessionId.isNotEmpty) {
       try {
         await routes.updateSession(
-          sessionId: activeSessionId!,
+          sessionId: activeSessionId,
           status: 'cancelled',
           note: 'Dọn runtime gate sau lỗi',
           idempotencyKey: CanonicalIdempotencyKey.create(
             'mcp.session.runtime-cleanup',
           ),
         );
-      } on Object {}
+      } on Object {
+        // Cleanup failure must not replace the primary gate result.
+      }
     }
-    if (addedRouteCustomerId != null && addedRouteCustomerId!.isNotEmpty) {
+    if (addedRouteCustomerId != null && addedRouteCustomerId.isNotEmpty) {
       try {
         await routes.archiveRouteCustomer(
-          routeCustomerId: addedRouteCustomerId!,
+          routeCustomerId: addedRouteCustomerId,
           idempotencyKey: CanonicalIdempotencyKey.create(
             'mcp.route-customer.runtime-added-retire',
           ),
         );
-      } on Object {}
+      } on Object {
+        // Cleanup failure must not replace the primary gate result.
+      }
     }
-    if (routeCustomerId != null && routeCustomerId!.isNotEmpty) {
+    if (routeCustomerId != null && routeCustomerId.isNotEmpty) {
       try {
         await routes.archiveRouteCustomer(
-          routeCustomerId: routeCustomerId!,
+          routeCustomerId: routeCustomerId,
           idempotencyKey: CanonicalIdempotencyKey.create(
             'mcp.route-customer.runtime-retire',
           ),
         );
-      } on Object {}
+      } on Object {
+        // Cleanup failure must not replace the primary gate result.
+      }
     }
-    if (routeId != null && routeId!.isNotEmpty) {
+    if (routeId != null && routeId.isNotEmpty) {
       try {
         await routes.archiveRoute(
-          routeId: routeId!,
+          routeId: routeId,
           idempotencyKey: CanonicalIdempotencyKey.create(
             'mcp.route.runtime-retire',
           ),
         );
-      } on Object {}
+      } on Object {
+        // Cleanup failure must not replace the primary gate result.
+      }
     }
   }
 }
@@ -598,7 +647,7 @@ void _requirePermissions(List<String> permissions) {
   expect(
     missing,
     isEmpty,
-    reason: 'Tài khoản runtime thiếu quyền bắt buộc: ' + missing.join(', '),
+    reason: 'Tài khoản runtime thiếu quyền bắt buộc: ${missing.join(', ')}',
   );
 }
 
@@ -692,7 +741,7 @@ class _RuntimeGateConfig {
         .map((entry) => entry.key)
         .toList(growable: false);
     if (missing.isNotEmpty) {
-      throw StateError('runtime_gate_missing_config:' + missing.join(','));
+      throw StateError('runtime_gate_missing_config:${missing.join(',')}');
     }
   }
 }
