@@ -851,8 +851,15 @@ void main() {
     await tester.tap(find.byKey(orderKey));
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const Key('create-order-screen')), findsOneWidget);
-    expect(find.text('Đại lý An Phát'), findsOneWidget);
+    final createOrderScreen = find.byKey(const Key('create-order-screen'));
+    expect(createOrderScreen, findsOneWidget);
+    expect(
+      find.descendant(
+        of: createOrderScreen,
+        matching: find.text('Đại lý An Phát'),
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets('customer directory exposes linked Company customers', (

@@ -12,6 +12,7 @@ class FixedRoutesPage extends StatefulWidget {
     required this.routes,
     super.key,
     this.initialRoute,
+    this.initialWorkspace,
     this.dataClient,
     this.managementService,
     this.canManageRoutes = false,
@@ -20,6 +21,7 @@ class FixedRoutesPage extends StatefulWidget {
 
   final List<FieldRoute> routes;
   final FieldRoute? initialRoute;
+  final FieldRouteWorkspace? initialWorkspace;
   final FieldDataClient? dataClient;
   final RouteManagementSubmissionService? managementService;
   final bool canManageRoutes;
@@ -43,7 +45,11 @@ class _FixedRoutesPageState extends State<FixedRoutesPage> {
     super.initState();
     _routes = List<FieldRoute>.from(widget.routes);
     _selectedRoute = _initialRoute();
-    if (_selectedRoute != null) {
+    final initialWorkspace = widget.initialWorkspace;
+    if (initialWorkspace != null &&
+        initialWorkspace.route.id == _selectedRoute?.id) {
+      _workspace = initialWorkspace;
+    } else if (_selectedRoute != null) {
       Future<void>.microtask(() => _loadWorkspace(_selectedRoute!));
     }
   }

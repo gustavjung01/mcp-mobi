@@ -2132,6 +2132,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
         builder: (context) => FixedRoutesPage(
           routes: _routes,
           initialRoute: _selectedRoute,
+          initialWorkspace: _workspace,
           dataClient: _fieldDataClient,
           managementService: _routeManagementSubmissionService,
           canManageRoutes: _canManageRoutes,
