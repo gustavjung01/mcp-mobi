@@ -54,8 +54,12 @@ class FakeCatalogClient implements OrderDataClient, CompleteOrderCatalogClient {
           !(item.sku ?? '').toLowerCase().contains(term)) {
         return false;
       }
-      if ((category ?? '').isNotEmpty && item.category != category) return false;
-      if ((brand ?? '').isNotEmpty && item.brand != brand) return false;
+      if ((category ?? '').isNotEmpty && item.category != category) {
+        return false;
+      }
+      if ((brand ?? '').isNotEmpty && item.brand != brand) {
+        return false;
+      }
       return true;
     }).toList(growable: false);
   }

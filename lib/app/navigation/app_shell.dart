@@ -48,6 +48,7 @@ import '../../features/outlets/outlets_page.dart';
 import '../../features/routes/add_route_customer_page.dart';
 import '../../features/routes/fixed_routes_page.dart';
 import '../../features/routes/routes_page.dart';
+import '../../features/settings/settings_page.dart';
 import '../../features/tasks/followup_page.dart';
 import '../../features/tasks/tasks_page.dart';
 import '../../features/today/today_page.dart';
