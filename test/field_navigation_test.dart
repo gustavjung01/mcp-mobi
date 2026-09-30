@@ -989,10 +989,23 @@ void main() {
     expect(find.text('Tuyến Quận 1'), findsWidgets);
     expect(find.text('Nguyễn Văn A'), findsOneWidget);
     expect(find.text('26/09/2026'), findsOneWidget);
-    expect(
-      find.byKey(const Key('fixed-route-customer-customer-1')),
-      findsOneWidget,
+
+    final customerCard =
+        find.byKey(const Key('fixed-route-customer-customer-1'));
+    final fixedRoutesScroll = find
+        .descendant(
+          of: find.byKey(const Key('fixed-routes-screen')),
+          matching: find.byType(Scrollable),
+        )
+        .last;
+    await tester.scrollUntilVisible(
+      customerCard,
+      240,
+      scrollable: fixedRoutesScroll,
     );
+    await tester.pumpAndSettle();
+
+    expect(customerCard, findsOneWidget);
     expect(find.byKey(const Key('route-finish-button')), findsNothing);
   });
 
