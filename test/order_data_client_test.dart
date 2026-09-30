@@ -30,7 +30,10 @@ void main() {
           expect(request.headers['authorization'], 'Bearer mobile-token');
 
           if (request.url.path == '/api/core-sales/products/search') {
-            expect(request.url.queryParameters['includePrice'], 'true');
+            expect(
+              request.url.queryParameters['includePrice'],
+              request.url.queryParameters['catalog'] == 'all' ? 'false' : anyOf('false', 'true'),
+            );
             return jsonResponse(
               {
                 'data': [
@@ -135,6 +138,8 @@ void main() {
 
       final products = await client.searchProducts(query: 'trà');
       expect(products.single.price, 125000);
+      final prices = await client.loadFreshPrices(query: 'trà');
+      expect(prices['variant-1'], 125000);
       expect(products.single.purchaseUnitLabel, 'Lẻ');
       expect(products.single.purchaseUnitDetail, contains('THÙNG 12'));
 
@@ -157,6 +162,7 @@ void main() {
       expect(
         seen,
         [
+          'GET /api/core-sales/products/search',
           'GET /api/core-sales/products/search',
           'GET /api/core-sales/orders',
           'POST /api/core-sales/orders',

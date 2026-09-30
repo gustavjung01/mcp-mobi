@@ -55,16 +55,17 @@ class LocalCatalogOrderDataClient implements OrderDataClient, OrderCatalogPriceC
   }) async {
     var state = await database.catalogState(scope);
     if (state.count == 0) {
-      final source = remote;
-      if (source is! CompleteOrderCatalogClient) {
-        return remote.searchProducts(
-          query: query,
-          category: category,
-          brand: brand,
-        );
-      }
-      await refreshCatalog();
-      state = await database.catalogState(scope);
+      final initial = await remote.searchProducts(
+        query: query,
+        category: category,
+        brand: brand,
+      );
+      unawaited(
+        refreshCatalog().catchError((_) {
+          // Search results stay usable while the complete catalog warms in background.
+        }),
+      );
+      return initial;
     } else if (state.isStale(refreshAfter)) {
       unawaited(
         refreshCatalog().catchError((_) {

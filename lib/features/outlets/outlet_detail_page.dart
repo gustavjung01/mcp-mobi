@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../app/theme/app_theme.dart';
 import '../../core/data/field_data_client.dart';
@@ -10,6 +11,16 @@ import '../../core/media/outlet_photo_pending_store.dart';
 import '../../core/media/outlet_photo_picker.dart';
 import '../../shared/widgets/app_card.dart';
 import 'outlet_photo_section.dart';
+
+class OutletLocationUpdateResult {
+  const OutletLocationUpdateResult({
+    required this.gps,
+    required this.synced,
+  });
+
+  final FieldGps gps;
+  final bool synced;
+}
 
 class OutletDetailPage extends StatefulWidget {
   const OutletDetailPage({
@@ -46,7 +57,10 @@ class OutletDetailPage extends StatefulWidget {
   final OutletPhotoPendingStore? photoPendingStore;
   final FieldHistoryClient? historyClient;
   final Future<void> Function(FieldGps? gps, String query)? onOpenMap;
-  final Future<bool> Function(String routeCustomerId, String customerName)?
+  final Future<OutletLocationUpdateResult> Function(
+    String routeCustomerId,
+    String customerName,
+  )?
   onUpdateLocation;
   final Future<bool> Function()? onEditOutlet;
   final Future<bool> Function()? onArchiveOutlet;
@@ -81,12 +95,15 @@ class _OutletDetailPageState extends State<OutletDetailPage> {
   late String _visitStatus;
   String? _heroPhotoUrl;
   Uint8List? _heroPhotoBytes;
+  FieldGps? _savedGps;
+  bool _locationSynced = true;
 
   @override
   void initState() {
     super.initState();
     _checkedIn = widget.line?.checkedIn == true;
     _visitStatus = widget.line?.status ?? 'pending';
+    _savedGps = widget.customer?.gps ?? widget.outlet?.gps;
   }
 
   String get _routeCustomerId =>
@@ -144,12 +161,16 @@ class _OutletDetailPageState extends State<OutletDetailPage> {
     if (action == null || routeCustomerId.isEmpty || _updatingLocation) return;
     setState(() => _updatingLocation = true);
     try {
-      final completed = await action(routeCustomerId, _outletName);
+      final result = await action(routeCustomerId, _outletName);
       if (!mounted) return;
+      setState(() {
+        _savedGps = result.gps;
+        _locationSynced = result.synced;
+      });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            completed
+            result.synced
                 ? 'Đã cập nhật vị trí điểm bán.'
                 : 'Đã lưu vị trí chờ gửi. Ứng dụng sẽ tự đồng bộ lại.',
           ),
@@ -168,6 +189,17 @@ class _OutletDetailPageState extends State<OutletDetailPage> {
     } finally {
       if (mounted) setState(() => _updatingLocation = false);
     }
+  }
+
+  String _mapsLink(FieldGps gps) =>
+      'https://www.google.com/maps/search/?api=1&query=${gps.lat},${gps.lng}';
+
+  Future<void> _copyLocationLink(FieldGps gps) async {
+    await Clipboard.setData(ClipboardData(text: _mapsLink(gps)));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Đã sao chép liên kết vị trí.')),
+    );
   }
 
   Future<void> _runProfileAction(
@@ -299,7 +331,7 @@ class _OutletDetailPageState extends State<OutletDetailPage> {
     final accountId = (customer?.accountId ?? outlet?.code ?? '').trim();
     final visited = _visitStatus == 'visited';
     final skipped = _visitStatus == 'skipped';
-    final gps = customer?.gps ?? outlet?.gps;
+    final gps = _savedGps ?? customer?.gps ?? outlet?.gps;
     final routeCustomerId =
         (line?.routeCustomerId ?? customer?.id ?? outlet?.id ?? '').trim();
     final canCheckIn =
@@ -723,6 +755,80 @@ class _OutletDetailPageState extends State<OutletDetailPage> {
                                     ),
                                   ),
                                 ),
+                            ],
+                          ),
+                        ),
+                      ],
+                      if (gps != null) ...[
+                        const SizedBox(height: AppSpacing.md),
+                        AppCard(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  const Expanded(
+                                    child: Text(
+                                      'Vị trí điểm bán',
+                                      style: TextStyle(
+                                        color: AppColors.textPrimary,
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w900,
+                                      ),
+                                    ),
+                                  ),
+                                  Text(
+                                    _locationSynced ? 'Đã đồng bộ' : 'Chờ đồng bộ',
+                                    key: const Key('outlet-location-sync-status'),
+                                    style: TextStyle(
+                                      color: _locationSynced
+                                          ? AppColors.success
+                                          : AppColors.warning,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: AppSpacing.xs),
+                              Text(
+                                '${gps.lat.toStringAsFixed(6)}, ${gps.lng.toStringAsFixed(6)}'
+                                '${gps.accuracyMeters == null ? '' : ' · ±${gps.accuracyMeters!.toStringAsFixed(0)} m'}',
+                                key: const Key('outlet-location-coordinates'),
+                                style: const TextStyle(
+                                  color: AppColors.textSecondary,
+                                  fontSize: 11,
+                                ),
+                              ),
+                              if ((gps.updatedAt ?? '').trim().isNotEmpty) ...[
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Cập nhật: ${gps.updatedAt}',
+                                  style: const TextStyle(
+                                    color: AppColors.textSecondary,
+                                    fontSize: 10,
+                                  ),
+                                ),
+                              ],
+                              const SizedBox(height: AppSpacing.xs),
+                              SelectableText(
+                                _mapsLink(gps),
+                                key: const Key('outlet-location-link'),
+                                style: const TextStyle(
+                                  color: AppColors.primary,
+                                  fontSize: 10,
+                                ),
+                              ),
+                              const SizedBox(height: AppSpacing.sm),
+                              SizedBox(
+                                width: double.infinity,
+                                child: OutlinedButton.icon(
+                                  key: const Key('outlet-copy-location-link'),
+                                  onPressed: () => _copyLocationLink(gps),
+                                  icon: const Icon(Icons.copy_rounded),
+                                  label: const Text('Sao chép liên kết vị trí'),
+                                ),
+                              ),
                             ],
                           ),
                         ),

@@ -411,7 +411,7 @@ class HttpOrderDataClient
     final params = <String, String>{
       'q': query.trim(),
       'limit': '50',
-      'includePrice': 'true',
+      'includePrice': 'false',
       if ((category ?? '').trim().isNotEmpty) 'category': category!.trim(),
       if ((brand ?? '').trim().isNotEmpty) 'brand': brand!.trim(),
     };
@@ -431,7 +431,7 @@ class HttpOrderDataClient
       query: const {
         'q': '',
         'catalog': 'all',
-        'includePrice': 'true',
+        'includePrice': 'false',
       },
     );
     return _catalogItems(data);

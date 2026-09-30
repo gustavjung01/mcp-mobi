@@ -46,7 +46,18 @@ class FakeCatalogClient implements OrderDataClient, CompleteOrderCatalogClient {
     String? brand,
   }) async {
     remoteSearches += 1;
-    return const [];
+    final rows = await loadCompleteCatalog();
+    final term = query.trim().toLowerCase();
+    return rows.where((item) {
+      if (term.isNotEmpty &&
+          !item.name.toLowerCase().contains(term) &&
+          !(item.sku ?? '').toLowerCase().contains(term)) {
+        return false;
+      }
+      if ((category ?? '').isNotEmpty && item.category != category) return false;
+      if ((brand ?? '').isNotEmpty && item.brand != brand) return false;
+      return true;
+    }).toList(growable: false);
   }
 
   @override
@@ -90,7 +101,7 @@ void main() {
     }
   });
 
-  test('first search warms full catalog then searches SQLite locally', () async {
+  test('first search returns bounded remote results while full catalog warms in background', () async {
     final remote = FakeCatalogClient();
     final client = LocalCatalogOrderDataClient(
       remote: remote,
@@ -102,13 +113,12 @@ void main() {
 
     expect(results.single.variantId, 'variant-1');
     expect(results.single.price, 340000);
-    expect(remote.catalogLoads, 1);
-    expect(remote.remoteSearches, 0);
+    expect(remote.remoteSearches, 1);
 
+    await client.refreshCatalog();
     final second = await client.searchProducts(query: 'td01');
     expect(second.single.variantId, 'variant-1');
-    expect(remote.catalogLoads, 1);
-    expect(remote.remoteSearches, 0);
+    expect(remote.remoteSearches, 1);
   });
 
   test('category and brand filters are resolved from the local catalog',
@@ -128,6 +138,7 @@ void main() {
 
     expect(results, hasLength(1));
     expect(results.single.sku, 'TD01');
-    expect(remote.catalogLoads, 1);
+    expect(remote.remoteSearches, 1);
+    await client.refreshCatalog();
   });
 }

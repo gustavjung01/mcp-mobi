@@ -571,6 +571,7 @@ void main() {
     expect(find.text('Tuyến Quận 3'), findsWidgets);
     expect(find.text('Quận 3'), findsWidgets);
     expect(find.byKey(const Key('outlet-checkin-button')), findsNothing);
+    expect(find.byKey(const Key('app-bottom-navigation')), findsOneWidget);
   });
 
   testWidgets('today next outlet keeps active route context', (
@@ -714,7 +715,15 @@ void main() {
             locationUpdates += 1;
             expect(routeCustomerId, 'outlet-map');
             expect(customerName, 'Đại lý Bản Đồ');
-            return true;
+            return const OutletLocationUpdateResult(
+              gps: FieldGps(
+                lat: 10.75,
+                lng: 106.67,
+                accuracyMeters: 8,
+                updatedAt: '2026-09-30T08:00:00Z',
+              ),
+              synced: true,
+            );
           },
         ),
       ),
@@ -734,6 +743,10 @@ void main() {
     expect(mapCalls, 1);
     expect(locationUpdates, 1);
     expect(find.text('Đã cập nhật vị trí điểm bán.'), findsOneWidget);
+    expect(find.byKey(const Key('outlet-location-coordinates')), findsOneWidget);
+    expect(find.textContaining('10.750000, 106.670000'), findsOneWidget);
+    expect(find.byKey(const Key('outlet-location-link')), findsOneWidget);
+    expect(find.byKey(const Key('outlet-copy-location-link')), findsOneWidget);
   });
 
   testWidgets('management proposals are hidden without report permission', (
