@@ -24,9 +24,12 @@ TARGET="${ANDROID_CI_TARGET:-default}"
 PROFILE="${ANDROID_CI_PROFILE:-pixel_6}"
 PORT="${ANDROID_CI_PORT:-5554}"
 AVD_NAME="${ANDROID_CI_AVD_NAME:-mcp-ci}"
+AVD_HOME="${ANDROID_CI_AVD_HOME:-${RUNNER_TEMP:-$HOME/.android}/android-avd}"
 DEVICE="emulator-$PORT"
 SYSTEM_IMAGE="system-images;android-${API_LEVEL};${TARGET};${ARCH}"
 LOG_FILE="${RUNNER_TEMP:-/tmp}/mcp-android-emulator-${PORT}.log"
+export ANDROID_AVD_HOME="$AVD_HOME"
+mkdir -p "$ANDROID_AVD_HOME"
 
 yes | sdkmanager --licenses >/dev/null 2>&1 || true
 timeout 10m sdkmanager "platform-tools" "emulator" "platforms;android-${API_LEVEL}" "$SYSTEM_IMAGE"
@@ -35,7 +38,14 @@ if [[ -e /dev/kvm ]]; then
   sudo chmod 666 /dev/kvm || true
 fi
 
-echo "no" | avdmanager create avd --force --name "$AVD_NAME" --package "$SYSTEM_IMAGE" --device "$PROFILE"
+echo "no" | avdmanager create avd \
+  --force \
+  --name "$AVD_NAME" \
+  --package "$SYSTEM_IMAGE" \
+  --device "$PROFILE" \
+  --path "$ANDROID_AVD_HOME/$AVD_NAME.avd"
+test -f "$ANDROID_AVD_HOME/$AVD_NAME.ini"
+"$SDK_ROOT/emulator/emulator" -list-avds | grep -Fxq "$AVD_NAME"
 
 "$SDK_ROOT/emulator/emulator" \
   -avd "$AVD_NAME" \
