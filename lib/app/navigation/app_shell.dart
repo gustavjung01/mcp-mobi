@@ -1741,6 +1741,23 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     );
   }
 
+  Future<Set<String>> _pendingRouteCustomerProfileIds() async {
+    final queue = _mutationQueueStore;
+    if (queue == null) return const <String>{};
+    try {
+      final rows = await queue.load(
+        operations: const {'mcp.route-customer.update'},
+      );
+      return rows
+          .where((item) => item.isOutstanding)
+          .map((item) => (item.payload['routeCustomerId'] ?? '').toString().trim())
+          .where((id) => id.isNotEmpty)
+          .toSet();
+    } catch (_) {
+      return const <String>{};
+    }
+  }
+
   Future<bool> _openCustomerOnboarding({
     String? routeCustomerId,
   }) async {
@@ -1762,6 +1779,8 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       if (_fieldDataClient != null) await _loadOutlets();
     }
 
+    final pendingProfileIds = await _pendingRouteCustomerProfileIds();
+
     var changed = false;
     await _contentNavigator.push<void>(
       MaterialPageRoute<void>(
@@ -1769,6 +1788,11 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
           client: client,
           focusRouteCustomerId: routeCustomerId,
           submissionService: _customerBoundarySubmissionService,
+          pendingRouteCustomerIds: pendingProfileIds,
+          onRetryProfileSync: () async {
+            await _syncRouteManagement();
+            if (_fieldDataClient != null) await _loadOutlets();
+          },
           onChanged: () async {
             changed = true;
             await Future.wait([

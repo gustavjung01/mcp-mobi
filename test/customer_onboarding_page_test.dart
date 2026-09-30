@@ -9,13 +9,14 @@ class FakeCustomerBoundaryClient implements CustomerBoundaryClient {
   bool failFirstSubmit = true;
   final List<String> submitKeys = [];
   String status = 'not_submitted';
+  String? address = '1 Nguyễn Trãi';
 
   CustomerVerificationItem get item => CustomerVerificationItem(
     routeCustomerId: 'route-customer-1',
     routeId: 'route-1',
     routeName: 'Tuyến 1',
     customerName: 'Điểm bán A',
-    address: '1 Nguyễn Trãi',
+    address: address,
     status: status,
     coreRequestId: status == 'not_submitted' ? null : 'request-1',
   );
@@ -126,4 +127,47 @@ void main() {
     expect(result.remaining, 0);
     expect(client.submitKeys, [firstKey, firstKey]);
   });
+
+  testWidgets('pending profile update is synced before enabling verification', (
+    WidgetTester tester,
+  ) async {
+    final client = FakeCustomerBoundaryClient()..address = null;
+    var retries = 0;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: CustomerOnboardingPage(
+          client: client,
+          pendingRouteCustomerIds: const {'route-customer-1'},
+          onRetryProfileSync: () async {
+            retries += 1;
+            client.address = '1 Nguyễn Trãi';
+          },
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.textContaining('đang chờ đồng bộ'),
+      findsOneWidget,
+    );
+    final submitBefore = tester.widget<FilledButton>(
+      find.byKey(const Key('customer-submit-route-customer-1')),
+    );
+    expect(submitBefore.onPressed, isNull);
+
+    await tester.tap(
+      find.byKey(const Key('customer-profile-sync-route-customer-1')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(retries, 1);
+    expect(find.text('1 Nguyễn Trãi'), findsOneWidget);
+    final submitAfter = tester.widget<FilledButton>(
+      find.byKey(const Key('customer-submit-route-customer-1')),
+    );
+    expect(submitAfter.onPressed, isNotNull);
+  });
+
 }

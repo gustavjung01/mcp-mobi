@@ -22,12 +22,16 @@ class CustomerOnboardingPage extends StatefulWidget {
     this.focusRouteCustomerId,
     this.submissionService,
     this.onChanged,
+    this.pendingRouteCustomerIds = const <String>{},
+    this.onRetryProfileSync,
   });
 
   final CustomerBoundaryClient client;
   final String? focusRouteCustomerId;
   final CustomerBoundarySubmissionService? submissionService;
   final Future<void> Function()? onChanged;
+  final Set<String> pendingRouteCustomerIds;
+  final Future<void> Function()? onRetryProfileSync;
 
   @override
   State<CustomerOnboardingPage> createState() => _CustomerOnboardingPageState();
@@ -67,6 +71,25 @@ class _CustomerOnboardingPageState extends State<CustomerOnboardingPage> {
       if (mounted) {
         setState(() {
           _loading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _retryProfileSync() async {
+    final retry = widget.onRetryProfileSync;
+    if (retry == null || _busyKey != null) return;
+    setState(() {
+      _busyKey = 'profile-sync';
+      _message = null;
+    });
+    try {
+      await retry();
+      await _load();
+    } finally {
+      if (mounted) {
+        setState(() {
+          _busyKey = null;
         });
       }
     }
@@ -247,11 +270,14 @@ class _CustomerOnboardingPageState extends State<CustomerOnboardingPage> {
                         padding: const EdgeInsets.only(bottom: AppSpacing.sm),
                         child: _VerificationCard(
                           item: item,
-                          busy:
-                              _busyKey?.endsWith(':${item.routeCustomerId}') ==
-                              true,
+                          busy: _busyKey != null,
+                          pendingProfile: widget.pendingRouteCustomerIds
+                              .contains(item.routeCustomerId),
                           onSubmit: () => _mutate(item, submit: true),
                           onSync: () => _mutate(item, submit: false),
+                          onRetryProfileSync: widget.onRetryProfileSync == null
+                              ? null
+                              : _retryProfileSync,
                         ),
                       ),
                     ),
@@ -271,12 +297,16 @@ class _VerificationCard extends StatelessWidget {
     required this.busy,
     required this.onSubmit,
     required this.onSync,
+    required this.pendingProfile,
+    this.onRetryProfileSync,
   });
 
   final CustomerVerificationItem item;
   final bool busy;
+  final bool pendingProfile;
   final VoidCallback onSubmit;
   final VoidCallback onSync;
+  final VoidCallback? onRetryProfileSync;
 
   @override
   Widget build(BuildContext context) {
@@ -385,14 +415,29 @@ class _VerificationCard extends StatelessWidget {
             ),
           if (!canSubmit && !submitted) ...[
             const SizedBox(height: AppSpacing.xs),
-            const Text(
-              'Cần bổ sung địa chỉ điểm bán trước khi gửi.',
-              style: TextStyle(
+            Text(
+              pendingProfile
+                  ? 'Thông tin điểm bán vừa bổ sung đang chờ đồng bộ. Đồng bộ xong hệ thống sẽ tự kiểm tra lại.'
+                  : 'Cần bổ sung địa chỉ điểm bán trước khi gửi.',
+              key: Key('customer-profile-warning-${item.routeCustomerId}'),
+              style: const TextStyle(
                 color: AppColors.warning,
                 fontSize: 11,
                 fontWeight: FontWeight.w700,
               ),
             ),
+            if (pendingProfile && onRetryProfileSync != null) ...[
+              const SizedBox(height: AppSpacing.xs),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  key: Key('customer-profile-sync-${item.routeCustomerId}'),
+                  onPressed: busy ? null : onRetryProfileSync,
+                  icon: const Icon(Icons.sync_rounded),
+                  label: Text(busy ? 'Đang đồng bộ...' : 'Đồng bộ lại thông tin'),
+                ),
+              ),
+            ],
           ],
         ],
       ),
