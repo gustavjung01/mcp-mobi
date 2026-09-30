@@ -2128,11 +2128,27 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
 
   Future<void> _openFixedRoutes() async {
     final selectedRoute = _selectedRoute;
-    if (_workspace == null &&
-        selectedRoute != null &&
-        _fieldDataClient != null) {
-      await _loadWorkspace(selectedRoute);
-      if (!mounted) return;
+    final client = _fieldDataClient;
+    var fixedWorkspace = _workspace;
+
+    if (selectedRoute != null && client != null) {
+      try {
+        fixedWorkspace = await client.loadRouteWorkspace(
+          route: selectedRoute,
+          date: DateTime.now(),
+        );
+        if (!mounted) return;
+        setState(() {
+          _workspace = fixedWorkspace;
+          _loadingWorkspace = false;
+          _fieldMessage = null;
+        });
+      } on FieldDataFailure catch (failure) {
+        if (!mounted) return;
+        setState(() {
+          _fieldMessage = failure.message;
+        });
+      }
     }
 
     await _pushContent<void>(
@@ -2140,7 +2156,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
         builder: (context) => FixedRoutesPage(
           routes: _routes,
           initialRoute: _selectedRoute,
-          initialWorkspace: _workspace,
+          initialWorkspace: fixedWorkspace,
           dataClient: _fieldDataClient,
           managementService: _routeManagementSubmissionService,
           canManageRoutes: _canManageRoutes,
