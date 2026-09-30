@@ -8,8 +8,8 @@
 - [ ] Không có secret, keystore, database credential hoặc internal token trong source.
 - [ ] Canonical Idempotency-Key vẫn được reuse cho cùng một mutation khi retry.
 - [ ] Device Foundation CI xanh trên Android emulator và iOS simulator.
-- [ ] Runtime Integration Gate xanh trên installation test được phê duyệt cho cả Android và iOS.
-- [ ] Exact backend release SHA của runtime test đã được xác nhận và chứa đủ contract mobile đang test.
+- [ ] Runtime Self-contained CI xanh cho cả Android và iOS trên installation test ephemeral.
+- [ ] Workflow ghi lại exact NPP runtime SHA đã checkout và SHA đó chứa đủ contract mobile đang test.
 - [ ] Parity Matrix không còn MISSING/BROKEN/PARTIAL thuộc scope nghiệp vụ/runtime trước khi đóng Issue #42.
 
 ## Regression nghiệp vụ
@@ -54,13 +54,14 @@
 ## Runtime gate
 
 - [ ] Đã đọc `docs/runtime-integration-gate.md`.
-- [ ] Runtime workflow chỉ trỏ vào installation test có tên bắt đầu bằng `test-`.
-- [ ] Không paste credential/fixture thật vào PR, issue, chat hoặc command line.
-- [ ] Customer/order/media fixture được xác nhận là dữ liệu test có thể mutate/cleanup.
-- [ ] Upload R2 runtime đã được xóa sau test.
+- [ ] Runtime Self-contained CI dùng PostgreSQL/API/provider test tạm; không trỏ vào production.
+- [ ] Fixture NPP từ chối `NODE_ENV` khác `test` và từ chối DB host không phải loopback.
+- [ ] Credential test được sinh mới trong job, mask và không upload artifact.
+- [ ] Upload S3/R2-contract runtime đã được xóa sau test.
 - [ ] Route/điểm bán tạm đã archive sau test.
 - [ ] Retry đơn dùng lại đúng Idempotency-Key và không tạo đơn trùng.
-- [ ] Snapshot + AI report chạy trên backend release có endpoint tương ứng.
+- [ ] Snapshot + AI report chạy qua MCP API thật và AI result được persist.
+- [ ] Manual Runtime Integration Gate, nếu dùng, chỉ trỏ vào installation test được phê duyệt.
 
 ## Production boundary
 

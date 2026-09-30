@@ -93,9 +93,13 @@ void main() {
       await proposals.load();
 
       await _reportSettings(activities, config.runId);
-      await _customerBoundary(customers, config.onboardingRouteCustomerId);
-      await _mediaBoundary(media, config.mediaRouteCustomerId, config.runId);
       await _orderReplay(orders, current, config);
+      await _customerBoundary(customers, config.boundaryRouteCustomerId);
+      await _mediaBoundary(
+        media,
+        config.boundaryRouteCustomerId,
+        config.runId,
+      );
       await _routeSessionChain(
         field: field,
         routes: routes,
@@ -559,8 +563,8 @@ Future<void> _routeSessionChain({
       draft: ManagementProposalDraft(
         title: 'Đề xuất runtime L7 $suffix',
         content: 'Đề xuất kiểm thử chuỗi mobile runtime.',
-        entityType: 'session',
-        entityId: activeSessionId,
+        entityType: 'route',
+        entityId: route.id,
         entityLabel: routeName,
         impact: 'Kiểm tra contract',
         reason: 'Runtime gate',
@@ -671,8 +675,7 @@ class _RuntimeGateConfig {
     required this.orderCustomerId,
     required this.orderCustomerAddressId,
     required this.orderVariantId,
-    required this.onboardingRouteCustomerId,
-    required this.mediaRouteCustomerId,
+    required this.boundaryRouteCustomerId,
     required this.runId,
   });
 
@@ -689,11 +692,8 @@ class _RuntimeGateConfig {
         'MCP_RUNTIME_ORDER_CUSTOMER_ADDRESS_ID',
       ),
       orderVariantId: String.fromEnvironment('MCP_RUNTIME_ORDER_VARIANT_ID'),
-      onboardingRouteCustomerId: String.fromEnvironment(
-        'MCP_RUNTIME_ONBOARDING_ROUTE_CUSTOMER_ID',
-      ),
-      mediaRouteCustomerId: String.fromEnvironment(
-        'MCP_RUNTIME_MEDIA_ROUTE_CUSTOMER_ID',
+      boundaryRouteCustomerId: String.fromEnvironment(
+        'MCP_RUNTIME_BOUNDARY_ROUTE_CUSTOMER_ID',
       ),
       runId: String.fromEnvironment('MCP_RUNTIME_RUN_ID'),
     );
@@ -708,8 +708,7 @@ class _RuntimeGateConfig {
   final String orderCustomerId;
   final String orderCustomerAddressId;
   final String orderVariantId;
-  final String onboardingRouteCustomerId;
-  final String mediaRouteCustomerId;
+  final String boundaryRouteCustomerId;
   final String runId;
 
   void validate() {
@@ -720,11 +719,20 @@ class _RuntimeGateConfig {
       throw StateError('runtime_gate_environment_must_start_with_test');
     }
     final uri = Uri.tryParse(apiBaseUrl);
-    if (uri == null ||
-        uri.scheme != 'https' ||
-        uri.host.isEmpty ||
-        uri.userInfo.isNotEmpty) {
-      throw StateError('runtime_gate_https_api_required');
+    final localEnvironment = environmentName.toLowerCase().startsWith(
+      'test-local-',
+    );
+    const localHosts = {'127.0.0.1', 'localhost', '10.0.2.2'};
+    final endpointAllowed =
+        uri != null &&
+        uri.host.isNotEmpty &&
+        uri.userInfo.isEmpty &&
+        (uri.scheme == 'https' ||
+            (localEnvironment &&
+                uri.scheme == 'http' &&
+                localHosts.contains(uri.host.toLowerCase())));
+    if (!endpointAllowed) {
+      throw StateError('runtime_gate_safe_api_required');
     }
     final required = <String, String>{
       'MCP_RUNTIME_LOGIN_NAME': loginName,
@@ -732,8 +740,7 @@ class _RuntimeGateConfig {
       'MCP_RUNTIME_ORDER_CUSTOMER_ID': orderCustomerId,
       'MCP_RUNTIME_ORDER_CUSTOMER_ADDRESS_ID': orderCustomerAddressId,
       'MCP_RUNTIME_ORDER_VARIANT_ID': orderVariantId,
-      'MCP_RUNTIME_ONBOARDING_ROUTE_CUSTOMER_ID': onboardingRouteCustomerId,
-      'MCP_RUNTIME_MEDIA_ROUTE_CUSTOMER_ID': mediaRouteCustomerId,
+      'MCP_RUNTIME_BOUNDARY_ROUTE_CUSTOMER_ID': boundaryRouteCustomerId,
       'MCP_RUNTIME_RUN_ID': runId,
     };
     final missing = required.entries
