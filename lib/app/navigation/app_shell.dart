@@ -104,6 +104,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   int _selectedIndex = 0;
   final GlobalKey<NavigatorState> _contentNavigatorKey =
       GlobalKey<NavigatorState>();
+  int _contentRouteDepth = 0;
   FieldDataClient? _fieldDataClient;
   FieldActivityClient? _fieldActivityClient;
   FieldHistoryClient? _fieldHistoryClient;
@@ -153,6 +154,25 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
 
   NavigatorState get _contentNavigator =>
       _contentNavigatorKey.currentState ?? Navigator.of(context);
+
+  Future<T?> _pushContent<T>(Route<T> route) async {
+    if (mounted) {
+      setState(() {
+        _contentRouteDepth += 1;
+      });
+    }
+    try {
+      return await _contentNavigator.push<T>(route);
+    } finally {
+      if (mounted) {
+        setState(() {
+          _contentRouteDepth = _contentRouteDepth > 0
+              ? _contentRouteDepth - 1
+              : 0;
+        });
+      }
+    }
+  }
 
   FieldActionClient? get _fieldActions {
     final client = _fieldDataClient;
@@ -475,9 +495,10 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     if (navigator != null && navigator.canPop()) {
       navigator.popUntil((route) => route.isFirst);
     }
-    if (_selectedIndex == index) return;
+    if (_selectedIndex == index && _contentRouteDepth == 0) return;
     setState(() {
       _selectedIndex = index;
+      _contentRouteDepth = 0;
     });
   }
 
@@ -906,7 +927,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
         message: 'Tài khoản chưa được cấp quyền sửa điểm bán.',
       );
     }
-    final input = await _contentNavigator.push<OutletEditInput>(
+    final input = await _pushContent<OutletEditInput>(
       MaterialPageRoute<OutletEditInput>(
         builder: (context) => OutletEditPage(
           name: name,
@@ -1083,7 +1104,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       return;
     }
 
-    final outcome = await _contentNavigator.push<RouteMutationSubmitStatus>(
+    final outcome = await _pushContent<RouteMutationSubmitStatus>(
       MaterialPageRoute<RouteMutationSubmitStatus>(
         builder: (context) => AddRouteCustomerPage(
           routeName: route.name,
@@ -1487,7 +1508,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     final currentDay = day!;
     final FieldActivitySubmitStatus? outcome;
     if (kind == FieldActivityKind.report) {
-      outcome = await _contentNavigator.push<FieldActivitySubmitStatus>(
+      outcome = await _pushContent<FieldActivitySubmitStatus>(
         MaterialPageRoute<FieldActivitySubmitStatus>(
           builder: (context) => MarketReportPage(
             line: line,
@@ -1504,7 +1525,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
         ),
       );
     } else if (kind == FieldActivityKind.productTrial) {
-      outcome = await _contentNavigator.push<FieldActivitySubmitStatus>(
+      outcome = await _pushContent<FieldActivitySubmitStatus>(
         MaterialPageRoute<FieldActivitySubmitStatus>(
           builder: (context) => ProductTrialPage(
             line: line,
@@ -1514,7 +1535,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
         ),
       );
     } else {
-      outcome = await _contentNavigator.push<FieldActivitySubmitStatus>(
+      outcome = await _pushContent<FieldActivitySubmitStatus>(
         MaterialPageRoute<FieldActivitySubmitStatus>(
           builder: (context) => FollowupPage(
             line: line,
@@ -1606,7 +1627,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       return;
     }
 
-    await _contentNavigator.push<void>(
+    await _pushContent<void>(
       MaterialPageRoute<void>(
         builder: (context) => SessionHistoryPage(
           client: client,
@@ -1625,7 +1646,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       return;
     }
 
-    await _contentNavigator.push<void>(
+    await _pushContent<void>(
       MaterialPageRoute<void>(
         builder: (context) => TasksPage(client: client),
       ),
@@ -1644,7 +1665,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       return;
     }
 
-    await _contentNavigator.push<void>(
+    await _pushContent<void>(
       MaterialPageRoute<void>(
         builder: (context) => FieldActivityHistoryPage(
           kind: kind,
@@ -1669,7 +1690,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     FieldDayLine line,
   ) {
     final outlet = _outletForRouteCustomerId(line.routeCustomerId);
-    _contentNavigator.push(
+    _pushContent(
       MaterialPageRoute<void>(
         builder: (context) => OutletDetailPage(
           routeName: _selectedRoute?.name ?? customer?.routeName ?? 'Đi tuyến',
@@ -1783,7 +1804,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     final pendingProfileIds = await _pendingRouteCustomerProfileIds();
 
     var changed = false;
-    await _contentNavigator.push<void>(
+    await _pushContent<void>(
       MaterialPageRoute<void>(
         builder: (context) => CustomerOnboardingPage(
           client: client,
@@ -1808,7 +1829,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   }
 
   void _openDirectoryOutlet(FieldOutlet outlet) {
-    _contentNavigator.push(
+    _pushContent(
       MaterialPageRoute<void>(
         builder: (context) => OutletDetailPage(
           routeName: outlet.routeName.isEmpty ? 'Điểm bán' : outlet.routeName,
@@ -1852,7 +1873,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   }
 
   void _openCompanyCustomer(CompanyCustomer customer) {
-    _contentNavigator.push(
+    _pushContent(
       MaterialPageRoute<void>(
         builder: (context) => CompanyCustomerDetailPage(
           customer: customer,
@@ -1947,7 +1968,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       }
     }
 
-    final outcome = await _contentNavigator.push<OrderSubmitOutcome>(
+    final outcome = await _pushContent<OrderSubmitOutcome>(
       MaterialPageRoute<OrderSubmitOutcome>(
         builder: (context) => CreateOrderPage(
           outlet: current,
@@ -2019,7 +2040,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       coreCustomerCode: customer.customerCode,
     );
 
-    final outcome = await _contentNavigator.push<OrderSubmitOutcome>(
+    final outcome = await _pushContent<OrderSubmitOutcome>(
       MaterialPageRoute<OrderSubmitOutcome>(
         builder: (context) => CreateOrderPage(
           outlet: target,
@@ -2049,7 +2070,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     if (historyClient == null || fieldDataClient == null || orderDataClient == null) {
       return;
     }
-    await _contentNavigator.push<void>(
+    await _pushContent<void>(
       MaterialPageRoute<void>(
         builder: (context) => DataExportsPage(
           historyClient: historyClient,
@@ -2067,7 +2088,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       return;
     }
     final client = source as FieldReportSettingsAdminClient;
-    await _contentNavigator.push<void>(
+    await _pushContent<void>(
       MaterialPageRoute<void>(
         builder: (context) => ReportSettingsPage(client: client),
       ),
@@ -2079,7 +2100,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     final queue = _mutationQueueStore;
     if (!_canManageProposals || client == null || queue == null) return;
 
-    await _contentNavigator.push<void>(
+    await _pushContent<void>(
       MaterialPageRoute<void>(
         builder: (context) => ManagementProposalsPage(
           client: client,
@@ -2098,7 +2119,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   }
 
   Future<void> _openSettings() async {
-    await _contentNavigator.push<void>(
+    await _pushContent<void>(
       MaterialPageRoute<void>(
         builder: (_) => const SettingsPage(),
       ),
@@ -2106,7 +2127,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   }
 
   Future<void> _openFixedRoutes() async {
-    await _contentNavigator.push<void>(
+    await _pushContent<void>(
       MaterialPageRoute<void>(
         builder: (context) => FixedRoutesPage(
           routes: _routes,
@@ -2254,13 +2275,14 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
             children: pages,
           ),
           Positioned.fill(
-            child: Navigator(
-              key: _contentNavigatorKey,
-              onGenerateRoute: (settings) => PageRouteBuilder<void>(
-                settings: settings,
-                opaque: false,
-                pageBuilder: (_, _, _) => const IgnorePointer(
-                  child: SizedBox.expand(),
+            child: IgnorePointer(
+              ignoring: _contentRouteDepth == 0,
+              child: Navigator(
+                key: _contentNavigatorKey,
+                onGenerateRoute: (settings) => PageRouteBuilder<void>(
+                  settings: settings,
+                  opaque: false,
+                  pageBuilder: (_, _, _) => const SizedBox.expand(),
                 ),
               ),
             ),
