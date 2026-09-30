@@ -992,18 +992,17 @@ void main() {
 
     final customerCard =
         find.byKey(const Key('fixed-route-customer-customer-1'));
-    final fixedRoutesScroll = find
-        .descendant(
-          of: find.byKey(const Key('fixed-routes-screen')),
-          matching: find.byType(Scrollable),
-        )
-        .last;
-    await tester.scrollUntilVisible(
-      customerCard,
-      240,
-      scrollable: fixedRoutesScroll,
+    final fixedRoutesList = find.descendant(
+      of: find.byKey(const Key('fixed-routes-screen')),
+      matching: find.byType(ListView),
     );
-    await tester.pumpAndSettle();
+    expect(fixedRoutesList, findsOneWidget);
+    for (var attempt = 0;
+        attempt < 4 && customerCard.evaluate().isEmpty;
+        attempt++) {
+      await tester.drag(fixedRoutesList, const Offset(0, -240));
+      await tester.pumpAndSettle();
+    }
 
     expect(customerCard, findsOneWidget);
     expect(find.byKey(const Key('route-finish-button')), findsNothing);
