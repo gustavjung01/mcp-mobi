@@ -16,6 +16,7 @@ export PATH="$SDK_ROOT/platform-tools:$SDK_ROOT/emulator:$SDK_ROOT/cmdline-tools
 command -v sdkmanager >/dev/null
 command -v avdmanager >/dev/null
 command -v adb >/dev/null
+command -v timeout >/dev/null
 
 API_LEVEL="${ANDROID_CI_API_LEVEL:-35}"
 ARCH="${ANDROID_CI_ARCH:-x86_64}"
@@ -28,7 +29,7 @@ SYSTEM_IMAGE="system-images;android-${API_LEVEL};${TARGET};${ARCH}"
 LOG_FILE="${RUNNER_TEMP:-/tmp}/mcp-android-emulator-${PORT}.log"
 
 yes | sdkmanager --licenses >/dev/null 2>&1 || true
-sdkmanager "platform-tools" "emulator" "platforms;android-${API_LEVEL}" "$SYSTEM_IMAGE"
+timeout 10m sdkmanager "platform-tools" "emulator" "platforms;android-${API_LEVEL}" "$SYSTEM_IMAGE"
 
 if [[ -e /dev/kvm ]]; then
   sudo chmod 666 /dev/kvm || true
@@ -54,7 +55,7 @@ cleanup() {
     echo "---- Android emulator log tail ----" >&2
     tail -n 200 "$LOG_FILE" >&2 || true
   fi
-  adb -s "$DEVICE" emu kill >/dev/null 2>&1 || true
+  timeout 10s adb -s "$DEVICE" emu kill >/dev/null 2>&1 || true
   if kill -0 "$EMULATOR_PID" >/dev/null 2>&1; then
     kill "$EMULATOR_PID" >/dev/null 2>&1 || true
   fi
@@ -64,14 +65,36 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 adb start-server
-adb -s "$DEVICE" wait-for-device
+
+device_seen=0
+for _ in $(seq 1 150); do
+  if ! kill -0 "$EMULATOR_PID" >/dev/null 2>&1; then
+    echo "Android emulator process exited before ADB detected the device." >&2
+    exit 1
+  fi
+  if adb devices | awk 'NR > 1 {print $1}' | grep -Fxq "$DEVICE"; then
+    device_seen=1
+    break
+  fi
+  sleep 2
+done
+
+if [[ "$device_seen" -ne 1 ]]; then
+  echo "Android emulator was not visible to ADB within 5 minutes." >&2
+  adb devices -l >&2 || true
+  exit 1
+fi
 
 ready=0
-for _ in $(seq 1 180); do
-  state="$(adb -s "$DEVICE" get-state 2>/dev/null || true)"
-  boot="$(adb -s "$DEVICE" shell getprop sys.boot_completed 2>/dev/null | tr -d "\r" || true)"
-  package_service="$(adb -s "$DEVICE" shell service check package 2>/dev/null | tr -d "\r" || true)"
-  activity_service="$(adb -s "$DEVICE" shell service check activity 2>/dev/null | tr -d "\r" || true)"
+for _ in $(seq 1 300); do
+  if ! kill -0 "$EMULATOR_PID" >/dev/null 2>&1; then
+    echo "Android emulator process exited during framework boot." >&2
+    exit 1
+  fi
+  state="$(timeout 10s adb -s "$DEVICE" get-state 2>/dev/null || true)"
+  boot="$(timeout 10s adb -s "$DEVICE" shell getprop sys.boot_completed 2>/dev/null | tr -d "\r" || true)"
+  package_service="$(timeout 10s adb -s "$DEVICE" shell service check package 2>/dev/null | tr -d "\r" || true)"
+  activity_service="$(timeout 10s adb -s "$DEVICE" shell service check activity 2>/dev/null | tr -d "\r" || true)"
   if [[ "$state" == "device" && "$boot" == "1" && "$package_service" == *"found"* && "$activity_service" == *"found"* ]]; then
     ready=1
     break
@@ -80,15 +103,23 @@ for _ in $(seq 1 180); do
 done
 
 if [[ "$ready" -ne 1 ]]; then
-  echo "Android emulator did not reach framework-ready state." >&2
+  echo "Android emulator did not reach framework-ready state within 10 minutes." >&2
   adb devices -l >&2 || true
   exit 1
 fi
 
-adb -s "$DEVICE" shell settings put global window_animation_scale 0.0 || true
-adb -s "$DEVICE" shell settings put global transition_animation_scale 0.0 || true
-adb -s "$DEVICE" shell settings put global animator_duration_scale 0.0 || true
-adb -s "$DEVICE" shell svc power stayon true || true
+timeout 15s adb -s "$DEVICE" shell settings put global window_animation_scale 0.0 || true
+timeout 15s adb -s "$DEVICE" shell settings put global transition_animation_scale 0.0 || true
+timeout 15s adb -s "$DEVICE" shell settings put global animator_duration_scale 0.0 || true
+timeout 15s adb -s "$DEVICE" shell svc power stayon true || true
 adb devices -l
 
-"$@"
+COMMAND_TIMEOUT="${ANDROID_CI_COMMAND_TIMEOUT:-30m}"
+status=0
+timeout --signal=TERM --kill-after=30s "$COMMAND_TIMEOUT" "$@" || status=$?
+if [[ "$status" -ne 0 ]]; then
+  if [[ "$status" -eq 124 || "$status" -eq 137 ]]; then
+    echo "Android gate command exceeded timeout: $COMMAND_TIMEOUT" >&2
+  fi
+  exit "$status"
+fi
