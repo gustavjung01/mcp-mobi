@@ -35,23 +35,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  runtime-source:
-    runs-on: ubuntu-latest
-    outputs:
-      npp_sha: ${{ steps.resolve.outputs.sha }}
-    steps:
-      - name: Resolve exact NPP runtime SHA
-        id: resolve
-        shell: bash
-        run: |
-          set -euo pipefail
-          sha="$(git ls-remote https://github.com/binhnxwjfjxm/NPP-Platform.git refs/heads/main | awk '{print $1}')"
-          [[ "$sha" =~ ^[0-9a-f]{40}$ ]]
-          echo "sha=$sha" >> "$GITHUB_OUTPUT"
-          echo "NPP runtime SHA: $sha"
-
   android-runtime:
-    needs: runtime-source
     runs-on: ubuntu-latest
     timeout-minutes: 40
     services:
@@ -82,7 +66,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: binhnxwjfjxm/NPP-Platform
-          ref: ${{ needs.runtime-source.outputs.npp_sha }}
+          ref: main
           path: _runtime/NPP-Platform
 
       - name: Record exact NPP runtime SHA
@@ -154,7 +138,6 @@ jobs:
     # Owner decision 2026-09-30: iOS is deferred while Android is the active release target.
     # Keep iOS evidence manually runnable without blocking Android PR/push gates.
     if: ${{ github.event_name == 'workflow_dispatch' }}
-    needs: runtime-source
     runs-on: macos-latest
     timeout-minutes: 60
     env:
@@ -170,7 +153,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: binhnxwjfjxm/NPP-Platform
-          ref: ${{ needs.runtime-source.outputs.npp_sha }}
+          ref: main
           path: _runtime/NPP-Platform
 
       - name: Record exact NPP runtime SHA
