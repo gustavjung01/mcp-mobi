@@ -77,12 +77,13 @@ trap cleanup EXIT INT TERM
 adb start-server
 
 device_seen=0
-for _ in $(seq 1 150); do
+device_deadline=$((SECONDS + 300))
+while (( SECONDS < device_deadline )); do
   if ! kill -0 "$EMULATOR_PID" >/dev/null 2>&1; then
     echo "Android emulator process exited before ADB detected the device." >&2
     exit 1
   fi
-  if adb devices | awk 'NR > 1 {print $1}' | grep -Fxq "$DEVICE"; then
+  if timeout 5s adb devices | awk 'NR > 1 {print $1}' | grep -Fxq "$DEVICE"; then
     device_seen=1
     break
   fi
@@ -91,30 +92,36 @@ done
 
 if [[ "$device_seen" -ne 1 ]]; then
   echo "Android emulator was not visible to ADB within 5 minutes." >&2
-  adb devices -l >&2 || true
+  timeout 5s adb devices -l >&2 || true
   exit 1
 fi
 
 ready=0
-for _ in $(seq 1 300); do
+framework_deadline=$((SECONDS + 600))
+while (( SECONDS < framework_deadline )); do
   if ! kill -0 "$EMULATOR_PID" >/dev/null 2>&1; then
     echo "Android emulator process exited during framework boot." >&2
     exit 1
   fi
-  state="$(timeout 10s adb -s "$DEVICE" get-state 2>/dev/null || true)"
-  boot="$(timeout 10s adb -s "$DEVICE" shell getprop sys.boot_completed 2>/dev/null | tr -d "\r" || true)"
-  package_service="$(timeout 10s adb -s "$DEVICE" shell service check package 2>/dev/null | tr -d "\r" || true)"
-  activity_service="$(timeout 10s adb -s "$DEVICE" shell service check activity 2>/dev/null | tr -d "\r" || true)"
-  if [[ "$state" == "device" && "$boot" == "1" && "$package_service" == *"found"* && "$activity_service" == *"found"* ]]; then
-    ready=1
-    break
+
+  state="$(timeout 3s adb -s "$DEVICE" get-state 2>/dev/null || true)"
+  if [[ "$state" == "device" ]]; then
+    boot="$(timeout 3s adb -s "$DEVICE" shell getprop sys.boot_completed 2>/dev/null | tr -d "\r" || true)"
+    if [[ "$boot" == "1" ]]; then
+      package_service="$(timeout 3s adb -s "$DEVICE" shell service check package 2>/dev/null | tr -d "\r" || true)"
+      activity_service="$(timeout 3s adb -s "$DEVICE" shell service check activity 2>/dev/null | tr -d "\r" || true)"
+      if [[ "$package_service" == *"found"* && "$activity_service" == *"found"* ]]; then
+        ready=1
+        break
+      fi
+    fi
   fi
   sleep 2
 done
 
 if [[ "$ready" -ne 1 ]]; then
   echo "Android emulator did not reach framework-ready state within 10 minutes." >&2
-  adb devices -l >&2 || true
+  timeout 5s adb devices -l >&2 || true
   exit 1
 fi
 
