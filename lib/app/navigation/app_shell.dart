@@ -2127,6 +2127,14 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   }
 
   Future<void> _openFixedRoutes() async {
+    final selectedRoute = _selectedRoute;
+    if (_workspace == null &&
+        selectedRoute != null &&
+        _fieldDataClient != null) {
+      await _loadWorkspace(selectedRoute);
+      if (!mounted) return;
+    }
+
     await _pushContent<void>(
       MaterialPageRoute<void>(
         builder: (context) => FixedRoutesPage(
