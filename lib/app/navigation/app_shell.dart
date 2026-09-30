@@ -2072,6 +2072,14 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     );
   }
 
+  Future<void> _openSettings() async {
+    await _contentNavigator.push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => const SettingsPage(),
+      ),
+    );
+  }
+
   Future<void> _openFixedRoutes() async {
     await _contentNavigator.push<void>(
       MaterialPageRoute<void>(
@@ -2204,6 +2212,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
         onCustomerOnboarding: _customerBoundaryClient == null
             ? null
             : () => _openCustomerOnboarding(),
+        onSettings: _openSettings,
         syncStatus: _syncStatus,
         onRetrySync: _localPersistenceReady ? _syncPendingWork : null,
         onLogout: widget.onLogout,

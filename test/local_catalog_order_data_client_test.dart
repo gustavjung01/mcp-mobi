@@ -109,7 +109,7 @@ void main() {
       scope: scope,
     );
 
-    final results = await client.searchProducts(query: 'tra dao');
+    final results = await client.searchProducts(query: 'TD01');
 
     expect(results.single.variantId, 'variant-1');
     expect(results.single.price, 340000);

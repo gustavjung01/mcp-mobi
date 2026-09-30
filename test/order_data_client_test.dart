@@ -19,6 +19,7 @@ void main() {
     'order client uses MCP core-sales contract without commercial fields',
     () async {
       final seen = <String>[];
+      var productSearchCount = 0;
       final client = HttpOrderDataClient(
         profile: InstallationProfile(
           name: 'Hưng Phát',
@@ -30,9 +31,10 @@ void main() {
           expect(request.headers['authorization'], 'Bearer mobile-token');
 
           if (request.url.path == '/api/core-sales/products/search') {
+            productSearchCount += 1;
             expect(
               request.url.queryParameters['includePrice'],
-              request.url.queryParameters['catalog'] == 'all' ? 'false' : anyOf('false', 'true'),
+              productSearchCount == 1 ? 'false' : 'true',
             );
             return jsonResponse(
               {

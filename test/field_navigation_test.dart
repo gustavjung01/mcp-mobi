@@ -1058,6 +1058,19 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('app-bottom-navigation')), findsOneWidget);
+
+    await tester.tap(navLabel('Điểm bán'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('outlet-row-outlet-1')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('outlet-detail-screen')), findsOneWidget);
+    expect(find.byKey(const Key('app-bottom-navigation')), findsOneWidget);
+
+    await tester.tap(navLabel('Thêm'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('more-screen')), findsOneWidget);
+    expect(find.byKey(const Key('app-bottom-navigation')), findsOneWidget);
   });
 
   testWidgets('selected route is restored after app restart', (
