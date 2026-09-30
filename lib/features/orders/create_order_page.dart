@@ -191,6 +191,7 @@ class _CreateOrderPageState extends State<CreateOrderPage> {
       if (!mounted || generation != _productLoadGeneration) return;
       setState(() {
         _products = products;
+        _loadingProducts = false;
         _knownCategories = {
           ..._knownCategories,
           ...products.map((item) => item.category).whereType<String>(),

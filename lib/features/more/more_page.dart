@@ -18,6 +18,7 @@ class MorePage extends StatelessWidget {
     this.onTasks,
     this.onManagementProposals,
     this.onCustomerOnboarding,
+    this.onSettings,
     this.syncStatus = const AppSyncStatus.synced(),
     this.onRetrySync,
     this.onLogout,
@@ -32,6 +33,7 @@ class MorePage extends StatelessWidget {
   final VoidCallback? onTasks;
   final VoidCallback? onManagementProposals;
   final VoidCallback? onCustomerOnboarding;
+  final VoidCallback? onSettings;
   final AppSyncStatus syncStatus;
   final VoidCallback? onRetrySync;
   final Future<void> Function()? onLogout;
@@ -110,7 +112,7 @@ class MorePage extends StatelessWidget {
                       'Kế hoạch & Công việc' => onTasks,
                       'Đề xuất' => onManagementProposals,
                       'Mở hoặc liên kết mã khách' => onCustomerOnboarding,
-                      'Thiết lập' => () {
+                      'Thiết lập' => onSettings ?? () {
                         Navigator.of(context).push(
                           MaterialPageRoute<void>(
                             builder: (_) => const SettingsPage(),

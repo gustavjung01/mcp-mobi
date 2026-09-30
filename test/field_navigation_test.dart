@@ -571,6 +571,7 @@ void main() {
     expect(find.text('Tuyến Quận 3'), findsWidgets);
     expect(find.text('Quận 3'), findsWidgets);
     expect(find.byKey(const Key('outlet-checkin-button')), findsNothing);
+    expect(find.byKey(const Key('app-bottom-navigation')), findsOneWidget);
   });
 
   testWidgets('today next outlet keeps active route context', (
@@ -714,7 +715,15 @@ void main() {
             locationUpdates += 1;
             expect(routeCustomerId, 'outlet-map');
             expect(customerName, 'Đại lý Bản Đồ');
-            return true;
+            return const OutletLocationUpdateResult(
+              gps: FieldGps(
+                lat: 10.75,
+                lng: 106.67,
+                accuracyMeters: 8,
+                updatedAt: '2026-09-30T08:00:00Z',
+              ),
+              synced: true,
+            );
           },
         ),
       ),
@@ -734,6 +743,10 @@ void main() {
     expect(mapCalls, 1);
     expect(locationUpdates, 1);
     expect(find.text('Đã cập nhật vị trí điểm bán.'), findsOneWidget);
+    expect(find.byKey(const Key('outlet-location-coordinates')), findsOneWidget);
+    expect(find.textContaining('10.750000, 106.670000'), findsOneWidget);
+    expect(find.byKey(const Key('outlet-location-link')), findsOneWidget);
+    expect(find.byKey(const Key('outlet-copy-location-link')), findsOneWidget);
   });
 
   testWidgets('management proposals are hidden without report permission', (
@@ -838,8 +851,15 @@ void main() {
     await tester.tap(find.byKey(orderKey));
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const Key('create-order-screen')), findsOneWidget);
-    expect(find.text('Đại lý An Phát'), findsOneWidget);
+    final createOrderScreen = find.byKey(const Key('create-order-screen'));
+    expect(createOrderScreen, findsOneWidget);
+    expect(
+      find.descendant(
+        of: createOrderScreen,
+        matching: find.text('Đại lý An Phát'),
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets('customer directory exposes linked Company customers', (
@@ -969,10 +989,22 @@ void main() {
     expect(find.text('Tuyến Quận 1'), findsWidgets);
     expect(find.text('Nguyễn Văn A'), findsOneWidget);
     expect(find.text('26/09/2026'), findsOneWidget);
-    expect(
-      find.byKey(const Key('fixed-route-customer-customer-1')),
-      findsOneWidget,
+
+    final customerCard =
+        find.byKey(const Key('fixed-route-customer-customer-1'));
+    final fixedRoutesList = find.descendant(
+      of: find.byKey(const Key('fixed-routes-screen')),
+      matching: find.byType(ListView),
     );
+    expect(fixedRoutesList, findsOneWidget);
+    for (var attempt = 0;
+        attempt < 4 && customerCard.evaluate().isEmpty;
+        attempt++) {
+      await tester.drag(fixedRoutesList, const Offset(0, -240));
+      await tester.pumpAndSettle();
+    }
+
+    expect(customerCard, findsOneWidget);
     expect(find.byKey(const Key('route-finish-button')), findsNothing);
   });
 
@@ -1044,6 +1076,19 @@ void main() {
     await tester.drag(list, const Offset(0, -240));
     await tester.pumpAndSettle();
 
+    expect(find.byKey(const Key('app-bottom-navigation')), findsOneWidget);
+
+    await tester.tap(navLabel('Điểm bán'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('outlet-row-outlet-1')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('outlet-detail-screen')), findsOneWidget);
+    expect(find.byKey(const Key('app-bottom-navigation')), findsOneWidget);
+
+    await tester.tap(navLabel('Thêm'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('more-screen')), findsOneWidget);
     expect(find.byKey(const Key('app-bottom-navigation')), findsOneWidget);
   });
 

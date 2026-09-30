@@ -19,6 +19,7 @@ void main() {
     'order client uses MCP core-sales contract without commercial fields',
     () async {
       final seen = <String>[];
+      var productSearchCount = 0;
       final client = HttpOrderDataClient(
         profile: InstallationProfile(
           name: 'Hưng Phát',
@@ -30,7 +31,11 @@ void main() {
           expect(request.headers['authorization'], 'Bearer mobile-token');
 
           if (request.url.path == '/api/core-sales/products/search') {
-            expect(request.url.queryParameters['includePrice'], 'true');
+            productSearchCount += 1;
+            expect(
+              request.url.queryParameters['includePrice'],
+              productSearchCount == 1 ? 'false' : 'true',
+            );
             return jsonResponse(
               {
                 'data': [
@@ -135,6 +140,8 @@ void main() {
 
       final products = await client.searchProducts(query: 'trà');
       expect(products.single.price, 125000);
+      final prices = await client.loadFreshPrices(query: 'trà');
+      expect(prices['variant-1'], 125000);
       expect(products.single.purchaseUnitLabel, 'Lẻ');
       expect(products.single.purchaseUnitDetail, contains('THÙNG 12'));
 
@@ -157,6 +164,7 @@ void main() {
       expect(
         seen,
         [
+          'GET /api/core-sales/products/search',
           'GET /api/core-sales/products/search',
           'GET /api/core-sales/orders',
           'POST /api/core-sales/orders',
