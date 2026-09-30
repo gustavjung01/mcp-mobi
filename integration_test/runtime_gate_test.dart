@@ -94,13 +94,17 @@ void main() {
 
       await _reportSettings(activities, config.runId);
       await _orderReplay(orders, current, config);
+      await _customerBoundary(customers, config.boundaryRouteCustomerId);
+      await _mediaBoundary(
+        media,
+        config.boundaryRouteCustomerId,
+        config.runId,
+      );
       await _routeSessionChain(
         field: field,
         routes: routes,
         activities: activities,
         history: history,
-        customers: customers,
-        media: media,
         proposals: proposals,
         session: current,
         runId: config.runId,
@@ -294,8 +298,6 @@ Future<void> _routeSessionChain({
   required HttpRouteManagementClient routes,
   required HttpFieldActivityClient activities,
   required HttpFieldHistoryClient history,
-  required HttpCustomerBoundaryClient customers,
-  required HttpOutletMediaClient media,
   required HttpManagementProposalClient proposals,
   required MobileSession session,
   required String runId,
@@ -387,9 +389,6 @@ Future<void> _routeSessionChain({
         'mcp.route-customer.runtime-location',
       ),
     );
-
-    await _customerBoundary(customers, customer.id);
-    await _mediaBoundary(media, customer.id, runId);
 
     await field.openRouteSession(
       routeId: route.id,
@@ -676,6 +675,7 @@ class _RuntimeGateConfig {
     required this.orderCustomerId,
     required this.orderCustomerAddressId,
     required this.orderVariantId,
+    required this.boundaryRouteCustomerId,
     required this.runId,
   });
 
@@ -692,6 +692,9 @@ class _RuntimeGateConfig {
         'MCP_RUNTIME_ORDER_CUSTOMER_ADDRESS_ID',
       ),
       orderVariantId: String.fromEnvironment('MCP_RUNTIME_ORDER_VARIANT_ID'),
+      boundaryRouteCustomerId: String.fromEnvironment(
+        'MCP_RUNTIME_BOUNDARY_ROUTE_CUSTOMER_ID',
+      ),
       runId: String.fromEnvironment('MCP_RUNTIME_RUN_ID'),
     );
   }
@@ -705,6 +708,7 @@ class _RuntimeGateConfig {
   final String orderCustomerId;
   final String orderCustomerAddressId;
   final String orderVariantId;
+  final String boundaryRouteCustomerId;
   final String runId;
 
   void validate() {
@@ -736,6 +740,7 @@ class _RuntimeGateConfig {
       'MCP_RUNTIME_ORDER_CUSTOMER_ID': orderCustomerId,
       'MCP_RUNTIME_ORDER_CUSTOMER_ADDRESS_ID': orderCustomerAddressId,
       'MCP_RUNTIME_ORDER_VARIANT_ID': orderVariantId,
+      'MCP_RUNTIME_BOUNDARY_ROUTE_CUSTOMER_ID': boundaryRouteCustomerId,
       'MCP_RUNTIME_RUN_ID': runId,
     };
     final missing = required.entries

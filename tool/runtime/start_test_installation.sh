@@ -16,6 +16,8 @@ CUSTOMER_ADDRESS_ID="96666666-6666-4666-8666-666666666666"
 VARIANT_ID="99999999-9999-4999-8999-999999999999"
 LOGIN_NAME="e2e.workforce"
 R2_BUCKET="mcp-l7-runtime"
+BOUNDARY_ROUTE_ID="route_l7_customer_boundary"
+BOUNDARY_ROUTE_CUSTOMER_ID="route_customer_l7_customer_boundary"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WORKSPACE="$(cd "$SCRIPT_DIR/../.." && pwd)"
@@ -90,6 +92,74 @@ echo "Preparing workforce and commercial fixtures..."
   DATABASE_SSL_MODE=disable \
   INSTALLATION_ID="$INSTALLATION_ID" \
   node npp-core/api/scripts/prepare-mcp-mobile-runtime-e2e.js
+
+  echo "Preparing assigned MCP customer-boundary fixture..."
+  RUNTIME_INSTALLATION_ID="$INSTALLATION_ID" \
+  RUNTIME_EMPLOYEE_ID="$EMPLOYEE_ID" \
+  RUNTIME_BOUNDARY_ROUTE_ID="$BOUNDARY_ROUTE_ID" \
+  RUNTIME_BOUNDARY_ROUTE_CUSTOMER_ID="$BOUNDARY_ROUTE_CUSTOMER_ID" \
+  node --input-type=module <<'NODE'
+import pg from 'pg';
+
+const { Pool } = pg;
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+const client = await pool.connect();
+try {
+  await client.query('BEGIN');
+  await client.query(
+    `INSERT INTO mcp.mcp_routes (
+       id, installation_id, route_name, area, sales, active, note, raw_payload
+     ) VALUES ($1,$2,'Tuyến xác minh L7','Runtime Gate',$3,true,
+       'Fixture xác minh khách Mobile L7','{"fixture":"mobile-l7-customer-boundary"}'::jsonb)
+     ON CONFLICT (id) DO UPDATE
+     SET installation_id = EXCLUDED.installation_id,
+         route_name = EXCLUDED.route_name,
+         area = EXCLUDED.area,
+         sales = EXCLUDED.sales,
+         active = true,
+         note = EXCLUDED.note,
+         raw_payload = EXCLUDED.raw_payload,
+         updated_at = now()`,
+    [
+      process.env.RUNTIME_BOUNDARY_ROUTE_ID,
+      process.env.RUNTIME_INSTALLATION_ID,
+      process.env.RUNTIME_EMPLOYEE_ID,
+    ],
+  );
+  await client.query(
+    `INSERT INTO mcp.mcp_route_customers (
+       id, installation_id, route_id, customer_name, phone, area, address,
+       sort_order, active, note, raw_payload
+     ) VALUES ($1,$2,$3,'Điểm bán xác minh L7','0900000001','Runtime Gate',
+       'Địa chỉ xác minh L7',0,true,'Fixture xác minh khách Mobile L7',
+       '{"fixture":"mobile-l7-customer-boundary"}'::jsonb)
+     ON CONFLICT (id) DO UPDATE
+     SET installation_id = EXCLUDED.installation_id,
+         route_id = EXCLUDED.route_id,
+         customer_name = EXCLUDED.customer_name,
+         phone = EXCLUDED.phone,
+         area = EXCLUDED.area,
+         address = EXCLUDED.address,
+         sort_order = EXCLUDED.sort_order,
+         active = true,
+         note = EXCLUDED.note,
+         raw_payload = EXCLUDED.raw_payload,
+         updated_at = now()`,
+    [
+      process.env.RUNTIME_BOUNDARY_ROUTE_CUSTOMER_ID,
+      process.env.RUNTIME_INSTALLATION_ID,
+      process.env.RUNTIME_BOUNDARY_ROUTE_ID,
+    ],
+  );
+  await client.query('COMMIT');
+} catch (error) {
+  await client.query('ROLLBACK');
+  throw error;
+} finally {
+  client.release();
+  await pool.end();
+}
+NODE
 )
 
 echo "Starting local S3-compatible object storage..."
@@ -216,6 +286,7 @@ payload = {
     "MCP_RUNTIME_ORDER_CUSTOMER_ID": "$CUSTOMER_ID",
     "MCP_RUNTIME_ORDER_CUSTOMER_ADDRESS_ID": "$CUSTOMER_ADDRESS_ID",
     "MCP_RUNTIME_ORDER_VARIANT_ID": "$VARIANT_ID",
+    "MCP_RUNTIME_BOUNDARY_ROUTE_CUSTOMER_ID": "$BOUNDARY_ROUTE_CUSTOMER_ID",
     "MCP_RUNTIME_RUN_ID": os.environ["MCP_RUNTIME_RUN_ID"],
 }
 with open(os.environ["RUNTIME_CONFIG"], "w", encoding="utf-8") as handle:
